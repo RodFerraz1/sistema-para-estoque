@@ -87,6 +87,8 @@ def make_fornecedor_sku(
         moq_unidades=moq_unidades,
         lead_time_dias_contratado=fornecedor.lead_time_dias_contratado,
         lead_time_dias_observado=lead_time_dias_observado,
+        prazo_pagamento_padrao=fornecedor.prazo_pagamento_padrao,
+        pedido_minimo_reais=fornecedor.pedido_minimo_reais,
         ativo=ativo,
     )
 

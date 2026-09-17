@@ -27,6 +27,8 @@ class FornecedorResponse(BaseModel):
     moq_unidades: int
     lead_time_dias_contratado: int
     lead_time_dias_observado: int | None
+    prazo_pagamento_padrao: str
+    pedido_minimo_reais: int
 
 
 class AnaliseSKUResponse(BaseModel):
@@ -39,3 +41,20 @@ class AnaliseSKUResponse(BaseModel):
     giro: GiroResponse
     cobertura: Cobertura
     fornecedores: list[FornecedorResponse]
+
+
+class SKUAbaixoDoPisoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    produto_nome: str
+    cobertura_meses: float
+
+
+class VendaMensalResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    ano: int
+    mes: int
+    quantidade_unidades: int
+    valor_total_reais: int

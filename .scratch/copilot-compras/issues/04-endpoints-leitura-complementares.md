@@ -1,6 +1,6 @@
 # 04: Endpoints de leitura complementares
 
-**Status:** ready-for-agent
+**Status:** shipped
 **Blocked by:** 03 (Análise de SKU end-to-end)
 **Spec:** `.scratch/copilot-compras/spec.md`
 
@@ -10,12 +10,12 @@ O comprador chefe consegue: listar SKUs abaixo do piso de estoque pra priorizar 
 
 ## Acceptance criteria
 
-- [ ] `GET /skus/abaixo-do-piso?dias=20` retorna lista de SKUs com cobertura abaixo do piso (padrão 20 dias, parametrizável). Cada item inclui `sku_code`, nome, cobertura em meses.
-- [ ] `Inventory.abaixo_do_piso(dias_piso)` implementado convertendo dias para meses (`dias_piso / 30`) e comparando com cobertura de cada SKU.
-- [ ] `GET /skus/{sku_code}/vendas?meses=12` retorna série mensal de vendas (mês + quantidade + valor total) pra janela solicitada.
-- [ ] `Sales.historico_vendas(sku_id, meses)` implementado.
-- [ ] `GET /skus/{sku_code}/sazonalidade` retorna dict `{mes: multiplicador}` com 12 entradas, calculado conforme regra do spec (média das vendas naquele mês nos últimos 24 meses / média geral do período).
-- [ ] `Sales.sazonalidade(sku_id)` implementado.
-- [ ] `GET /skus/{sku_code}/fornecedores` retorna lista de fornecedores que suprem o SKU, cada um com nome, preço unitário atual, MOQ, lead time contratado, lead time observado, prazo de pagamento, pedido mínimo do fornecedor.
-- [ ] Cada endpoint tem pelo menos 1 teste feliz e 1 edge case (SKU inexistente, SKU sem vendas suficientes pra sazonalidade, lista abaixo-do-piso vazia).
-- [ ] Endpoints reutilizam a mesma injeção de `erp_adapter` estabelecida no ticket 03.
+- [x] `GET /skus/abaixo-do-piso?dias=20` retorna lista de SKUs com cobertura abaixo do piso (padrão 20 dias, parametrizável). Cada item inclui `sku_code`, nome, cobertura em meses.
+- [x] `Inventory.abaixo_do_piso(dias_piso)` implementado convertendo dias para meses (`dias_piso / 30`) e comparando com cobertura de cada SKU.
+- [x] `GET /skus/{sku_code}/vendas?meses=12` retorna série mensal de vendas (mês + quantidade + valor total) pra janela solicitada.
+- [x] `Sales.historico_vendas(sku_id, meses)` implementado.
+- [x] `GET /skus/{sku_code}/sazonalidade` retorna dict `{mes: multiplicador}` com 12 entradas, calculado conforme regra do spec (média das vendas naquele mês nos últimos 24 meses / média geral do período).
+- [x] `Sales.sazonalidade(sku_id)` implementado.
+- [x] `GET /skus/{sku_code}/fornecedores` retorna lista de fornecedores que suprem o SKU, cada um com nome, preço unitário atual, MOQ, lead time contratado, lead time observado, prazo de pagamento, pedido mínimo do fornecedor.
+- [x] Cada endpoint tem pelo menos 1 teste feliz e 1 edge case (SKU inexistente, SKU sem vendas suficientes pra sazonalidade, lista abaixo-do-piso vazia).
+- [x] Endpoints reutilizam a mesma injeção de `erp_adapter` estabelecida no ticket 03.

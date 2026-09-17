@@ -104,3 +104,117 @@ def test_giro_apenas_mes_corrente_sem_meses_fechados() -> None:
 
     assert giro.unidades_por_mes == 0.0
     assert giro.meses_considerados == 0
+
+
+def test_historico_vendas_retorna_serie_zero_fill() -> None:
+    """Série mensal completa (zero-fill) do mais antigo pro mais recente."""
+    sku = make_sku("A")
+    vendas = [
+        make_venda(sku, datetime(2026, 6, 10, tzinfo=UTC), 40, key="jun",
+                   valor_unitario_reais=1000),
+        make_venda(sku, datetime(2026, 6, 20, tzinfo=UTC), 10, key="jun2",
+                   valor_unitario_reais=1000),
+        make_venda(sku, datetime(2026, 8, 5, tzinfo=UTC), 20, key="ago",
+                   valor_unitario_reais=1500),
+    ]
+    sales = _sales_at_now(skus=[sku], vendas=vendas)
+
+    historico = sales.historico_vendas(sku.id, meses=3)
+
+    assert len(historico) == 3
+    assert (historico[0].ano, historico[0].mes) == (2026, 6)
+    assert historico[0].quantidade_unidades == 50
+    assert historico[0].valor_total_reais == 50 * 1000
+    assert (historico[1].ano, historico[1].mes) == (2026, 7)
+    assert historico[1].quantidade_unidades == 0
+    assert historico[1].valor_total_reais == 0
+    assert (historico[2].ano, historico[2].mes) == (2026, 8)
+    assert historico[2].quantidade_unidades == 20
+    assert historico[2].valor_total_reais == 20 * 1500
+
+
+def test_historico_vendas_ignora_mes_corrente_parcial() -> None:
+    sku = make_sku("A")
+    vendas = [
+        make_venda(sku, datetime(2026, 8, 15, tzinfo=UTC), 10, key="ago"),
+        make_venda(sku, datetime(2026, 9, 10, tzinfo=UTC), 9999, key="set"),
+    ]
+    sales = _sales_at_now(skus=[sku], vendas=vendas)
+
+    historico = sales.historico_vendas(sku.id, meses=2)
+
+    meses = {(h.ano, h.mes) for h in historico}
+    assert (2026, 9) not in meses
+    assert (2026, 8) in meses
+
+
+def test_historico_vendas_sku_sem_vendas_retorna_serie_zero() -> None:
+    sku = make_sku("A")
+    sales = _sales_at_now(skus=[sku], vendas=[])
+
+    historico = sales.historico_vendas(sku.id, meses=3)
+
+    assert len(historico) == 3
+    assert all(h.quantidade_unidades == 0 for h in historico)
+    assert all(h.valor_total_reais == 0 for h in historico)
+
+
+def test_historico_vendas_sku_inexistente_retorna_serie_zero() -> None:
+    sales = _sales_at_now()
+
+    historico = sales.historico_vendas(uid("sku", "fantasma"), meses=2)
+
+    assert len(historico) == 2
+    assert all(h.quantidade_unidades == 0 for h in historico)
+
+
+def test_sazonalidade_com_pattern_definido() -> None:
+    """Vende 100 em jul de 2025+2026 e 50 nos outros meses do período de 24 meses.
+    Jul deve ficar acima de 1.0, os outros abaixo."""
+    sku = make_sku("A")
+    vendas: list = []
+    for ano in (2024, 2025, 2026):
+        for mes in range(1, 13):
+            if ano == 2024 and mes < 9:
+                continue
+            if ano == 2026 and mes >= 9:
+                continue
+            qty = 100 if mes == 7 else 50
+            vendas.append(
+                make_venda(
+                    sku, datetime(ano, mes, 15, tzinfo=UTC), qty,
+                    key=f"{ano}-{mes:02d}",
+                )
+            )
+    sales = _sales_at_now(skus=[sku], vendas=vendas)
+
+    sazo = sales.sazonalidade(sku.id)
+
+    assert sazo.meses_considerados == 24
+    assert len(sazo.multiplicadores) == 12
+    assert sazo.multiplicadores[7] > 1.0
+    for m in (1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12):
+        assert sazo.multiplicadores[m] < 1.0
+    # A soma dos multiplicadores (ponderada pelas ocorrências, 2 cada) / 24
+    # deve ser 1.0 (por definição).
+    soma_pond = sum(sazo.multiplicadores[m] * 2 for m in range(1, 13))
+    assert abs(soma_pond / 24 - 1.0) < 1e-9
+
+
+def test_sazonalidade_sku_sem_vendas_retorna_neutro() -> None:
+    sku = make_sku("A")
+    sales = _sales_at_now(skus=[sku], vendas=[])
+
+    sazo = sales.sazonalidade(sku.id)
+
+    assert sazo.meses_considerados == 0
+    assert sazo.multiplicadores == {m: 1.0 for m in range(1, 13)}
+
+
+def test_sazonalidade_sku_inexistente_retorna_neutro() -> None:
+    sales = _sales_at_now()
+
+    sazo = sales.sazonalidade(uid("sku", "fantasma"))
+
+    assert sazo.meses_considerados == 0
+    assert sazo.multiplicadores == {m: 1.0 for m in range(1, 13)}

@@ -8,7 +8,8 @@ from __future__ import annotations
 from uuid import UUID
 
 from src.erp_adapter.port import ERPAdapter
-from src.inventory.schemas import Cobertura, Estoque
+from src.erp_adapter.schemas import FiltrosSKU
+from src.inventory.schemas import Cobertura, Estoque, SKUAbaixoDoPiso
 from src.sales.service import Sales
 
 
@@ -37,3 +38,30 @@ class Inventory:
             meses=disponivel / giro.unidades_por_mes,
             sem_giro=False,
         )
+
+    def abaixo_do_piso(self, dias_piso: int = 20) -> list[SKUAbaixoDoPiso]:
+        """SKUs ativos com cobertura abaixo do piso, ordenados por urgência.
+
+        Converte `dias_piso` em meses via `dias_piso / 30`. SKUs sem giro
+        (cobertura indefinida) ficam de fora - sem demanda, não há alerta
+        de reposição.
+        """
+        piso_meses = dias_piso / 30
+        skus = self._erp.list_skus_raw(FiltrosSKU(ativo=True))
+        alertas: list[SKUAbaixoDoPiso] = []
+        for sku in skus:
+            cobertura = self.cobertura_meses(sku.id)
+            if cobertura.meses is None:
+                continue
+            if cobertura.meses >= piso_meses:
+                continue
+            alertas.append(
+                SKUAbaixoDoPiso(
+                    sku_id=sku.id,
+                    sku_code=sku.sku_code,
+                    produto_nome=sku.produto_nome,
+                    cobertura_meses=cobertura.meses,
+                )
+            )
+        alertas.sort(key=lambda a: a.cobertura_meses)
+        return alertas

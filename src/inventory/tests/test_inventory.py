@@ -88,3 +88,102 @@ def test_cobertura_zero_quando_estoque_zero_e_ha_giro() -> None:
 
     assert cobertura.sem_giro is False
     assert cobertura.meses == 0.0
+
+
+def _vendas_giro_60(sku, key_prefix: str = "") -> list:
+    return [
+        make_venda(sku, datetime(2026, m, 10, tzinfo=UTC), 60,
+                   key=f"{key_prefix}{m}")
+        for m in range(3, 9)
+    ]
+
+
+def test_abaixo_do_piso_retorna_apenas_skus_em_alerta() -> None:
+    baixo = make_sku("BAIXO", produto_nome="Toalha Baixa")
+    alto = make_sku("ALTO", produto_nome="Toalha Alta")
+    inv = _inv(
+        skus=[baixo, alto],
+        estoques=[
+            make_estoque(baixo, disponivel=20),
+            make_estoque(alto, disponivel=500),
+        ],
+        vendas=_vendas_giro_60(baixo, "b") + _vendas_giro_60(alto, "a"),
+    )
+
+    resultado = inv.abaixo_do_piso(dias_piso=20)
+
+    assert len(resultado) == 1
+    assert resultado[0].sku_code == "BAIXO"
+    assert resultado[0].produto_nome == "Toalha Baixa"
+    assert resultado[0].cobertura_meses == 20 / 60
+
+
+def test_abaixo_do_piso_ordena_por_cobertura_crescente() -> None:
+    urgente = make_sku("URG")
+    menos = make_sku("MENOS")
+    inv = _inv(
+        skus=[menos, urgente],
+        estoques=[
+            make_estoque(urgente, disponivel=5),
+            make_estoque(menos, disponivel=25),
+        ],
+        vendas=_vendas_giro_60(urgente, "u") + _vendas_giro_60(menos, "m"),
+    )
+
+    resultado = inv.abaixo_do_piso(dias_piso=20)
+
+    assert [r.sku_code for r in resultado] == ["URG", "MENOS"]
+
+
+def test_abaixo_do_piso_ignora_sku_sem_giro() -> None:
+    sku = make_sku("SEM-VENDAS")
+    inv = _inv(
+        skus=[sku],
+        estoques=[make_estoque(sku, disponivel=0)],
+        vendas=[],
+    )
+
+    assert inv.abaixo_do_piso(dias_piso=20) == []
+
+
+def test_abaixo_do_piso_ignora_sku_inativo() -> None:
+    ativo = make_sku("ATIVO")
+    inativo = make_sku("INATIVO", ativo=False)
+    inv = _inv(
+        skus=[ativo, inativo],
+        estoques=[
+            make_estoque(ativo, disponivel=10),
+            make_estoque(inativo, disponivel=1),
+        ],
+        vendas=_vendas_giro_60(ativo, "a") + _vendas_giro_60(inativo, "i"),
+    )
+
+    resultado = inv.abaixo_do_piso(dias_piso=20)
+
+    assert [r.sku_code for r in resultado] == ["ATIVO"]
+
+
+def test_abaixo_do_piso_lista_vazia_quando_ninguem_abaixo() -> None:
+    sku = make_sku("A")
+    inv = _inv(
+        skus=[sku],
+        estoques=[make_estoque(sku, disponivel=1000)],
+        vendas=_vendas_giro_60(sku),
+    )
+
+    assert inv.abaixo_do_piso(dias_piso=20) == []
+
+
+def test_abaixo_do_piso_parametro_dias_muda_limite() -> None:
+    """Cobertura de ~0.83 meses (25/30): abaixo de 30d (1.0), acima de 20d (0.667)."""
+    sku = make_sku("A")
+    inv = _inv(
+        skus=[sku],
+        estoques=[make_estoque(sku, disponivel=25)],
+        vendas=_vendas_giro_60(sku),
+    )
+
+    # cobertura = 25/60 = 0.417 meses. Piso 20d = 0.667 -> abaixo.
+    # Piso 10d = 0.333 -> acima.
+    assert len(inv.abaixo_do_piso(dias_piso=20)) == 1
+    assert inv.abaixo_do_piso(dias_piso=10) == []

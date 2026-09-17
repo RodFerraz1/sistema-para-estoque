@@ -33,6 +33,8 @@ def _to_fornecedor(raw: FornecedorSKURaw) -> FornecedorParaSKU:
         moq_unidades=raw.moq_unidades,
         lead_time_dias_contratado=raw.lead_time_dias_contratado,
         lead_time_dias_observado=raw.lead_time_dias_observado,
+        prazo_pagamento_padrao=raw.prazo_pagamento_padrao,
+        pedido_minimo_reais=raw.pedido_minimo_reais,
     )
 
 

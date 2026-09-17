@@ -112,3 +112,187 @@ def test_analise_sku_sem_vendas_marca_sem_giro() -> None:
     assert body["cobertura"]["sem_giro"] is True
     assert body["cobertura"]["meses"] is None
     assert body["fornecedores"] == []
+
+
+def _adapter_com_dois_skus_um_urgente() -> InMemoryERPAdapter:
+    urgente = make_sku("URG", produto_nome="Urgente")
+    tranquilo = make_sku("OK", produto_nome="Tranquilo")
+    vendas = [
+        make_venda(urgente, datetime(2026, m, 10, tzinfo=UTC), 60, key=f"u{m}")
+        for m in range(3, 9)
+    ] + [
+        make_venda(tranquilo, datetime(2026, m, 10, tzinfo=UTC), 60, key=f"t{m}")
+        for m in range(3, 9)
+    ]
+    return InMemoryERPAdapter(
+        skus=[urgente, tranquilo],
+        estoques=[
+            make_estoque(urgente, disponivel=10),
+            make_estoque(tranquilo, disponivel=1000),
+        ],
+        vendas=vendas,
+    )
+
+
+def test_abaixo_do_piso_retorna_apenas_skus_em_alerta() -> None:
+    client = _client(_adapter_com_dois_skus_um_urgente())
+    try:
+        response = client.get("/skus/abaixo-do-piso")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["sku_code"] == "URG"
+    assert body[0]["produto_nome"] == "Urgente"
+    assert body[0]["cobertura_meses"] > 0
+    assert set(body[0].keys()) == {"sku_code", "produto_nome", "cobertura_meses"}
+
+
+def test_abaixo_do_piso_dias_parametrizavel() -> None:
+    client = _client(_adapter_com_dois_skus_um_urgente())
+    try:
+        # Piso 1 dia = 0.033 meses. Cobertura URG = 10/60 = 0.167 > 0.033.
+        # Ninguém abaixo.
+        response = client.get("/skus/abaixo-do-piso?dias=1")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_abaixo_do_piso_lista_vazia() -> None:
+    adapter = InMemoryERPAdapter(skus=[])
+    client = _client(adapter)
+    try:
+        response = client.get("/skus/abaixo-do-piso")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_vendas_retorna_serie_mensal() -> None:
+    client = _client(_adapter_completo())
+    try:
+        response = client.get("/skus/TBC-BEG-70140/vendas?meses=6")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 6
+    for entry in body:
+        assert "ano" in entry and "mes" in entry
+        assert "quantidade_unidades" in entry
+        assert "valor_total_reais" in entry
+    assert body[0]["mes"] < body[-1]["mes"] or body[0]["ano"] < body[-1]["ano"]
+
+
+def test_vendas_sku_inexistente_retorna_404() -> None:
+    client = _client(_adapter_completo())
+    try:
+        response = client.get("/skus/NAO-EXISTE/vendas")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 404
+
+
+def test_vendas_sku_sem_vendas_retorna_serie_zerada() -> None:
+    sku = make_sku("SEM-VENDAS")
+    adapter = InMemoryERPAdapter(skus=[sku])
+    client = _client(adapter)
+    try:
+        response = client.get("/skus/SEM-VENDAS/vendas?meses=3")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 3
+    assert all(e["quantidade_unidades"] == 0 for e in body)
+
+
+def test_sazonalidade_retorna_doze_meses() -> None:
+    client = _client(_adapter_completo())
+    try:
+        response = client.get("/skus/TBC-BEG-70140/sazonalidade")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body.keys()) == {str(m) for m in range(1, 13)}
+    assert all(isinstance(v, float | int) for v in body.values())
+
+
+def test_sazonalidade_sku_inexistente_retorna_404() -> None:
+    client = _client(_adapter_completo())
+    try:
+        response = client.get("/skus/NAO-EXISTE/sazonalidade")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 404
+
+
+def test_sazonalidade_sku_sem_vendas_retorna_neutro() -> None:
+    sku = make_sku("SEM-VENDAS")
+    adapter = InMemoryERPAdapter(skus=[sku])
+    client = _client(adapter)
+    try:
+        response = client.get("/skus/SEM-VENDAS/sazonalidade")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert all(v == 1.0 for v in body.values())
+    assert len(body) == 12
+
+
+def test_fornecedores_endpoint_retorna_condicoes_completas() -> None:
+    client = _client(_adapter_completo())
+    try:
+        response = client.get("/skus/TBC-BEG-70140/fornecedores")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 2
+    for f in body:
+        assert "fornecedor_nome" in f
+        assert "preco_unitario_reais" in f
+        assert "moq_unidades" in f
+        assert "lead_time_dias_contratado" in f
+        assert "lead_time_dias_observado" in f
+        assert "prazo_pagamento_padrao" in f
+        assert "pedido_minimo_reais" in f
+
+
+def test_fornecedores_sku_inexistente_retorna_404() -> None:
+    client = _client(_adapter_completo())
+    try:
+        response = client.get("/skus/NAO-EXISTE/fornecedores")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 404
+
+
+def test_fornecedores_sku_sem_fornecedores_retorna_lista_vazia() -> None:
+    sku = make_sku("SOZINHO")
+    adapter = InMemoryERPAdapter(skus=[sku])
+    client = _client(adapter)
+    try:
+        response = client.get("/skus/SOZINHO/fornecedores")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    assert response.json() == []

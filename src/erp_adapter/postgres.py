@@ -116,6 +116,7 @@ class PostgresERPAdapter(ERPAdapter):
                     SELECT fs.fornecedor_id, fs.sku_id, f.nome AS fornecedor_nome,
                            fs.preco_unitario_atual, fs.moq_unidades,
                            f.lead_time_dias_contratado, fs.lead_time_dias_observado,
+                           f.prazo_pagamento_padrao, f.pedido_minimo_reais,
                            fs.ativo
                     FROM erp.fornecedores_skus fs
                     JOIN erp.fornecedores f ON f.id = fs.fornecedor_id
@@ -134,6 +135,8 @@ class PostgresERPAdapter(ERPAdapter):
                 moq_unidades=r.moq_unidades,
                 lead_time_dias_contratado=r.lead_time_dias_contratado,
                 lead_time_dias_observado=r.lead_time_dias_observado,
+                prazo_pagamento_padrao=r.prazo_pagamento_padrao,
+                pedido_minimo_reais=r.pedido_minimo_reais,
                 ativo=r.ativo,
             )
             for r in rows

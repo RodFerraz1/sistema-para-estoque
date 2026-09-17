@@ -51,6 +51,8 @@ class FornecedorSKURaw(_RawBase):
     moq_unidades: int
     lead_time_dias_contratado: int
     lead_time_dias_observado: int | None
+    prazo_pagamento_padrao: str
+    pedido_minimo_reais: int
     ativo: bool
 
 

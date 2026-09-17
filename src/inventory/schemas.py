@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
@@ -25,3 +26,18 @@ class Cobertura(BaseModel):
 
     meses: float | None
     sem_giro: bool
+
+
+class SKUAbaixoDoPiso(BaseModel):
+    """SKU com cobertura abaixo do piso configurado.
+
+    SKUs sem giro (cobertura indefinida) nunca aparecem aqui - sem demanda,
+    não há alerta de reposição.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    sku_id: UUID
+    sku_code: str
+    produto_nome: str
+    cobertura_meses: float
