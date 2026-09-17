@@ -22,10 +22,13 @@ def _db_available() -> bool:
         return False
 
 
-pytestmark = pytest.mark.skipif(
-    not _db_available(),
-    reason="Postgres com schema erp precisa estar disponível (docker compose up + alembic upgrade head)",
-)
+pytestmark = [
+    pytest.mark.smoke,
+    pytest.mark.skipif(
+        not _db_available(),
+        reason="Postgres com schema erp precisa estar disponível (docker compose up + alembic upgrade head)",
+    ),
+]
 
 
 @pytest.fixture(scope="module", autouse=True)
