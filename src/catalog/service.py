@@ -14,6 +14,7 @@ from src.erp_adapter.schemas import FornecedorSKURaw, SKURaw
 def _to_sku(raw: SKURaw) -> SKU:
     return SKU(
         id=raw.id,
+        produto_id=raw.produto_id,
         sku_code=raw.sku_code,
         produto_nome=raw.produto_nome,
         categoria=raw.produto_categoria,

@@ -12,6 +12,7 @@ class _CatalogDTO(BaseModel):
 
 class SKU(_CatalogDTO):
     id: UUID
+    produto_id: UUID
     sku_code: str
     produto_nome: str
     categoria: str
@@ -19,6 +20,22 @@ class SKU(_CatalogDTO):
     tamanho: str
     gramatura: int | None
     material: str | None
+    ativo: bool
+
+
+class Fornecedor(_CatalogDTO):
+    """Fornecedor do atacadista, independente de qualquer SKU.
+
+    `FornecedorParaSKU` é a visão comercial de um fornecedor *para um SKU
+    específico* (preço, MOQ); esta é a entidade em si.
+    """
+
+    id: UUID
+    nome: str
+    cnpj: str
+    prazo_pagamento_padrao: str
+    pedido_minimo_reais: int
+    lead_time_dias_contratado: int
     ativo: bool
 
 

@@ -15,6 +15,26 @@ class Estoque(BaseModel):
     atualizado_em: datetime
 
 
+class Movimentacao(BaseModel):
+    """Entrada ou saída de estoque de um SKU.
+
+    `referencia_tipo`/`referencia_id` apontam pro documento que originou a
+    movimentação (pedido de compra, venda); ambos são `None` para ajustes
+    manuais.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    sku_id: UUID
+    tipo: str
+    quantidade: int
+    data: datetime
+    referencia_tipo: str | None
+    referencia_id: UUID | None
+    observacao: str | None
+
+
 class Cobertura(BaseModel):
     """Cobertura em meses.
 

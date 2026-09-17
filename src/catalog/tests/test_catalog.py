@@ -21,6 +21,7 @@ def test_buscar_sku_por_codigo_encontra() -> None:
     assert encontrado.sku_code == "TBC-BEG-70140"
     assert encontrado.produto_nome == "Produto Teste"
     assert encontrado.categoria == "felpudo"
+    assert encontrado.produto_id == uid("produto", "Produto Teste")
 
 
 def test_buscar_sku_por_codigo_inexistente_retorna_none() -> None:

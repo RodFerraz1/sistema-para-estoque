@@ -1,7 +1,23 @@
 """DTOs de domínio do módulo `sales`."""
 from __future__ import annotations
 
+from datetime import datetime
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict
+
+
+class Venda(BaseModel):
+    """Uma venda individual de um SKU para um cliente varejista."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    sku_id: UUID
+    quantidade: int
+    valor_unitario_reais: int
+    data: datetime
+    cliente_ref: str
 
 
 class GiroMedioMensal(BaseModel):
