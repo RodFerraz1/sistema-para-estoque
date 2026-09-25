@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
+from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.schemas import (
     EstoqueRaw,
     FiltrosSKU,
@@ -17,6 +18,8 @@ from src.erp_adapter.schemas import (
     SKURaw,
     VendaRaw,
 )
+from src.inventory.schemas import Estoque, Movimentacao
+from src.sales.schemas import Venda
 
 
 class ERPAdapter(Protocol):
@@ -37,3 +40,27 @@ class ERPAdapter(Protocol):
     ) -> list[MovimentacaoRaw]: ...
 
     def list_vendas(self, sku_id: UUID, desde: datetime) -> list[VendaRaw]: ...
+
+    def carregar_sku(self, sku_code: str) -> SKU | None: ...
+
+    def listar_skus(self) -> list[SKU]:
+        """SKUs ativos, ordenados por `sku_code`."""
+        ...
+
+    def carregar_fornecedor(self, fornecedor_id: UUID) -> Fornecedor | None: ...
+
+    def fornecedores_de(self, sku_code: str) -> list[FornecedorParaSKU]:
+        """Só fornecedores ativos com vínculo ativo, do mais barato ao mais caro."""
+        ...
+
+    def estoque_de(self, sku_code: str) -> Estoque | None: ...
+
+    def vendas_de(self, sku_code: str, desde: datetime) -> list[Venda]:
+        """Vendas com `data >= desde`, em ordem cronológica."""
+        ...
+
+    def movimentacoes_de(
+        self, sku_code: str, desde: datetime
+    ) -> list[Movimentacao]:
+        """Movimentações com `data >= desde`, em ordem cronológica."""
+        ...
