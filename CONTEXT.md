@@ -40,6 +40,10 @@ _Avoid_: dias de estoque (é o mesmo conceito em outra unidade - escolhemos mese
 Prazo entre colocar um pedido de compra e receber a mercadoria no CD. Contratual vs observado é uma distinção que importa (ver reunião Q1/2025 no corpus).
 _Avoid_: prazo de entrega (ambíguo - pode significar do atacadista pro varejista).
 
+**Ficha (do SKU)**:
+Composição de leitura que devolve o estado atual de um SKU pronto pra decisão de compra - dados do catálogo, estoque atual, giro, cobertura e fornecedores disponíveis. Materializada no módulo `ficha_sku` e servida pelo endpoint `/skus/{sku_code}/analise`.
+_Avoid_: análise (ambíguo), dashboard, resumo.
+
 ### Sistemas
 
 **ERP fake**:

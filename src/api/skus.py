@@ -13,6 +13,9 @@ from src.api.schemas import (
 from src.catalog.dependencies import get_catalog
 from src.catalog.schemas import SKU, FornecedorParaSKU
 from src.catalog.service import Catalog
+from src.ficha_sku.dependencies import get_ficha_sku
+from src.ficha_sku.schemas import Ficha
+from src.ficha_sku.service import FichaSKU, SKUSemEstoque
 from src.inventory.dependencies import get_inventory
 from src.inventory.service import Inventory
 from src.sales.dependencies import get_sales
@@ -34,13 +37,32 @@ def _fornecedor_to_response(f: FornecedorParaSKU) -> FornecedorResponse:
     )
 
 
+def _ficha_to_response(ficha: Ficha) -> AnaliseSKUResponse:
+    return AnaliseSKUResponse(
+        sku_code=ficha.sku.sku_code,
+        produto_nome=ficha.sku.produto_nome,
+        categoria=ficha.sku.categoria,
+        estoque=ficha.estoque,
+        giro=GiroResponse(
+            unidades_por_mes=ficha.giro.unidades_por_mes,
+            meses_considerados=ficha.giro.meses_considerados,
+        ),
+        cobertura=ficha.cobertura,
+        fornecedores=[_fornecedor_to_response(f) for f in ficha.fornecedores],
+    )
+
+
+def _sku_nao_encontrado(sku_code: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"SKU '{sku_code}' não encontrado",
+    )
+
+
 def _sku_ou_404(catalog: Catalog, sku_code: str) -> SKU:
     sku = catalog.carregar_sku(sku_code)
     if sku is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"SKU '{sku_code}' não encontrado",
-        )
+        raise _sku_nao_encontrado(sku_code)
     return sku
 
 
@@ -62,34 +84,17 @@ def abaixo_do_piso(
 @router.get("/{sku_code}/analise", response_model=AnaliseSKUResponse)
 def analise_sku(
     sku_code: str,
-    catalog: Catalog = Depends(get_catalog),
-    inventory: Inventory = Depends(get_inventory),
-    sales: Sales = Depends(get_sales),
+    ficha_sku: FichaSKU = Depends(get_ficha_sku),
 ) -> AnaliseSKUResponse:
-    sku = _sku_ou_404(catalog, sku_code)
-
-    estoque = inventory.estoque_atual(sku_code)
-    if estoque is None:
+    try:
+        ficha = ficha_sku.completa(sku_code)
+    except SKUSemEstoque as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"SKU '{sku_code}' sem snapshot de estoque",
-        )
-    giro = sales.giro_medio_mensal(sku_code)
-    cobertura = inventory.cobertura_meses(sku_code)
-    fornecedores = catalog.fornecedores_de(sku_code)
-
-    return AnaliseSKUResponse(
-        sku_code=sku.sku_code,
-        produto_nome=sku.produto_nome,
-        categoria=sku.categoria,
-        estoque=estoque,
-        giro=GiroResponse(
-            unidades_por_mes=giro.unidades_por_mes,
-            meses_considerados=giro.meses_considerados,
-        ),
-        cobertura=cobertura,
-        fornecedores=[_fornecedor_to_response(f) for f in fornecedores],
-    )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        ) from e
+    if ficha is None:
+        raise _sku_nao_encontrado(sku_code)
+    return _ficha_to_response(ficha)
 
 
 @router.get("/{sku_code}/vendas", response_model=list[VendaMensalResponse])
