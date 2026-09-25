@@ -37,6 +37,8 @@ Sem ciclos. Se surgir vontade de fazer `catalog` chamar `sales`, é sinal de que
 
 ## Divisão de tools por nível de risco
 
+> Desde a ADR-0002 quem escolhe a tool é o Jev (pergunta tipada com confiança) e quem chama é o código do `ai`. O LLM só redige a resposta e não tem tools. Onde abaixo se lê "LLM chama", leia "o `ai` chama após decisão do Jev". A divisão por risco não muda.
+
 O `ai` só pode chamar diretamente **tools de leitura**. Tools que geram decisão ou escrita passam por `purchasing` (determinístico) e por aprovação humana.
 
 **Tools de leitura (LLM chama direto)**:
@@ -142,7 +144,7 @@ class Purchasing:
 
 ### `ai`
 
-RAG, tool orchestration, conversa.
+RAG, roteamento de decisões (Jev), redação da resposta (LLM). Ver ADR-0002.
 
 ```python
 class AICopilot:
@@ -152,7 +154,7 @@ class AICopilot:
     def buscar_contexto(self, query: str, k: int = 5) -> list[TrechoRelevante]: ...
 ```
 
-Internamente `ai` chama `Purchasing`, `Catalog`, `Inventory`, `Sales` como "tools" que o LLM pode invocar. É onde tool use acontece.
+Internamente `ai` pergunta ao Jev qual é a intenção e qual tool usar, chama `Purchasing`, `Catalog`, `Inventory` e `Sales` no código e entrega os dados ao LLM só para redigir. Jev e LLM ficam cada um atrás do seu port.
 
 ## Separação de bancos
 

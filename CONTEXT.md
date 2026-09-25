@@ -49,3 +49,15 @@ _Avoid_: banco (é ambíguo), simulador, mock.
 **Corpus**:
 Conjunto de documentos sintéticos (contratos, notas de reunião, relatórios de mercado, políticas) alimentados no RAG. Fica em `.scratch/copilot-compras/rag-seeds/`.
 _Avoid_: base de conhecimento, docs, arquivos.
+
+**Jev**:
+Modelo System One da TypeSafe que toma as decisões semânticas do Copilot: intenção da pergunta, relevância de trecho do corpus, sinais qualitativos sobre fornecedor. Responde perguntas tipadas (`Choice`, `Score`, `Noul`) com confiança. Nunca faz conta, contagem ou comparação de data. Ver ADR-0002.
+_Avoid_: LLM, classificador, agente.
+
+**Redator**:
+O papel do LLM no Copilot: só escreve a resposta final em linguagem natural a partir de dados já montados pelo código. Não escolhe tools nem decide nada. Ver ADR-0002.
+_Avoid_: agente, chatbot, LLM com tools.
+
+**Confiança**:
+Número de 0 a 1 que o Jev devolve junto de cada resposta, derivado da distribuição de probabilidades. O código usa faixas de confiança pra decidir entre executar, pedir confirmação ou pedir esclarecimento. Nunca substitui a aprovação humana de um pedido de compra.
+_Avoid_: certeza, probabilidade (é outra coisa), score.

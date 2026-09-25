@@ -41,43 +41,54 @@ Cada milestone é um bloco de trabalho de 1 sessão a 2-3 dias. Você marca como
 
 **Ponto de reflexão**: nesta altura você já tem um sistema *útil* sem IA. Isso é intencional - se a IA falhar depois, o sistema ainda funciona. IA é aumento de valor, não fundação.
 
-## M4 - RAG básico
+## Divisão de papéis na IA (M4 em diante)
 
-- Módulo `ai` com componente RAG: pipeline de ingestão dos 11 documentos seed, chunking, embedding (via API - `text-embedding-3-small` da OpenAI, ~2 centavos pro corpus todo), gravação em pgvector.
-- Função `ai.buscar_contexto(query, k=5)` que retorna trechos relevantes.
-- Endpoint `/rag/busca?q=...` que retorna trechos brutos. Ainda sem LLM gerando resposta.
+A partir do M4 o `ai` segue a ADR-0002: **Jev decide, código executa, LLM redige**. O Jev (TypeSafe) responde perguntas tipadas (`Choice`, `Score`, `Noul`) com confiança, o código roteia e faz as contas, e o LLM só escreve a resposta final. Número, contagem e data nunca vão para o Jev.
 
-**Saída visível**: pesquisa "lead time da Katrina" e vê os trechos dos documentos relevantes.
+## M4 - Spike do Jev + RAG com filtro de trechos
 
-## M5 - Primeira conversa com LLM + tool use de leitura
+- **Spike primeiro (gate da ADR-0002)**: rodar o Jev em português contra o corpus e umas 20 perguntas típicas do comprador. Medir acerto de intenção, acerto de relevância de trecho, custo e latência. Se não passar, reabrir a ADR-0002 antes de seguir.
+- Módulo `ai` com port `DecisionModel` (adapter Jev + adapter in-memory pra teste).
+- Pipeline de ingestão dos 11 documentos seed: chunking, embedding (`text-embedding-3-small`), gravação em pgvector.
+- `ai.buscar_contexto(query, k)`: busca vetorial seguida de um filtro com o Jev, que pergunta por trecho se é relevante, se contradiz outro trecho e se tenta dar instrução ao modelo. Devolve trechos classificados como aceito, conflitante ou descartado.
+- Endpoint `/rag/busca?q=...` que retorna os trechos com a classificação e a confiança.
 
-- Cliente Groq configurado.
-- Endpoint `/chat` recebe pergunta em linguagem natural, LLM tem acesso a 5-6 tools de leitura (`get_sku`, `estoque_atual`, `giro_medio_mensal`, `cobertura_meses`, `buscar_contexto`).
-- LLM decide qual tool chamar, você vê no log.
-- Resposta em texto pra pergunta tipo "qual a situação do SKU TBC-BEG-70140?".
+**Saída visível**: pesquisa "lead time da Katrina" e vê os trechos relevantes, com o conflito entre lead time contratual e observado sinalizado.
 
-**Saída visível**: você conversa com o Copilot sobre um SKU e ele responde usando dados reais.
+## M5 - Primeira conversa: Jev roteia, LLM redige
 
-## M6 - Sugestão via LLM (tool call para `sugerir_pedido`)
+- Endpoint `/chat` recebe pergunta em linguagem natural.
+- Jev classifica a intenção com um `Choice` (situação do SKU, pergunta sobre política ou fornecedor, pedido de sugestão, fora de escopo) e extrai o `sku_code` quando houver.
+- Roteamento com confiança: alta executa, média executa e pede confirmação, baixa pede esclarecimento ao comprador.
+- Código chama os leitores (`ficha_sku.completa`, `buscar_contexto`) conforme a intenção.
+- Cliente Groq configurado **só como redator**: recebe os dados montados e escreve a resposta. Não tem tools.
+- Log de cada decisão do Jev (pergunta, resposta, confiança) pra auditoria.
 
-- `purchasing.sugerir_pedido` exposta como tool do LLM.
-- LLM decide quando invocar - ex: pergunta "devo comprar do SKU X?" faz ele chamar `sugerir_pedido` e explicar o resultado.
-- Resposta cita documentos do RAG quando relevante ("segundo a política de estoque...").
+**Saída visível**: "qual a situação do SKU TBC-BEG-70140?" gera resposta em texto, e o log mostra a intenção escolhida e a confiança.
 
-**Saída visível**: pergunta livre em linguagem natural e resposta rica combinando dados + sugestão + contexto do RAG.
+## M6 - Sugestão com sinais do corpus
+
+- Intenção "pedido de sugestão" leva o código a chamar `purchasing.sugerir_pedido` (determinístico, do M3).
+- Jev extrai sinais qualitativos do corpus sobre o SKU e o fornecedor sugerido, por exemplo um `Score` de confiabilidade do fornecedor segundo as reuniões e um `Noul` de evento sazonal relevante. Os sinais viram alertas anexados à `SugestaoPedido` e não alteram a quantidade calculada.
+- LLM redige a explicação citando os documentos.
+- Jev confere se cada citação da resposta é sustentada pelo trecho citado. Citação sem suporte é removida ou sinalizada.
+
+**Saída visível**: pergunta livre gera resposta que combina dados, sugestão e contexto do RAG, com citações verificadas.
 
 ## M7 - Aprovação humana (workflow completo)
 
 - UI mínima (HTML puro ou React simples) com: lista de sugestões pendentes, botão aprovar/rejeitar/editar.
+- Sugestões com alertas do Jev ou baixa confiança aparecem destacadas no topo da fila. A confiança só prioriza, nunca aprova.
 - `purchasing.submeter_pedido` só é acionado por endpoint que exige aprovação.
 - Sugestão aprovada vira `pedido_compra` no ERP fake com status `aprovado`.
 
-**Saída visível**: workflow end-to-end. LLM sugere, você aprova, aparece no ERP.
+**Saída visível**: workflow end-to-end. Copilot sugere, você aprova, aparece no ERP.
 
 ## M8 - Refinamentos e apresentabilidade
 
-- Trocar Groq por Claude/GPT no deploy final (chave em env var).
-- Melhorar prompts com base em observação real.
+- Trocar o redator Groq por Claude/GPT no deploy final (chave em env var).
+- Ajustar perguntas do Jev e thresholds de confiança com base no log de decisões.
+- Melhorar prompt do redator com base em observação real.
 - README com fluxo, screenshots, arquitetura desenhada.
 - Vídeo de demo curto.
 
