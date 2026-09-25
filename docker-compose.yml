@@ -23,6 +23,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://copilot:copilot@db:5432/copilot
+      JEV_KEY: ${JEV_KEY:-}
     ports:
       - "8000:8000"
 

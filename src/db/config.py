@@ -9,6 +9,8 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://copilot:copilot@localhost:5432/copilot",
         alias="DATABASE_URL",
     )
+    jev_key: str | None = Field(default=None, alias="JEV_KEY")
+    jev_model: str = Field(default="jev-latest", alias="JEV_MODEL")
 
 
 def get_settings() -> Settings:
