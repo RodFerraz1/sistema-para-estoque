@@ -5,7 +5,6 @@ dependência intra-módulo explícita (documentada em module-interfaces.md).
 """
 from __future__ import annotations
 
-from src.catalog.schemas import SKU
 from src.erp_adapter.port import ERPAdapter
 from src.inventory.schemas import Cobertura, Estoque, SKUAbaixoDoPiso
 from src.sales.service import Sales
@@ -20,14 +19,8 @@ class Inventory:
         return self._erp.estoque_de(sku_code)
 
     def cobertura_meses(self, sku_code: str) -> Cobertura:
-        sku = self._erp.carregar_sku(sku_code)
-        if sku is None:
-            return Cobertura(meses=None, sem_giro=True)
-        return self._cobertura(sku)
-
-    def _cobertura(self, sku: SKU) -> Cobertura:
-        estoque = self.estoque_atual(sku.sku_code)
-        giro = self._sales.giro_medio_mensal(sku.id)
+        estoque = self.estoque_atual(sku_code)
+        giro = self._sales.giro_medio_mensal(sku_code)
         if giro.unidades_por_mes == 0.0:
             return Cobertura(meses=None, sem_giro=True)
         disponivel = estoque.quantidade_disponivel if estoque is not None else 0
@@ -46,7 +39,7 @@ class Inventory:
         piso_meses = dias_piso / 30
         alertas: list[SKUAbaixoDoPiso] = []
         for sku in self._erp.listar_skus():
-            cobertura = self._cobertura(sku)
+            cobertura = self.cobertura_meses(sku.sku_code)
             if cobertura.meses is None:
                 continue
             if cobertura.meses >= piso_meses:

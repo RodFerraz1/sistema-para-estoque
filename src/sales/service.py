@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID
 
 from src.erp_adapter.port import ERPAdapter
-from src.sales.schemas import GiroMedioMensal, Sazonalidade, VendaMensal
+from src.sales.schemas import GiroMedioMensal, Sazonalidade, Venda, VendaMensal
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -44,7 +43,9 @@ class Sales:
     def _agora(self) -> datetime:
         return self._now or datetime.now(UTC)
 
-    def _vendas_fechadas(self, sku_id: UUID, meses: int) -> tuple[list, datetime, datetime]:
+    def _vendas_fechadas(
+        self, sku_code: str, meses: int
+    ) -> tuple[list[Venda], datetime, datetime]:
         """Vendas na janela de `meses` fechados antes do mês corrente.
 
         Retorna `(vendas, janela_inicio, fim)` onde `fim` é o início do mês
@@ -52,14 +53,14 @@ class Sales:
         """
         fim = _start_of_month(self._agora())
         janela_inicio = _subtract_months(fim, meses)
-        todas = self._erp.list_vendas(sku_id, janela_inicio)
+        todas = self._erp.vendas_de(sku_code, janela_inicio)
         return [v for v in todas if v.data < fim], janela_inicio, fim
 
-    def giro_medio_mensal(self, sku_id: UUID, meses: int = 6) -> GiroMedioMensal:
+    def giro_medio_mensal(self, sku_code: str, meses: int = 6) -> GiroMedioMensal:
         fim = _start_of_month(self._agora())
         janela_inicio = _subtract_months(fim, meses)
 
-        todas = self._erp.list_vendas(sku_id, _EPOCH)
+        todas = self._erp.vendas_de(sku_code, _EPOCH)
         fechadas = [v for v in todas if v.data < fim]
         if not fechadas:
             return GiroMedioMensal(
@@ -79,14 +80,14 @@ class Sales:
         )
 
     def historico_vendas(
-        self, sku_id: UUID, meses: int = 12
+        self, sku_code: str, meses: int = 12
     ) -> list[VendaMensal]:
         """Série mensal (zero-fill) dos últimos `meses` meses fechados.
 
         Ordenada do mais antigo pro mais recente. Meses sem venda entram
         com quantidade e valor zero pra preservar a forma do sinal.
         """
-        fechadas, janela_inicio, fim = self._vendas_fechadas(sku_id, meses)
+        fechadas, janela_inicio, fim = self._vendas_fechadas(sku_code, meses)
 
         buckets: dict[tuple[int, int], tuple[int, int]] = {}
         cursor = janela_inicio
@@ -112,7 +113,7 @@ class Sales:
             for (ano, mes), (qty, valor) in sorted(buckets.items())
         ]
 
-    def sazonalidade(self, sku_id: UUID, meses: int = 24) -> Sazonalidade:
+    def sazonalidade(self, sku_code: str, meses: int = 24) -> Sazonalidade:
         """Multiplicadores mês-a-mês normalizados pela média do período.
 
         Para cada mês do ano (1-12) calcula a média de vendas naquele mês
@@ -120,7 +121,7 @@ class Sales:
         na janela retorna multiplicadores neutros (1.0) e
         `meses_considerados=0` como sinal de "sem dado".
         """
-        fechadas, janela_inicio, fim = self._vendas_fechadas(sku_id, meses)
+        fechadas, janela_inicio, fim = self._vendas_fechadas(sku_code, meses)
 
         neutro = {m: 1.0 for m in range(1, 13)}
         if not fechadas:

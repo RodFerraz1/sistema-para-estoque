@@ -74,7 +74,7 @@ def analise_sku(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"SKU '{sku_code}' sem snapshot de estoque",
         )
-    giro = sales.giro_medio_mensal(sku.id)
+    giro = sales.giro_medio_mensal(sku_code)
     cobertura = inventory.cobertura_meses(sku_code)
     fornecedores = catalog.fornecedores_de(sku_code)
 
@@ -99,7 +99,7 @@ def historico_vendas(
     catalog: Catalog = Depends(get_catalog),
     sales: Sales = Depends(get_sales),
 ) -> list[VendaMensalResponse]:
-    sku = _sku_ou_404(catalog, sku_code)
+    _sku_ou_404(catalog, sku_code)
     return [
         VendaMensalResponse(
             ano=v.ano,
@@ -107,7 +107,7 @@ def historico_vendas(
             quantidade_unidades=v.quantidade_unidades,
             valor_total_reais=v.valor_total_reais,
         )
-        for v in sales.historico_vendas(sku.id, meses=meses)
+        for v in sales.historico_vendas(sku_code, meses=meses)
     ]
 
 
@@ -117,8 +117,8 @@ def sazonalidade(
     catalog: Catalog = Depends(get_catalog),
     sales: Sales = Depends(get_sales),
 ) -> dict[int, float]:
-    sku = _sku_ou_404(catalog, sku_code)
-    return sales.sazonalidade(sku.id).multiplicadores
+    _sku_ou_404(catalog, sku_code)
+    return sales.sazonalidade(sku_code).multiplicadores
 
 
 @router.get("/{sku_code}/fornecedores", response_model=list[FornecedorResponse])

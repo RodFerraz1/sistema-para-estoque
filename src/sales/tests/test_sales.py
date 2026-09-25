@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.sales.service import Sales
-from tests.fakes import make_sku, make_venda, uid
+from tests.fakes import make_sku, make_venda
 
 
 NOW = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
@@ -29,7 +29,7 @@ def test_giro_medio_com_seis_meses_cheios() -> None:
     ]
     sales = _sales_at_now(skus=[sku], vendas=vendas)
 
-    giro = sales.giro_medio_mensal(sku.id)
+    giro = sales.giro_medio_mensal(sku.sku_code)
 
     assert giro.total_unidades == 360
     assert giro.meses_considerados == 6
@@ -51,7 +51,7 @@ def test_giro_ignora_mes_corrente_parcial() -> None:
     ]
     sales = _sales_at_now(skus=[sku], vendas=vendas)
 
-    giro = sales.giro_medio_mensal(sku.id)
+    giro = sales.giro_medio_mensal(sku.sku_code)
 
     assert giro.total_unidades == 360
     assert giro.unidades_por_mes == 60.0
@@ -67,7 +67,7 @@ def test_giro_historico_menor_nao_extrapola() -> None:
     ]
     sales = _sales_at_now(skus=[sku], vendas=vendas)
 
-    giro = sales.giro_medio_mensal(sku.id)
+    giro = sales.giro_medio_mensal(sku.sku_code)
 
     assert giro.total_unidades == 90
     assert giro.meses_considerados == 3
@@ -78,7 +78,7 @@ def test_giro_sem_vendas_retorna_zero() -> None:
     sku = make_sku("A")
     sales = _sales_at_now(skus=[sku], vendas=[])
 
-    giro = sales.giro_medio_mensal(sku.id)
+    giro = sales.giro_medio_mensal(sku.sku_code)
 
     assert giro.total_unidades == 0
     assert giro.meses_considerados == 0
@@ -88,7 +88,7 @@ def test_giro_sem_vendas_retorna_zero() -> None:
 def test_giro_para_sku_inexistente_retorna_zero() -> None:
     sales = _sales_at_now(skus=[], vendas=[])
 
-    giro = sales.giro_medio_mensal(uid("sku", "fantasma"))
+    giro = sales.giro_medio_mensal("FANTASMA")
 
     assert giro.unidades_por_mes == 0.0
     assert giro.meses_considerados == 0
@@ -100,7 +100,7 @@ def test_giro_apenas_mes_corrente_sem_meses_fechados() -> None:
     vendas = [make_venda(sku, datetime(2026, 9, 10, tzinfo=UTC), 50, key="1")]
     sales = _sales_at_now(skus=[sku], vendas=vendas)
 
-    giro = sales.giro_medio_mensal(sku.id)
+    giro = sales.giro_medio_mensal(sku.sku_code)
 
     assert giro.unidades_por_mes == 0.0
     assert giro.meses_considerados == 0
@@ -119,7 +119,7 @@ def test_historico_vendas_retorna_serie_zero_fill() -> None:
     ]
     sales = _sales_at_now(skus=[sku], vendas=vendas)
 
-    historico = sales.historico_vendas(sku.id, meses=3)
+    historico = sales.historico_vendas(sku.sku_code, meses=3)
 
     assert len(historico) == 3
     assert (historico[0].ano, historico[0].mes) == (2026, 6)
@@ -141,7 +141,7 @@ def test_historico_vendas_ignora_mes_corrente_parcial() -> None:
     ]
     sales = _sales_at_now(skus=[sku], vendas=vendas)
 
-    historico = sales.historico_vendas(sku.id, meses=2)
+    historico = sales.historico_vendas(sku.sku_code, meses=2)
 
     meses = {(h.ano, h.mes) for h in historico}
     assert (2026, 9) not in meses
@@ -152,7 +152,7 @@ def test_historico_vendas_sku_sem_vendas_retorna_serie_zero() -> None:
     sku = make_sku("A")
     sales = _sales_at_now(skus=[sku], vendas=[])
 
-    historico = sales.historico_vendas(sku.id, meses=3)
+    historico = sales.historico_vendas(sku.sku_code, meses=3)
 
     assert len(historico) == 3
     assert all(h.quantidade_unidades == 0 for h in historico)
@@ -162,7 +162,7 @@ def test_historico_vendas_sku_sem_vendas_retorna_serie_zero() -> None:
 def test_historico_vendas_sku_inexistente_retorna_serie_zero() -> None:
     sales = _sales_at_now()
 
-    historico = sales.historico_vendas(uid("sku", "fantasma"), meses=2)
+    historico = sales.historico_vendas("FANTASMA", meses=2)
 
     assert len(historico) == 2
     assert all(h.quantidade_unidades == 0 for h in historico)
@@ -188,7 +188,7 @@ def test_sazonalidade_com_pattern_definido() -> None:
             )
     sales = _sales_at_now(skus=[sku], vendas=vendas)
 
-    sazo = sales.sazonalidade(sku.id)
+    sazo = sales.sazonalidade(sku.sku_code)
 
     assert sazo.meses_considerados == 24
     assert len(sazo.multiplicadores) == 12
@@ -205,7 +205,7 @@ def test_sazonalidade_sku_sem_vendas_retorna_neutro() -> None:
     sku = make_sku("A")
     sales = _sales_at_now(skus=[sku], vendas=[])
 
-    sazo = sales.sazonalidade(sku.id)
+    sazo = sales.sazonalidade(sku.sku_code)
 
     assert sazo.meses_considerados == 0
     assert sazo.multiplicadores == {m: 1.0 for m in range(1, 13)}
@@ -214,7 +214,7 @@ def test_sazonalidade_sku_sem_vendas_retorna_neutro() -> None:
 def test_sazonalidade_sku_inexistente_retorna_neutro() -> None:
     sales = _sales_at_now()
 
-    sazo = sales.sazonalidade(uid("sku", "fantasma"))
+    sazo = sales.sazonalidade("FANTASMA")
 
     assert sazo.meses_considerados == 0
     assert sazo.multiplicadores == {m: 1.0 for m in range(1, 13)}
