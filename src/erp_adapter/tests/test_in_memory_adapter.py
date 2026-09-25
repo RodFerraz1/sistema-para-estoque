@@ -83,10 +83,12 @@ def test_fornecedores_de_ordena_por_preco() -> None:
     erp = InMemoryERPAdapter(
         skus=[sku],
         fornecedores=[caro, barato],
-        fornecedores_skus=[
-            make_fornecedor_sku(sku, caro, preco_unitario_atual=3000),
-            make_fornecedor_sku(sku, barato, preco_unitario_atual=1500),
-        ],
+        fornecedores_por_sku={
+            sku.sku_code: [
+                make_fornecedor_sku(caro, preco_unitario_reais=3000),
+                make_fornecedor_sku(barato, preco_unitario_reais=1500),
+            ]
+        },
     )
 
     fornecedores = erp.fornecedores_de("TBC-001")
@@ -95,19 +97,19 @@ def test_fornecedores_de_ordena_por_preco() -> None:
     assert [f.preco_unitario_reais for f in fornecedores] == [1500, 3000]
 
 
-def test_fornecedores_de_corta_inativos() -> None:
+def test_fornecedores_de_corta_fornecedor_inativo() -> None:
     sku = make_sku("TBC-001")
     ativo = make_fornecedor("Ativo")
-    fornecedor_inativo = make_fornecedor("Fornecedor Inativo", ativo=False)
-    vinculo_inativo = make_fornecedor("Vínculo Inativo")
+    inativo = make_fornecedor("Inativo", ativo=False)
     erp = InMemoryERPAdapter(
         skus=[sku],
-        fornecedores=[ativo, fornecedor_inativo, vinculo_inativo],
-        fornecedores_skus=[
-            make_fornecedor_sku(sku, ativo),
-            make_fornecedor_sku(sku, fornecedor_inativo),
-            make_fornecedor_sku(sku, vinculo_inativo, ativo=False),
-        ],
+        fornecedores=[ativo, inativo],
+        fornecedores_por_sku={
+            sku.sku_code: [
+                make_fornecedor_sku(ativo),
+                make_fornecedor_sku(inativo),
+            ]
+        },
     )
 
     fornecedores = erp.fornecedores_de("TBC-001")
@@ -128,7 +130,7 @@ def test_fornecedores_de_sku_sem_fornecedores() -> None:
 def test_estoque_de() -> None:
     sku = make_sku("TBC-001")
     erp = InMemoryERPAdapter(
-        skus=[sku], estoques=[make_estoque(sku, disponivel=42, reservada=3)]
+        skus=[sku], estoques={sku.sku_code: make_estoque(disponivel=42, reservada=3)}
     )
 
     estoque = erp.estoque_de("TBC-001")

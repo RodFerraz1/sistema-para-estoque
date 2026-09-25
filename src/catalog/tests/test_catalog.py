@@ -39,11 +39,13 @@ def test_fornecedores_de_ordenado_por_preco_e_ignora_inativos() -> None:
     adapter = InMemoryERPAdapter(
         skus=[sku],
         fornecedores=[caro, barato, inativo],
-        fornecedores_skus=[
-            make_fornecedor_sku(sku, caro, preco_unitario_atual=5000),
-            make_fornecedor_sku(sku, barato, preco_unitario_atual=2000),
-            make_fornecedor_sku(sku, inativo, preco_unitario_atual=100),
-        ],
+        fornecedores_por_sku={
+            sku.sku_code: [
+                make_fornecedor_sku(caro, preco_unitario_reais=5000),
+                make_fornecedor_sku(barato, preco_unitario_reais=2000),
+                make_fornecedor_sku(inativo, preco_unitario_reais=100),
+            ]
+        },
     )
     catalog = Catalog(adapter)
 

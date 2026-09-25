@@ -1,4 +1,4 @@
-"""Fábricas de raws para montar `InMemoryERPAdapter` em testes.
+"""Fábricas de DTOs de domínio para montar `InMemoryERPAdapter` em testes.
 
 Mantém defaults sensatos para que cada teste especifique apenas o que
 importa. UUIDs são derivados por `uuid5` a partir do nome/código para
@@ -10,14 +10,9 @@ import uuid
 from datetime import UTC, datetime
 from uuid import UUID
 
-from src.erp_adapter.schemas import (
-    EstoqueRaw,
-    FornecedorRaw,
-    FornecedorSKURaw,
-    MovimentacaoRaw,
-    SKURaw,
-    VendaRaw,
-)
+from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
+from src.inventory.schemas import Estoque, Movimentacao
+from src.sales.schemas import Venda
 
 
 _NS = uuid.UUID("00000000-0000-0000-0000-000000000fff")
@@ -37,18 +32,18 @@ def make_sku(
     gramatura: int | None = 400,
     material: str | None = "algodão 100%",
     ativo: bool = True,
-) -> SKURaw:
-    return SKURaw(
+) -> SKU:
+    return SKU(
         id=uid("sku", sku_code),
         produto_id=uid("produto", produto_nome),
         sku_code=sku_code,
+        produto_nome=produto_nome,
+        categoria=categoria,
         cor=cor,
         tamanho=tamanho,
         gramatura=gramatura,
         material=material,
         ativo=ativo,
-        produto_nome=produto_nome,
-        produto_categoria=categoria,
     )
 
 
@@ -58,8 +53,8 @@ def make_fornecedor(
     lead_time_dias_contratado: int = 30,
     pedido_minimo_reais: int = 10_000,
     ativo: bool = True,
-) -> FornecedorRaw:
-    return FornecedorRaw(
+) -> Fornecedor:
+    return Fornecedor(
         id=uid("fornecedor", nome),
         nome=nome,
         cnpj="00.000.000/0001-00",
@@ -71,37 +66,31 @@ def make_fornecedor(
 
 
 def make_fornecedor_sku(
-    sku: SKURaw,
-    fornecedor: FornecedorRaw,
+    fornecedor: Fornecedor,
     *,
-    preco_unitario_atual: int = 2000,
+    preco_unitario_reais: int = 2000,
     moq_unidades: int = 48,
     lead_time_dias_observado: int | None = 35,
-    ativo: bool = True,
-) -> FornecedorSKURaw:
-    return FornecedorSKURaw(
+) -> FornecedorParaSKU:
+    return FornecedorParaSKU(
         fornecedor_id=fornecedor.id,
-        sku_id=sku.id,
         fornecedor_nome=fornecedor.nome,
-        preco_unitario_atual=preco_unitario_atual,
+        preco_unitario_reais=preco_unitario_reais,
         moq_unidades=moq_unidades,
         lead_time_dias_contratado=fornecedor.lead_time_dias_contratado,
         lead_time_dias_observado=lead_time_dias_observado,
         prazo_pagamento_padrao=fornecedor.prazo_pagamento_padrao,
         pedido_minimo_reais=fornecedor.pedido_minimo_reais,
-        ativo=ativo,
     )
 
 
 def make_estoque(
-    sku: SKURaw,
     *,
     disponivel: int = 100,
     reservada: int = 0,
     atualizado_em: datetime | None = None,
-) -> EstoqueRaw:
-    return EstoqueRaw(
-        sku_id=sku.id,
+) -> Estoque:
+    return Estoque(
         quantidade_disponivel=disponivel,
         quantidade_reservada=reservada,
         atualizado_em=atualizado_em or datetime(2026, 9, 1, tzinfo=UTC),
@@ -109,16 +98,16 @@ def make_estoque(
 
 
 def make_venda(
-    sku: SKURaw,
+    sku: SKU,
     data: datetime,
     quantidade: int,
     *,
     key: str | None = None,
     valor_unitario_reais: int = 3000,
     cliente_ref: str = "varejista-001",
-) -> VendaRaw:
+) -> Venda:
     ref = key or f"{sku.sku_code}|{data.isoformat()}|{quantidade}"
-    return VendaRaw(
+    return Venda(
         id=uid("venda", ref),
         sku_id=sku.id,
         quantidade=quantidade,
@@ -129,15 +118,15 @@ def make_venda(
 
 
 def make_movimentacao(
-    sku: SKURaw,
+    sku: SKU,
     data: datetime,
     tipo: str,
     quantidade: int,
     *,
     key: str | None = None,
-) -> MovimentacaoRaw:
+) -> Movimentacao:
     ref = key or f"{sku.sku_code}|{tipo}|{data.isoformat()}|{quantidade}"
-    return MovimentacaoRaw(
+    return Movimentacao(
         id=uid("mov", ref),
         sku_id=sku.id,
         tipo=tipo,

@@ -19,7 +19,10 @@ def _inv(**kwargs) -> Inventory:
 
 def test_estoque_atual_retorna_dto() -> None:
     sku = make_sku("A")
-    inv = _inv(skus=[sku], estoques=[make_estoque(sku, disponivel=200, reservada=15)])
+    inv = _inv(
+        skus=[sku],
+        estoques={sku.sku_code: make_estoque(disponivel=200, reservada=15)},
+    )
 
     estoque = inv.estoque_atual(sku.sku_code)
 
@@ -47,7 +50,7 @@ def test_cobertura_calcula_meses() -> None:
     ]
     inv = _inv(
         skus=[sku],
-        estoques=[make_estoque(sku, disponivel=120, reservada=0)],
+        estoques={sku.sku_code: make_estoque(disponivel=120, reservada=0)},
         vendas=vendas,
     )
 
@@ -62,7 +65,7 @@ def test_cobertura_sem_giro_quando_giro_zero() -> None:
     sku = make_sku("A")
     inv = _inv(
         skus=[sku],
-        estoques=[make_estoque(sku, disponivel=50)],
+        estoques={sku.sku_code: make_estoque(disponivel=50)},
         vendas=[],
     )
 
@@ -89,7 +92,7 @@ def test_cobertura_zero_quando_estoque_zero_e_ha_giro() -> None:
     ]
     inv = _inv(
         skus=[sku],
-        estoques=[make_estoque(sku, disponivel=0)],
+        estoques={sku.sku_code: make_estoque(disponivel=0)},
         vendas=vendas,
     )
 
@@ -112,10 +115,10 @@ def test_abaixo_do_piso_retorna_apenas_skus_em_alerta() -> None:
     alto = make_sku("ALTO", produto_nome="Toalha Alta")
     inv = _inv(
         skus=[baixo, alto],
-        estoques=[
-            make_estoque(baixo, disponivel=20),
-            make_estoque(alto, disponivel=500),
-        ],
+        estoques={
+            baixo.sku_code: make_estoque(disponivel=20),
+            alto.sku_code: make_estoque(disponivel=500),
+        },
         vendas=_vendas_giro_60(baixo, "b") + _vendas_giro_60(alto, "a"),
     )
 
@@ -132,10 +135,10 @@ def test_abaixo_do_piso_ordena_por_cobertura_crescente() -> None:
     menos = make_sku("MENOS")
     inv = _inv(
         skus=[menos, urgente],
-        estoques=[
-            make_estoque(urgente, disponivel=5),
-            make_estoque(menos, disponivel=25),
-        ],
+        estoques={
+            urgente.sku_code: make_estoque(disponivel=5),
+            menos.sku_code: make_estoque(disponivel=25),
+        },
         vendas=_vendas_giro_60(urgente, "u") + _vendas_giro_60(menos, "m"),
     )
 
@@ -148,7 +151,7 @@ def test_abaixo_do_piso_ignora_sku_sem_giro() -> None:
     sku = make_sku("SEM-VENDAS")
     inv = _inv(
         skus=[sku],
-        estoques=[make_estoque(sku, disponivel=0)],
+        estoques={sku.sku_code: make_estoque(disponivel=0)},
         vendas=[],
     )
 
@@ -160,10 +163,10 @@ def test_abaixo_do_piso_ignora_sku_inativo() -> None:
     inativo = make_sku("INATIVO", ativo=False)
     inv = _inv(
         skus=[ativo, inativo],
-        estoques=[
-            make_estoque(ativo, disponivel=10),
-            make_estoque(inativo, disponivel=1),
-        ],
+        estoques={
+            ativo.sku_code: make_estoque(disponivel=10),
+            inativo.sku_code: make_estoque(disponivel=1),
+        },
         vendas=_vendas_giro_60(ativo, "a") + _vendas_giro_60(inativo, "i"),
     )
 
@@ -176,7 +179,7 @@ def test_abaixo_do_piso_lista_vazia_quando_ninguem_abaixo() -> None:
     sku = make_sku("A")
     inv = _inv(
         skus=[sku],
-        estoques=[make_estoque(sku, disponivel=1000)],
+        estoques={sku.sku_code: make_estoque(disponivel=1000)},
         vendas=_vendas_giro_60(sku),
     )
 
@@ -188,7 +191,7 @@ def test_abaixo_do_piso_parametro_dias_muda_limite() -> None:
     sku = make_sku("A")
     inv = _inv(
         skus=[sku],
-        estoques=[make_estoque(sku, disponivel=25)],
+        estoques={sku.sku_code: make_estoque(disponivel=25)},
         vendas=_vendas_giro_60(sku),
     )
 

@@ -36,15 +36,17 @@ def _adapter_completo() -> InMemoryERPAdapter:
     return InMemoryERPAdapter(
         skus=[sku, outro],
         fornecedores=[katrina, verdela],
-        fornecedores_skus=[
-            make_fornecedor_sku(
-                sku, katrina, preco_unitario_atual=1800, moq_unidades=48
-            ),
-            make_fornecedor_sku(
-                sku, verdela, preco_unitario_atual=1950, moq_unidades=60
-            ),
-        ],
-        estoques=[make_estoque(sku, disponivel=120, reservada=10)],
+        fornecedores_por_sku={
+            sku.sku_code: [
+                make_fornecedor_sku(
+                    katrina, preco_unitario_reais=1800, moq_unidades=48
+                ),
+                make_fornecedor_sku(
+                    verdela, preco_unitario_reais=1950, moq_unidades=60
+                ),
+            ]
+        },
+        estoques={sku.sku_code: make_estoque(disponivel=120, reservada=10)},
         vendas=vendas,
     )
 
@@ -98,7 +100,7 @@ def test_analise_sku_sem_vendas_marca_sem_giro() -> None:
     sku = make_sku("SEM-VENDAS")
     adapter = InMemoryERPAdapter(
         skus=[sku],
-        estoques=[make_estoque(sku, disponivel=50)],
+        estoques={sku.sku_code: make_estoque(disponivel=50)},
     )
     client = _client(adapter)
     try:
@@ -126,10 +128,10 @@ def _adapter_com_dois_skus_um_urgente() -> InMemoryERPAdapter:
     ]
     return InMemoryERPAdapter(
         skus=[urgente, tranquilo],
-        estoques=[
-            make_estoque(urgente, disponivel=10),
-            make_estoque(tranquilo, disponivel=1000),
-        ],
+        estoques={
+            urgente.sku_code: make_estoque(disponivel=10),
+            tranquilo.sku_code: make_estoque(disponivel=1000),
+        },
         vendas=vendas,
     )
 

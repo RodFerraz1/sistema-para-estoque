@@ -9,38 +9,11 @@ from typing import Protocol
 from uuid import UUID
 
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
-from src.erp_adapter.schemas import (
-    EstoqueRaw,
-    FiltrosSKU,
-    FornecedorRaw,
-    FornecedorSKURaw,
-    MovimentacaoRaw,
-    SKURaw,
-    VendaRaw,
-)
 from src.inventory.schemas import Estoque, Movimentacao
 from src.sales.schemas import Venda
 
 
 class ERPAdapter(Protocol):
-    def get_sku_raw(self, sku_id: UUID) -> SKURaw | None: ...
-
-    def get_sku_raw_por_codigo(self, sku_code: str) -> SKURaw | None: ...
-
-    def list_skus_raw(self, filtros: FiltrosSKU) -> list[SKURaw]: ...
-
-    def get_fornecedor_raw(self, fornecedor_id: UUID) -> FornecedorRaw | None: ...
-
-    def list_fornecedores_para_sku(self, sku_id: UUID) -> list[FornecedorSKURaw]: ...
-
-    def get_estoque_atual(self, sku_id: UUID) -> EstoqueRaw | None: ...
-
-    def list_movimentacoes(
-        self, sku_id: UUID, desde: datetime
-    ) -> list[MovimentacaoRaw]: ...
-
-    def list_vendas(self, sku_id: UUID, desde: datetime) -> list[VendaRaw]: ...
-
     def carregar_sku(self, sku_code: str) -> SKU | None: ...
 
     def listar_skus(self) -> list[SKU]:
