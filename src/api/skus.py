@@ -35,7 +35,7 @@ def _fornecedor_to_response(f: FornecedorParaSKU) -> FornecedorResponse:
 
 
 def _sku_ou_404(catalog: Catalog, sku_code: str) -> SKU:
-    sku = catalog.buscar_sku_por_codigo(sku_code)
+    sku = catalog.carregar_sku(sku_code)
     if sku is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -76,7 +76,7 @@ def analise_sku(
         )
     giro = sales.giro_medio_mensal(sku.id)
     cobertura = inventory.cobertura_meses(sku.id)
-    fornecedores = catalog.list_fornecedores_para_sku(sku.id)
+    fornecedores = catalog.fornecedores_de(sku_code)
 
     return AnaliseSKUResponse(
         sku_code=sku.sku_code,
@@ -126,5 +126,5 @@ def fornecedores_do_sku(
     sku_code: str,
     catalog: Catalog = Depends(get_catalog),
 ) -> list[FornecedorResponse]:
-    sku = _sku_ou_404(catalog, sku_code)
-    return [_fornecedor_to_response(f) for f in catalog.list_fornecedores_para_sku(sku.id)]
+    _sku_ou_404(catalog, sku_code)
+    return [_fornecedor_to_response(f) for f in catalog.fornecedores_de(sku_code)]

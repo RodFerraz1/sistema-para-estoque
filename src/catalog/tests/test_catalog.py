@@ -11,11 +11,11 @@ from tests.fakes import (
 )
 
 
-def test_buscar_sku_por_codigo_encontra() -> None:
+def test_carregar_sku_encontra() -> None:
     sku = make_sku("TBC-BEG-70140")
     catalog = Catalog(InMemoryERPAdapter(skus=[sku]))
 
-    encontrado = catalog.buscar_sku_por_codigo("TBC-BEG-70140")
+    encontrado = catalog.carregar_sku("TBC-BEG-70140")
 
     assert encontrado is not None
     assert encontrado.sku_code == "TBC-BEG-70140"
@@ -24,21 +24,13 @@ def test_buscar_sku_por_codigo_encontra() -> None:
     assert encontrado.produto_id == uid("produto", "Produto Teste")
 
 
-def test_buscar_sku_por_codigo_inexistente_retorna_none() -> None:
+def test_carregar_sku_inexistente_retorna_none() -> None:
     catalog = Catalog(InMemoryERPAdapter(skus=[make_sku("A")]))
 
-    assert catalog.buscar_sku_por_codigo("NAO-EXISTE") is None
+    assert catalog.carregar_sku("NAO-EXISTE") is None
 
 
-def test_get_sku_por_id() -> None:
-    sku = make_sku("A")
-    catalog = Catalog(InMemoryERPAdapter(skus=[sku]))
-
-    assert catalog.get_sku(sku.id) is not None
-    assert catalog.get_sku(uid("sku", "fantasma")) is None
-
-
-def test_list_fornecedores_ordenado_por_preco_e_ignora_inativos() -> None:
+def test_fornecedores_de_ordenado_por_preco_e_ignora_inativos() -> None:
     sku = make_sku("A")
     caro = make_fornecedor("Caro")
     barato = make_fornecedor("Barato")
@@ -55,13 +47,13 @@ def test_list_fornecedores_ordenado_por_preco_e_ignora_inativos() -> None:
     )
     catalog = Catalog(adapter)
 
-    fornecedores = catalog.list_fornecedores_para_sku(sku.id)
+    fornecedores = catalog.fornecedores_de("A")
 
     assert [f.fornecedor_nome for f in fornecedores] == ["Barato", "Caro"]
     assert fornecedores[0].preco_unitario_reais == 2000
 
 
-def test_list_fornecedores_sku_sem_relacao_retorna_vazio() -> None:
+def test_fornecedores_de_sku_sem_relacao_retorna_vazio() -> None:
     catalog = Catalog(InMemoryERPAdapter(skus=[make_sku("A")]))
 
-    assert catalog.list_fornecedores_para_sku(uid("sku", "A")) == []
+    assert catalog.fornecedores_de("A") == []
