@@ -5,10 +5,8 @@ dependência intra-módulo explícita (documentada em module-interfaces.md).
 """
 from __future__ import annotations
 
-from uuid import UUID
-
+from src.catalog.schemas import SKU
 from src.erp_adapter.port import ERPAdapter
-from src.erp_adapter.schemas import FiltrosSKU
 from src.inventory.schemas import Cobertura, Estoque, SKUAbaixoDoPiso
 from src.sales.service import Sales
 
@@ -18,19 +16,18 @@ class Inventory:
         self._erp = erp
         self._sales = sales
 
-    def estoque_atual(self, sku_id: UUID) -> Estoque | None:
-        raw = self._erp.get_estoque_atual(sku_id)
-        if raw is None:
-            return None
-        return Estoque(
-            quantidade_disponivel=raw.quantidade_disponivel,
-            quantidade_reservada=raw.quantidade_reservada,
-            atualizado_em=raw.atualizado_em,
-        )
+    def estoque_atual(self, sku_code: str) -> Estoque | None:
+        return self._erp.estoque_de(sku_code)
 
-    def cobertura_meses(self, sku_id: UUID) -> Cobertura:
-        estoque = self.estoque_atual(sku_id)
-        giro = self._sales.giro_medio_mensal(sku_id)
+    def cobertura_meses(self, sku_code: str) -> Cobertura:
+        sku = self._erp.carregar_sku(sku_code)
+        if sku is None:
+            return Cobertura(meses=None, sem_giro=True)
+        return self._cobertura(sku)
+
+    def _cobertura(self, sku: SKU) -> Cobertura:
+        estoque = self.estoque_atual(sku.sku_code)
+        giro = self._sales.giro_medio_mensal(sku.id)
         if giro.unidades_por_mes == 0.0:
             return Cobertura(meses=None, sem_giro=True)
         disponivel = estoque.quantidade_disponivel if estoque is not None else 0
@@ -47,10 +44,9 @@ class Inventory:
         de reposição.
         """
         piso_meses = dias_piso / 30
-        skus = self._erp.list_skus_raw(FiltrosSKU(ativo=True))
         alertas: list[SKUAbaixoDoPiso] = []
-        for sku in skus:
-            cobertura = self.cobertura_meses(sku.id)
+        for sku in self._erp.listar_skus():
+            cobertura = self._cobertura(sku)
             if cobertura.meses is None:
                 continue
             if cobertura.meses >= piso_meses:

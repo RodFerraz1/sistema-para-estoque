@@ -68,14 +68,14 @@ def analise_sku(
 ) -> AnaliseSKUResponse:
     sku = _sku_ou_404(catalog, sku_code)
 
-    estoque = inventory.estoque_atual(sku.id)
+    estoque = inventory.estoque_atual(sku_code)
     if estoque is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"SKU '{sku_code}' sem snapshot de estoque",
         )
     giro = sales.giro_medio_mensal(sku.id)
-    cobertura = inventory.cobertura_meses(sku.id)
+    cobertura = inventory.cobertura_meses(sku_code)
     fornecedores = catalog.fornecedores_de(sku_code)
 
     return AnaliseSKUResponse(

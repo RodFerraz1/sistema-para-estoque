@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.inventory.service import Inventory
 from src.sales.service import Sales
-from tests.fakes import make_estoque, make_sku, make_venda, uid
+from tests.fakes import make_estoque, make_sku, make_venda
 
 
 NOW = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
@@ -21,7 +21,7 @@ def test_estoque_atual_retorna_dto() -> None:
     sku = make_sku("A")
     inv = _inv(skus=[sku], estoques=[make_estoque(sku, disponivel=200, reservada=15)])
 
-    estoque = inv.estoque_atual(sku.id)
+    estoque = inv.estoque_atual(sku.sku_code)
 
     assert estoque is not None
     assert estoque.quantidade_disponivel == 200
@@ -31,7 +31,7 @@ def test_estoque_atual_retorna_dto() -> None:
 def test_estoque_atual_inexistente_retorna_none() -> None:
     inv = _inv()
 
-    assert inv.estoque_atual(uid("sku", "fantasma")) is None
+    assert inv.estoque_atual("FANTASMA") is None
 
 
 def test_cobertura_calcula_meses() -> None:
@@ -51,7 +51,7 @@ def test_cobertura_calcula_meses() -> None:
         vendas=vendas,
     )
 
-    cobertura = inv.cobertura_meses(sku.id)
+    cobertura = inv.cobertura_meses(sku.sku_code)
 
     assert cobertura.sem_giro is False
     assert cobertura.meses == 2.0
@@ -66,7 +66,16 @@ def test_cobertura_sem_giro_quando_giro_zero() -> None:
         vendas=[],
     )
 
-    cobertura = inv.cobertura_meses(sku.id)
+    cobertura = inv.cobertura_meses(sku.sku_code)
+
+    assert cobertura.sem_giro is True
+    assert cobertura.meses is None
+
+
+def test_cobertura_sem_giro_quando_sku_inexistente() -> None:
+    inv = _inv()
+
+    cobertura = inv.cobertura_meses("FANTASMA")
 
     assert cobertura.sem_giro is True
     assert cobertura.meses is None
@@ -84,7 +93,7 @@ def test_cobertura_zero_quando_estoque_zero_e_ha_giro() -> None:
         vendas=vendas,
     )
 
-    cobertura = inv.cobertura_meses(sku.id)
+    cobertura = inv.cobertura_meses(sku.sku_code)
 
     assert cobertura.sem_giro is False
     assert cobertura.meses == 0.0
