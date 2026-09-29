@@ -8,6 +8,7 @@ from src.api.schemas import (
     FornecedorResponse,
     GiroResponse,
     SKUAbaixoDoPisoResponse,
+    SugestaoPedidoResponse,
     VendaMensalResponse,
 )
 from src.catalog.dependencies import get_catalog
@@ -20,6 +21,9 @@ from src.inventory.dependencies import get_inventory
 from src.inventory.service import Inventory
 from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
+from src.purchasing.dependencies import get_purchasing
+from src.purchasing.schemas import SugestaoPedido
+from src.purchasing.service import Purchasing
 from src.sales.dependencies import get_sales
 from src.sales.service import Sales
 
@@ -51,6 +55,29 @@ def _ficha_to_response(ficha: Ficha) -> AnaliseSKUResponse:
         ),
         cobertura=ficha.cobertura,
         fornecedores=[_fornecedor_to_response(f) for f in ficha.fornecedores],
+    )
+
+
+def _sugestao_to_response(sugestao: SugestaoPedido) -> SugestaoPedidoResponse:
+    return SugestaoPedidoResponse(
+        sku_code=sugestao.sku_code,
+        quantidade=sugestao.quantidade,
+        motivo=sugestao.motivo,
+        fornecedor=(
+            _fornecedor_to_response(sugestao.fornecedor)
+            if sugestao.fornecedor is not None
+            else None
+        ),
+        valor_estimado_centavos=sugestao.valor_estimado_centavos,
+        calculo=sugestao.calculo,
+        alertas=sugestao.alertas,
+        politica_versao=sugestao.politica_versao,
+    )
+
+
+def _sku_sem_estoque(e: SKUSemEstoque) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
     )
 
 
@@ -98,12 +125,24 @@ def analise_sku(
     try:
         ficha = ficha_sku.completa(sku_code)
     except SKUSemEstoque as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        ) from e
+        raise _sku_sem_estoque(e) from e
     if ficha is None:
         raise _sku_nao_encontrado(sku_code)
     return _ficha_to_response(ficha)
+
+
+@router.get("/{sku_code}/sugestao-compra", response_model=SugestaoPedidoResponse)
+def sugestao_compra(
+    sku_code: str,
+    purchasing: Purchasing = Depends(get_purchasing),
+) -> SugestaoPedidoResponse:
+    try:
+        sugestao = purchasing.sugerir_pedido(sku_code)
+    except SKUSemEstoque as e:
+        raise _sku_sem_estoque(e) from e
+    if sugestao is None:
+        raise _sku_nao_encontrado(sku_code)
+    return _sugestao_to_response(sugestao)
 
 
 @router.get("/{sku_code}/vendas", response_model=list[VendaMensalResponse])

@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict
 
 from src.inventory.schemas import Cobertura, Estoque
 from src.politica_compra.schemas import ParametrosPolitica
+from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
 
 
 class GiroResponse(BaseModel):
@@ -68,3 +69,16 @@ class PoliticaCompraResponse(BaseModel):
     versao: int
     criada_em: datetime
     parametros: ParametrosPolitica
+
+
+class SugestaoPedidoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    quantidade: int
+    motivo: MotivoSemCompra | None
+    fornecedor: FornecedorResponse | None
+    valor_estimado_centavos: int
+    calculo: MemoriaCalculo | None
+    alertas: list[Alerta]
+    politica_versao: int

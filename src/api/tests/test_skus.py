@@ -339,3 +339,95 @@ def test_fornecedores_sku_sem_fornecedores_retorna_lista_vazia() -> None:
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def _adapter_precisa_comprar() -> InMemoryERPAdapter:
+    sku = make_sku("TBC-BEG-70140")
+    katrina = make_fornecedor("Katrina Têxtil", lead_time_dias_contratado=35)
+    vendas = [
+        make_venda(sku, datetime(2026, m, 5, tzinfo=UTC), 100, key=str(m))
+        for m in range(3, 9)
+    ]
+    return InMemoryERPAdapter(
+        skus=[sku],
+        fornecedores=[katrina],
+        fornecedores_por_sku={
+            sku.sku_code: [
+                make_fornecedor_sku(
+                    katrina, preco_unitario_reais=1800, lead_time_dias_observado=62
+                )
+            ]
+        },
+        estoques={sku.sku_code: make_estoque(disponivel=150)},
+        vendas=vendas,
+    )
+
+
+def test_sugestao_compra_retorna_quantidade_fornecedor_e_calculo() -> None:
+    client = _client(_adapter_precisa_comprar())
+    try:
+        response = client.get("/skus/TBC-BEG-70140/sugestao-compra")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["sku_code"] == "TBC-BEG-70140"
+    assert body["quantidade"] > 0
+    assert body["motivo"] is None
+    assert body["fornecedor"]["fornecedor_nome"] == "Katrina Têxtil"
+    assert body["valor_estimado_centavos"] == body["quantidade"] * 1800
+    assert body["politica_versao"] == 1
+    assert body["calculo"]["lead_time_origem"] == "observado"
+    assert set(body["calculo"].keys()) == {
+        "giro_mensal",
+        "disponivel",
+        "em_transito",
+        "posicao",
+        "lead_time_dias",
+        "lead_time_origem",
+        "estoque_na_chegada",
+        "qtd_necessaria",
+        "cobertura_na_chegada_meses",
+    }
+    assert [a["tipo"] for a in body["alertas"]] == ["ruptura_antes_da_chegada"]
+    assert body["alertas"][0]["mensagem"]
+
+
+def test_sugestao_compra_sku_inexistente_retorna_404() -> None:
+    client = _client(_adapter_precisa_comprar())
+    try:
+        response = client.get("/skus/NAO-EXISTE/sugestao-compra")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 404
+    assert "NAO-EXISTE" in response.json()["detail"]
+
+
+def test_sugestao_compra_sem_compra_retorna_quantidade_zero_com_motivo() -> None:
+    # Giro 30/mês e 120 disponíveis: chega com folga acima do piso.
+    client = _client(_adapter_completo())
+    try:
+        response = client.get("/skus/TBC-BEG-70140/sugestao-compra")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["quantidade"] == 0
+    assert body["motivo"] == "acima_do_ponto_de_reposicao"
+    assert body["fornecedor"] is None
+    assert body["valor_estimado_centavos"] == 0
+    assert body["calculo"] is not None
+    assert body["alertas"] == []
+
+
+def test_sugestao_compra_sku_sem_snapshot_de_estoque_retorna_500() -> None:
+    client = _client(InMemoryERPAdapter(skus=[make_sku("A")]))
+    try:
+        response = client.get("/skus/A/sugestao-compra")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 500
