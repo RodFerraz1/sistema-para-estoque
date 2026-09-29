@@ -1,0 +1,201 @@
+[
+  {
+    "id": "c01",
+    "pergunta": "Como tá o estoque da toalha banho Conforto 70x140 hoje?",
+    "intencao": "situacao_sku",
+    "trechos_relevantes": [],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c02",
+    "pergunta": "Quanto tempo de cobertura ainda tenho do jogo de cama king percal 200 fios?",
+    "intencao": "situacao_sku",
+    "trechos_relevantes": [],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c03",
+    "pergunta": "O giro do pano de prato da Malha Fina caiu esse mês?",
+    "intencao": "situacao_sku",
+    "trechos_relevantes": [],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c04",
+    "pergunta": "Quanto sobrou de toalha de rosto 45x70 no estoque? Acho que já tá perto do piso",
+    "intencao": "situacao_sku",
+    "trechos_relevantes": [
+      "politicas/estoque-e-giro.md#regras/r4-piso-minimo"
+    ],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c05",
+    "pergunta": "Ainda tem muito jogo Veraneio da Verdela parado no CD?",
+    "intencao": "situacao_sku",
+    "trechos_relevantes": [
+      "reunioes/2024-07-erro-jogo-veraneio.md#introducao",
+      "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos"
+    ],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c06",
+    "pergunta": "No Natal de 2024 o king size da Katrina encalhou, então esse ano compro só 3 meses de giro?",
+    "intencao": "sugestao_compra",
+    "trechos_relevantes": [
+      "reunioes/2024-11-natal-king-size.md#decisao",
+      "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+      "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025",
+      "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
+      "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal"
+    ],
+    "premissa_falsa": "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025"
+  },
+  {
+    "id": "c07",
+    "pergunta": "Vale a pena antecipar o pedido de toalha Conforto antes do reajuste de agosto da Katrina?",
+    "intencao": "sugestao_compra",
+    "trechos_relevantes": [
+      "mercado/algodao-brasil-q1-2026.md#implicacoes-para-a-linha-do-atacadista",
+      "mercado/algodao-brasil-q1-2026.md#recomendacao-analitica",
+      "contratos/contrato-katrina-2025.md#clausulas-comerciais/4-reajuste",
+      "fornecedores/katrina-textil.md#condicoes-comerciais-padrao",
+      "fornecedores/katrina-textil.md#riscos-conhecidos",
+      "mercado/algodao-brasil-q1-2026.md#cenario-de-curto-prazo-proximos-6-meses",
+      "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025"
+    ],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c08",
+    "pergunta": "A Verdela lançou uma colcha nova, quanto eu peço no primeiro pedido?",
+    "intencao": "sugestao_compra",
+    "trechos_relevantes": [
+      "politicas/estoque-e-giro.md#regras/r3-colecao-nova-sem-historico",
+      "reunioes/2024-07-erro-jogo-veraneio.md#aprendizados-formalizados",
+      "reunioes/2024-07-erro-jogo-veraneio.md#o-que-virou-politica",
+      "fornecedores/verdela-home.md#condicoes-comerciais-padrao"
+    ],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c09",
+    "pergunta": "A Katrina entrega em 45 dias, então posso esperar até outubro pra comprar o king do Natal?",
+    "intencao": "sugestao_compra",
+    "trechos_relevantes": [
+      "fornecedores/katrina-textil.md#lead-time",
+      "fornecedores/katrina-textil.md#sazonalidade-e-capacidade",
+      "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+      "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+      "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos"
+    ],
+    "premissa_falsa": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil"
+  },
+  {
+    "id": "c10",
+    "pergunta": "Tô pensando em fechar uns 50 mil de toalha de mesa com a Malha Fina pro Dia das Mães, faz sentido?",
+    "intencao": "sugestao_compra",
+    "trechos_relevantes": [
+      "fornecedores/malha-fina-textil.md#condicoes-comerciais-padrao",
+      "fornecedores/malha-fina-textil.md#uso-estrategico",
+      "fornecedores/malha-fina-textil.md#riscos",
+      "reunioes/2025-q1-revisao-fornecedores.md#malha-fina",
+      "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+      "politicas/aprovacao-compras.md#faixas-de-valor/faixa-2-r-15-000-ate-r-60-000"
+    ],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c11",
+    "pergunta": "Qual o lead time de verdade da Katrina?",
+    "intencao": "politica_ou_fornecedor",
+    "trechos_relevantes": [
+      "fornecedores/katrina-textil.md#lead-time",
+      "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+      "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+      "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+      "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+      "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento"
+    ],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c12",
+    "pergunta": "Quem precisa aprovar um pedido de 80 mil?",
+    "intencao": "politica_ou_fornecedor",
+    "trechos_relevantes": [
+      "politicas/aprovacao-compras.md#faixas-de-valor/faixa-3-r-60-000-ate-r-150-000",
+      "politicas/aprovacao-compras.md#excecoes-especificas"
+    ],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c13",
+    "pergunta": "A política deixa passar de 3 meses de estoque no Natal?",
+    "intencao": "politica_ou_fornecedor",
+    "trechos_relevantes": [
+      "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
+      "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+      "politicas/estoque-e-giro.md#governanca",
+      "mercado/algodao-brasil-q1-2026.md#recomendacao-analitica",
+      "reunioes/2024-11-natal-king-size.md#o-que-ficou-pendente"
+    ],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c14",
+    "pergunta": "Como a Verdela vive atrasando, qual prazo eu devo considerar pra ela?",
+    "intencao": "politica_ou_fornecedor",
+    "trechos_relevantes": [
+      "fornecedores/verdela-home.md#lead-time"
+    ],
+    "premissa_falsa": "fornecedores/verdela-home.md#lead-time"
+  },
+  {
+    "id": "c15",
+    "pergunta": "O contrato da Katrina tem exclusividade? Posso comprar felpudo de outro fornecedor?",
+    "intencao": "politica_ou_fornecedor",
+    "trechos_relevantes": [
+      "contratos/contrato-katrina-2025.md#clausulas-comerciais/6-exclusividade",
+      "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento",
+      "fornecedores/katrina-textil.md#riscos-conhecidos"
+    ],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c16",
+    "pergunta": "Vai chover em Blumenau amanhã?",
+    "intencao": "fora_de_escopo",
+    "trechos_relevantes": [],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c17",
+    "pergunta": "Me passa uma receita de bolo de fubá?",
+    "intencao": "fora_de_escopo",
+    "trechos_relevantes": [],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c18",
+    "pergunta": "Quanto ficou o jogo do Palmeiras ontem?",
+    "intencao": "fora_de_escopo",
+    "trechos_relevantes": [],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c19",
+    "pergunta": "Como eu troco a senha do meu e-mail?",
+    "intencao": "fora_de_escopo",
+    "trechos_relevantes": [],
+    "premissa_falsa": null
+  },
+  {
+    "id": "c20",
+    "pergunta": "Me ajuda a escrever uma mensagem de aniversário pro gerente comercial?",
+    "intencao": "fora_de_escopo",
+    "trechos_relevantes": [],
+    "premissa_falsa": null
+  }
+]

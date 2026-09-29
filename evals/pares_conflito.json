@@ -1,0 +1,62 @@
+[
+  {
+    "trecho_a": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+    "trecho_b": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+    "conflitam": true,
+    "motivo": "Nota interna diz que a antecedência de 45 dias é rigorosamente cumprida em setembro-outubro; a reunião diz que o lead time de outubro-novembro passou de 45 para 68 dias."
+  },
+  {
+    "trecho_a": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+    "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+    "conflitam": true,
+    "motivo": "Nota interna diz que a cláusula 3 é cumprida em setembro-outubro; a revisão diz que o lead time ficou acima do contratado em Q3/2024, Q4/2024 e Q1/2025."
+  },
+  {
+    "trecho_a": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+    "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+    "conflitam": true,
+    "motivo": "Lead time contratado (45 dias) contra observado (62 dias, operar com 65-70 dias de antecedência)."
+  },
+  {
+    "trecho_a": "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
+    "trecho_b": "reunioes/2024-11-natal-king-size.md#decisao",
+    "conflitam": true,
+    "motivo": "A política limita a 3 meses de giro; a decisão comprou 5 meses de giro do king size."
+  },
+  {
+    "trecho_a": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+    "trecho_b": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+    "conflitam": true,
+    "motivo": "O contrato garante entrega com 45 dias de antecedência; a reunião diz que o lead time real de outubro-novembro foi de 68 dias."
+  },
+  {
+    "trecho_a": "contratos/contrato-katrina-2025.md#clausulas-comerciais/2-volumes-minimos",
+    "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+    "conflitam": false,
+    "motivo": "Mínimo semestral de R$ 240 mil e faturamento de Q1/2025 dentro do ritmo para batê-lo."
+  },
+  {
+    "trecho_a": "fornecedores/malha-fina-textil.md#riscos",
+    "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#malha-fina",
+    "conflitam": false,
+    "motivo": "Os dois registram duas ocorrências de qualidade em 2024; a revisão acrescenta que o trimestre não teve incidentes."
+  },
+  {
+    "trecho_a": "politicas/estoque-e-giro.md#regras/r3-colecao-nova-sem-historico",
+    "trecho_b": "reunioes/2024-07-erro-jogo-veraneio.md#o-que-virou-politica",
+    "conflitam": false,
+    "motivo": "A regra de coleção nova com teto de 1 mês é a mesma que a retrospectiva diz ter virado política."
+  },
+  {
+    "trecho_a": "fornecedores/katrina-textil.md#lead-time",
+    "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+    "conflitam": false,
+    "motivo": "Os dois dizem que o prometido é 45 dias e o observado fica perto de 60 dias."
+  },
+  {
+    "trecho_a": "fornecedores/verdela-home.md#condicoes-comerciais-padrao",
+    "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#verdela-home",
+    "conflitam": false,
+    "motivo": "Reajuste anual em março acima da inflação por câmbio; a revisão registra +9,4% em março por câmbio."
+  }
+]
