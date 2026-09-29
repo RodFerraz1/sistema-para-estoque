@@ -4,11 +4,13 @@ Camada API compõe DTOs dos módulos em respostas amigáveis.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
 from src.inventory.schemas import Cobertura, Estoque
+from src.politica_compra.schemas import ParametrosPolitica
 
 
 class GiroResponse(BaseModel):
@@ -58,3 +60,11 @@ class VendaMensalResponse(BaseModel):
     mes: int
     quantidade_unidades: int
     valor_total_reais: int
+
+
+class PoliticaCompraResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    versao: int
+    criada_em: datetime
+    parametros: ParametrosPolitica

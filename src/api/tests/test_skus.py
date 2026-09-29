@@ -8,6 +8,9 @@ from fastapi.testclient import TestClient
 from src.erp_adapter.dependencies import get_erp_adapter
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.main import app
+from src.politica_compra.dependencies import get_politica_compra_repositorio
+from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
+from src.politica_compra.schemas import PARAMETROS_V1
 from tests.fakes import (
     make_estoque,
     make_fornecedor,
@@ -51,13 +54,19 @@ def _adapter_completo() -> InMemoryERPAdapter:
     )
 
 
-def _client(adapter: InMemoryERPAdapter) -> TestClient:
+def _client(
+    adapter: InMemoryERPAdapter,
+    politicas: InMemoryPoliticaCompraRepositorio | None = None,
+) -> TestClient:
+    repo = politicas or InMemoryPoliticaCompraRepositorio()
     app.dependency_overrides[get_erp_adapter] = lambda: adapter
+    app.dependency_overrides[get_politica_compra_repositorio] = lambda: repo
     return TestClient(app)
 
 
 def _cleanup() -> None:
     app.dependency_overrides.pop(get_erp_adapter, None)
+    app.dependency_overrides.pop(get_politica_compra_repositorio, None)
 
 
 def test_analise_sku_retorna_shape_esperado() -> None:
@@ -163,6 +172,38 @@ def test_abaixo_do_piso_dias_parametrizavel() -> None:
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def _politica_com_piso_alerta(dias: int) -> InMemoryPoliticaCompraRepositorio:
+    repo = InMemoryPoliticaCompraRepositorio()
+    repo.salvar_nova_versao(
+        PARAMETROS_V1.model_copy(update={"piso_alerta_dias": dias})
+    )
+    return repo
+
+
+def test_abaixo_do_piso_sem_dias_usa_piso_alerta_da_politica() -> None:
+    # URG tem cobertura de 5 dias (10 / 60 por mês). Com piso de alerta 3,
+    # sai da lista; com o padrão 20, estaria nela.
+    client = _client(_adapter_com_dois_skus_um_urgente(), _politica_com_piso_alerta(3))
+    try:
+        response = client.get("/skus/abaixo-do-piso")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_abaixo_do_piso_com_dias_ignora_a_politica() -> None:
+    client = _client(_adapter_com_dois_skus_um_urgente(), _politica_com_piso_alerta(3))
+    try:
+        response = client.get("/skus/abaixo-do-piso?dias=20")
+    finally:
+        _cleanup()
+
+    assert response.status_code == 200
+    assert [s["sku_code"] for s in response.json()] == ["URG"]
 
 
 def test_abaixo_do_piso_lista_vazia() -> None:

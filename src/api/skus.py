@@ -18,6 +18,8 @@ from src.ficha_sku.schemas import Ficha
 from src.ficha_sku.service import FichaSKU, SKUSemEstoque
 from src.inventory.dependencies import get_inventory
 from src.inventory.service import Inventory
+from src.politica_compra.dependencies import get_politica_compra_repositorio
+from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.sales.dependencies import get_sales
 from src.sales.service import Sales
 
@@ -68,9 +70,16 @@ def _sku_ou_404(catalog: Catalog, sku_code: str) -> SKU:
 
 @router.get("/abaixo-do-piso", response_model=list[SKUAbaixoDoPisoResponse])
 def abaixo_do_piso(
-    dias: int = Query(20, ge=1, description="Piso em dias de cobertura"),
+    dias: int | None = Query(
+        None,
+        ge=1,
+        description="Piso de alerta em dias de cobertura. Sem ele, usa o da política ativa.",
+    ),
     inventory: Inventory = Depends(get_inventory),
+    politicas: PoliticaCompraRepositorio = Depends(get_politica_compra_repositorio),
 ) -> list[SKUAbaixoDoPisoResponse]:
+    if dias is None:
+        dias = politicas.ativa().parametros.piso_alerta_dias
     return [
         SKUAbaixoDoPisoResponse(
             sku_code=a.sku_code,
