@@ -390,8 +390,8 @@ def test_sugestao_compra_retorna_quantidade_fornecedor_e_calculo() -> None:
         "qtd_necessaria",
         "cobertura_na_chegada_meses",
     }
-    assert [a["tipo"] for a in body["alertas"]] == ["ruptura_antes_da_chegada"]
-    assert body["alertas"][0]["mensagem"]
+    assert "ruptura_antes_da_chegada" in {a["tipo"] for a in body["alertas"]}
+    assert all(a["mensagem"] for a in body["alertas"])
 
 
 def test_sugestao_compra_sku_inexistente_retorna_404() -> None:

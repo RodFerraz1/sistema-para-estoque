@@ -11,7 +11,7 @@ from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.ficha_sku.service import FichaSKU
 from src.inventory.service import Inventory
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
-from src.politica_compra.schemas import PARAMETROS_V1, LeadTimeBase
+from src.politica_compra.schemas import PARAMETROS_V1, CriterioFornecedor, LeadTimeBase
 from src.purchasing.schemas import LeadTimeOrigem, MotivoSemCompra, TipoAlerta
 from src.purchasing.service import Purchasing
 from src.sales.service import Sales
@@ -43,6 +43,37 @@ def _katrina(**kwargs) -> FornecedorParaSKU:
     kwargs.setdefault("moq_unidades", 48)
     kwargs.setdefault("lead_time_dias_observado", 62)
     return make_fornecedor_sku(KATRINA, **kwargs)
+
+
+BRAVO = make_fornecedor("Bravo Malhas", lead_time_dias_contratado=20)
+
+
+def _bravo(**kwargs) -> FornecedorParaSKU:
+    kwargs.setdefault("preco_unitario_reais", 2000)
+    kwargs.setdefault("moq_unidades", 48)
+    kwargs.setdefault("lead_time_dias_observado", 20)
+    return make_fornecedor_sku(BRAVO, **kwargs)
+
+
+def _dois_fornecedores(
+    katrina: FornecedorParaSKU, bravo: FornecedorParaSKU, **kwargs
+) -> Purchasing:
+    return _purchasing(
+        fornecedores=[KATRINA, BRAVO], fornecedores_sku=[katrina, bravo], **kwargs
+    )
+
+
+def _escolhido(purchasing: Purchasing) -> str:
+    sugestao = purchasing.sugerir_pedido(SKU.sku_code)
+    assert sugestao is not None
+    assert sugestao.fornecedor is not None
+    return sugestao.fornecedor.fornecedor_nome
+
+
+def _tipos(purchasing: Purchasing) -> set[TipoAlerta]:
+    sugestao = purchasing.sugerir_pedido(SKU.sku_code)
+    assert sugestao is not None
+    return {a.tipo for a in sugestao.alertas}
 
 
 def _purchasing(
@@ -100,7 +131,11 @@ def test_exemplo_da_spec_numero_a_numero() -> None:
     assert calculo.qtd_necessaria == 200
     assert calculo.cobertura_na_chegada_meses == pytest.approx(2.0)
 
-    assert [a.tipo for a in sugestao.alertas] == [TipoAlerta.RUPTURA_ANTES_DA_CHEGADA]
+    assert [a.tipo for a in sugestao.alertas] == [
+        TipoAlerta.RUPTURA_ANTES_DA_CHEGADA,
+        TipoAlerta.ABAIXO_PEDIDO_MINIMO,
+        TipoAlerta.LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO,
+    ]
 
 
 def test_sku_inexistente_retorna_none() -> None:
@@ -189,7 +224,7 @@ def test_sem_ruptura_quando_a_posicao_cobre_o_lead_time() -> None:
 
     assert sugestao is not None
     assert sugestao.quantidade > 0
-    assert sugestao.alertas == []
+    assert TipoAlerta.RUPTURA_ANTES_DA_CHEGADA not in {a.tipo for a in sugestao.alertas}
 
 
 def test_lead_time_contratado() -> None:
@@ -271,3 +306,164 @@ def test_quantidade_exata_nao_ganha_unidade_por_erro_de_ponto_flutuante() -> Non
 
     assert sugestao is not None
     assert sugestao.quantidade == 220
+
+
+def test_cada_candidato_usa_o_proprio_lead_time_e_moq() -> None:
+    # Katrina estoura o teto pelo MOQ. Bravo chega em 20 dias:
+    # 150 - 66,7 = 83,3 na chegada; ceil(200 - 83,3) = 117, MOQ 120.
+    purchasing = _dois_fornecedores(_katrina(moq_unidades=400), _bravo(moq_unidades=120))
+
+    sugestao = purchasing.sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None
+    assert sugestao.fornecedor is not None
+    assert sugestao.fornecedor.fornecedor_nome == "Bravo Malhas"
+    assert sugestao.calculo is not None
+    assert sugestao.calculo.lead_time_dias == 20
+    assert sugestao.calculo.qtd_necessaria == 117
+    assert sugestao.quantidade == 120
+    assert sugestao.valor_estimado_centavos == 120 * 2000
+
+
+def test_menor_preco_escolhe_o_mais_barato() -> None:
+    purchasing = _dois_fornecedores(_katrina(), _bravo())
+
+    assert _escolhido(purchasing) == "Katrina Têxtil"
+
+
+def test_menor_preco_desempata_pelo_lead_time() -> None:
+    purchasing = _dois_fornecedores(
+        _katrina(preco_unitario_reais=2000), _bravo(preco_unitario_reais=2000)
+    )
+
+    assert _escolhido(purchasing) == "Bravo Malhas"
+
+
+def test_menor_lead_time_escolhe_o_mais_rapido() -> None:
+    purchasing = _dois_fornecedores(
+        _katrina(),
+        _bravo(),
+        politicas=_politica(criterio_fornecedor=CriterioFornecedor.MENOR_LEAD_TIME),
+    )
+
+    assert _escolhido(purchasing) == "Bravo Malhas"
+
+
+def test_menor_lead_time_desempata_pelo_preco() -> None:
+    purchasing = _dois_fornecedores(
+        _katrina(lead_time_dias_observado=20, preco_unitario_reais=2100),
+        _bravo(preco_unitario_reais=2200),
+        politicas=_politica(criterio_fornecedor=CriterioFornecedor.MENOR_LEAD_TIME),
+    )
+
+    assert _escolhido(purchasing) == "Katrina Têxtil"
+
+
+@pytest.mark.parametrize(
+    ("base", "escolhido"),
+    [
+        (LeadTimeBase.OBSERVADO, "Katrina Têxtil"),
+        (LeadTimeBase.CONTRATADO, "Bravo Malhas"),
+        (LeadTimeBase.MAIOR, "Bravo Malhas"),
+    ],
+)
+def test_criterio_usa_o_lead_time_resolvido_pela_base(
+    base: LeadTimeBase, escolhido: str
+) -> None:
+    # Katrina: observado 10, contratado 35. Bravo: observado 30, contratado 20.
+    # Com 50 disponíveis os dois precisam comprar, qualquer que seja a base.
+    purchasing = _dois_fornecedores(
+        _katrina(lead_time_dias_observado=10),
+        _bravo(lead_time_dias_observado=30),
+        disponivel=50,
+        politicas=_politica(
+            lead_time_base=base, criterio_fornecedor=CriterioFornecedor.MENOR_LEAD_TIME
+        ),
+    )
+
+    assert _escolhido(purchasing) == escolhido
+
+
+def test_moq_do_mais_barato_estourando_o_teto_passa_pro_seguinte() -> None:
+    # Katrina: 0 na chegada + MOQ 400 = 4 meses, acima do teto de 3.
+    purchasing = _dois_fornecedores(_katrina(moq_unidades=400), _bravo())
+
+    assert _escolhido(purchasing) == "Bravo Malhas"
+    assert TipoAlerta.VIOLA_TETO not in _tipos(purchasing)
+
+
+def test_moq_na_borda_do_teto_ainda_cabe() -> None:
+    # 0 na chegada + MOQ 300 = exatamente 3 meses.
+    purchasing = _dois_fornecedores(_katrina(moq_unidades=300), _bravo())
+
+    assert _escolhido(purchasing) == "Katrina Têxtil"
+
+
+def test_nenhum_cabendo_no_teto_escolhe_o_primeiro_e_alerta() -> None:
+    purchasing = _dois_fornecedores(_katrina(moq_unidades=400), _bravo(moq_unidades=500))
+
+    sugestao = purchasing.sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None
+    assert sugestao.fornecedor is not None
+    assert sugestao.fornecedor.fornecedor_nome == "Katrina Têxtil"
+    assert sugestao.quantidade == 400
+    viola_teto = [a for a in sugestao.alertas if a.tipo == TipoAlerta.VIOLA_TETO]
+    assert len(viola_teto) == 1
+    assert "4,0 meses" in viola_teto[0].mensagem
+    assert "3,0 meses" in viola_teto[0].mensagem
+
+
+def test_nenhum_cabendo_escolhe_o_primeiro_da_ordem_mesmo_estourando_mais() -> None:
+    # Katrina chega com 5,0 meses; Bravo com (83,3 + 400) / 100 = 4,8.
+    purchasing = _dois_fornecedores(_katrina(moq_unidades=500), _bravo(moq_unidades=400))
+
+    assert _escolhido(purchasing) == "Katrina Têxtil"
+    assert TipoAlerta.VIOLA_TETO in _tipos(purchasing)
+
+
+def _com_pedido_minimo(reais: int) -> Purchasing:
+    # Compra de 200 x R$ 18,00 = R$ 3.600,00.
+    katrina = make_fornecedor(
+        "Katrina Têxtil", lead_time_dias_contratado=35, pedido_minimo_reais=reais
+    )
+    return _purchasing(
+        fornecedores=[katrina],
+        fornecedores_sku=[
+            make_fornecedor_sku(
+                katrina, preco_unitario_reais=1800, lead_time_dias_observado=62
+            )
+        ],
+    )
+
+
+def test_abaixo_do_pedido_minimo_converte_reais_para_centavos() -> None:
+    assert TipoAlerta.ABAIXO_PEDIDO_MINIMO in _tipos(_com_pedido_minimo(3601))
+    assert TipoAlerta.ABAIXO_PEDIDO_MINIMO not in _tipos(_com_pedido_minimo(3600))
+
+
+def test_mensagem_do_pedido_minimo_mostra_os_valores_em_reais() -> None:
+    sugestao = _com_pedido_minimo(10_000).sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None
+    [alerta] = [a for a in sugestao.alertas if a.tipo == TipoAlerta.ABAIXO_PEDIDO_MINIMO]
+    assert "R$ 3.600,00" in alerta.mensagem
+    assert "R$ 10.000,00" in alerta.mensagem
+
+
+@pytest.mark.parametrize("base", list(LeadTimeBase))
+def test_lead_time_observado_acima_do_contratado_independe_da_base(
+    base: LeadTimeBase,
+) -> None:
+    purchasing = _purchasing(politicas=_politica(lead_time_base=base))
+
+    assert TipoAlerta.LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO in _tipos(purchasing)
+
+
+@pytest.mark.parametrize("observado", [35, 20, None])
+def test_sem_alerta_de_lead_time_quando_observado_nao_passa_do_contratado(
+    observado: int | None,
+) -> None:
+    purchasing = _purchasing(fornecedores_sku=[_katrina(lead_time_dias_observado=observado)])
+
+    assert TipoAlerta.LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO not in _tipos(purchasing)

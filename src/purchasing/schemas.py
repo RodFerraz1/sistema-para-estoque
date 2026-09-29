@@ -16,6 +16,9 @@ class MotivoSemCompra(StrEnum):
 
 class TipoAlerta(StrEnum):
     RUPTURA_ANTES_DA_CHEGADA = "ruptura_antes_da_chegada"
+    VIOLA_TETO = "viola_teto"
+    ABAIXO_PEDIDO_MINIMO = "abaixo_pedido_minimo"
+    LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO = "lead_time_observado_acima_do_contratado"
 
 
 class LeadTimeOrigem(StrEnum):
