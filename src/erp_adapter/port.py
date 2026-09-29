@@ -9,7 +9,7 @@ from typing import Protocol
 from uuid import UUID
 
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
-from src.inventory.schemas import Estoque, Movimentacao
+from src.inventory.schemas import Estoque, ItemEmTransito, Movimentacao
 from src.sales.schemas import Venda
 
 
@@ -36,4 +36,10 @@ class ERPAdapter(Protocol):
         self, sku_code: str, desde: datetime
     ) -> list[Movimentacao]:
         """Movimentações com `data >= desde`, em ordem cronológica."""
+        ...
+
+    def itens_em_transito_de(self, sku_code: str) -> list[ItemEmTransito]:
+        """Itens de pedidos `aprovado`, `enviado` ou `recebido_parcial` com
+        `quantidade - quantidade_recebida > 0`, por data prevista de entrega
+        (sem data por último)."""
         ...

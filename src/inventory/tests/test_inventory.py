@@ -1,12 +1,21 @@
 """Testes unitários do módulo `inventory`."""
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from src.erp_adapter.in_memory import InMemoryERPAdapter
+import pytest
+
+from src.erp_adapter.in_memory import InMemoryERPAdapter, StatusPedidoCompra
 from src.inventory.service import Inventory
 from src.sales.service import Sales
-from tests.fakes import make_estoque, make_sku, make_venda
+from tests.fakes import (
+    make_estoque,
+    make_fornecedor,
+    make_item_pedido_compra,
+    make_pedido_compra,
+    make_sku,
+    make_venda,
+)
 
 
 NOW = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
@@ -199,3 +208,142 @@ def test_abaixo_do_piso_parametro_dias_muda_limite() -> None:
     # Piso 10d = 0.333 -> acima.
     assert len(inv.abaixo_do_piso(dias_piso=20)) == 1
     assert inv.abaixo_do_piso(dias_piso=10) == []
+
+
+def test_em_transito_conta_pendente_de_pedido_enviado() -> None:
+    sku = make_sku("A")
+    fornecedor = make_fornecedor()
+    pedido = make_pedido_compra(
+        fornecedor, "enviado", data_prevista_entrega=date(2026, 10, 20)
+    )
+    inv = _inv(
+        skus=[sku],
+        pedidos_compra=[pedido],
+        itens_pedido_compra=[make_item_pedido_compra(pedido, sku, quantidade=120)],
+    )
+
+    em_transito = inv.em_transito(sku.sku_code)
+
+    assert em_transito.total_unidades == 120
+    [item] = em_transito.itens
+    assert item.pedido_id == pedido.id
+    assert item.fornecedor_id == fornecedor.id
+    assert item.status == "enviado"
+    assert item.quantidade_pendente == 120
+    assert item.data_prevista_entrega == date(2026, 10, 20)
+
+
+@pytest.mark.parametrize("status", ["aprovado", "enviado", "recebido_parcial"])
+def test_em_transito_conta_status_de_pedido_aberto(status: StatusPedidoCompra) -> None:
+    sku = make_sku("A")
+    pedido = make_pedido_compra(make_fornecedor(), status)
+    inv = _inv(
+        skus=[sku],
+        pedidos_compra=[pedido],
+        itens_pedido_compra=[make_item_pedido_compra(pedido, sku, quantidade=50)],
+    )
+
+    assert inv.em_transito(sku.sku_code).total_unidades == 50
+
+
+@pytest.mark.parametrize("status", ["rascunho", "cancelado", "recebido_total"])
+def test_em_transito_ignora_status_fora_do_transito(
+    status: StatusPedidoCompra,
+) -> None:
+    sku = make_sku("A")
+    pedido = make_pedido_compra(make_fornecedor(), status)
+    inv = _inv(
+        skus=[sku],
+        pedidos_compra=[pedido],
+        itens_pedido_compra=[make_item_pedido_compra(pedido, sku, quantidade=50)],
+    )
+
+    em_transito = inv.em_transito(sku.sku_code)
+
+    assert em_transito.total_unidades == 0
+    assert em_transito.itens == []
+
+
+def test_em_transito_recebido_parcial_conta_so_o_pendente() -> None:
+    sku = make_sku("A")
+    pedido = make_pedido_compra(make_fornecedor(), "recebido_parcial")
+    inv = _inv(
+        skus=[sku],
+        pedidos_compra=[pedido],
+        itens_pedido_compra=[
+            make_item_pedido_compra(pedido, sku, quantidade=100, quantidade_recebida=40)
+        ],
+    )
+
+    em_transito = inv.em_transito(sku.sku_code)
+
+    assert em_transito.total_unidades == 60
+    assert [i.quantidade_pendente for i in em_transito.itens] == [60]
+
+
+def test_em_transito_ignora_item_ja_recebido_por_inteiro() -> None:
+    sku = make_sku("A")
+    pedido = make_pedido_compra(make_fornecedor(), "recebido_parcial")
+    inv = _inv(
+        skus=[sku],
+        pedidos_compra=[pedido],
+        itens_pedido_compra=[
+            make_item_pedido_compra(pedido, sku, quantidade=100, quantidade_recebida=100)
+        ],
+    )
+
+    em_transito = inv.em_transito(sku.sku_code)
+
+    assert em_transito.total_unidades == 0
+    assert em_transito.itens == []
+
+
+def test_em_transito_soma_pedidos_e_ignora_outros_skus() -> None:
+    sku = make_sku("A")
+    outro = make_sku("B")
+    katrina = make_fornecedor("Katrina Têxtil")
+    buddemeyer = make_fornecedor("Buddemeyer")
+    tardio = make_pedido_compra(
+        katrina, "enviado", data_prevista_entrega=date(2026, 11, 1)
+    )
+    cedo = make_pedido_compra(
+        buddemeyer, "aprovado", data_prevista_entrega=date(2026, 10, 1)
+    )
+    inv = _inv(
+        skus=[sku, outro],
+        pedidos_compra=[tardio, cedo],
+        itens_pedido_compra=[
+            make_item_pedido_compra(tardio, sku, quantidade=30),
+            make_item_pedido_compra(tardio, outro, quantidade=999),
+            make_item_pedido_compra(cedo, sku, quantidade=70),
+        ],
+    )
+
+    em_transito = inv.em_transito(sku.sku_code)
+
+    assert em_transito.total_unidades == 100
+    assert [i.pedido_id for i in em_transito.itens] == [cedo.id, tardio.id]
+
+
+def test_em_transito_sku_sem_pedidos_devolve_zero() -> None:
+    sku = make_sku("A")
+    inv = _inv(skus=[sku])
+
+    em_transito = inv.em_transito(sku.sku_code)
+
+    assert em_transito.total_unidades == 0
+    assert em_transito.itens == []
+
+
+def test_cobertura_ignora_em_transito() -> None:
+    sku = make_sku("A")
+    pedido = make_pedido_compra(make_fornecedor(), "enviado")
+    inv = _inv(
+        skus=[sku],
+        estoques={sku.sku_code: make_estoque(disponivel=120)},
+        vendas=_vendas_giro_60(sku),
+        pedidos_compra=[pedido],
+        itens_pedido_compra=[make_item_pedido_compra(pedido, sku, quantidade=600)],
+    )
+
+    assert inv.cobertura_meses(sku.sku_code).meses == 2.0

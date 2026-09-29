@@ -6,7 +6,12 @@ dependência intra-módulo explícita (documentada em module-interfaces.md).
 from __future__ import annotations
 
 from src.erp_adapter.port import ERPAdapter
-from src.inventory.schemas import Cobertura, Estoque, SKUAbaixoDoPiso
+from src.inventory.schemas import (
+    Cobertura,
+    EmTransito,
+    Estoque,
+    SKUAbaixoDoPiso,
+)
 from src.sales.service import Sales
 
 
@@ -27,6 +32,13 @@ class Inventory:
         return Cobertura(
             meses=disponivel / giro.unidades_por_mes,
             sem_giro=False,
+        )
+
+    def em_transito(self, sku_code: str) -> EmTransito:
+        itens = self._erp.itens_em_transito_de(sku_code)
+        return EmTransito(
+            total_unidades=sum(i.quantidade_pendente for i in itens),
+            itens=itens,
         )
 
     def abaixo_do_piso(self, dias_piso: int = 20) -> list[SKUAbaixoDoPiso]:

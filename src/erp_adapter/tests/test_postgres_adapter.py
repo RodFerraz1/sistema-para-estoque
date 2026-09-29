@@ -5,7 +5,7 @@ Requerem `docker compose up` + `alembic upgrade head` + seed populado.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 import pytest
@@ -14,6 +14,7 @@ from sqlalchemy import text
 from scripts.seed import run as run_seed
 from src.db.engine import get_engine
 from src.erp_adapter.postgres import PostgresERPAdapter
+from src.inventory.schemas import STATUS_EM_TRANSITO
 from tests.fakes import uid
 
 
@@ -261,3 +262,165 @@ def test_movimentacoes_de_sku_inexistente(adapter: PostgresERPAdapter) -> None:
         adapter.movimentacoes_de("NAO-EXISTE-XYZ", datetime(2020, 1, 1, tzinfo=UTC))
         == []
     )
+
+
+_SKU_TRANSITO_CODE = "TESTE-SKU-TRANSITO"
+
+
+def _pedido_id(status: str) -> UUID:
+    return uid("pedido", f"teste-transito|{status}")
+
+
+_PEDIDOS_TESTE_TRANSITO = [
+    ("rascunho", 0, None),
+    ("aprovado", 0, None),
+    ("enviado", 0, date(2026, 11, 10)),
+    ("recebido_parcial", 40, date(2026, 10, 5)),
+    ("recebido_total", 100, None),
+    ("cancelado", 0, None),
+]
+
+
+@pytest.fixture
+def fornecedor_com_pedidos_em_transito() -> Iterator[UUID]:
+    """Cria um SKU sem histórico e pendura nele um pedido de cada status,
+    todos com 100 unidades. O `recebido_parcial` já recebeu 40, e um
+    segundo item dele (em outro SKU) não deve vazar. Devolve o id do
+    fornecedor dos pedidos."""
+    agora = datetime.now(UTC)
+    with get_engine().begin() as conn:
+        (outro_sku_id, produto_id) = conn.execute(
+            text("SELECT id, produto_id FROM erp.skus WHERE sku_code = :c"),
+            {"c": _algum_sku_code()},
+        ).one()
+        (fornecedor_id,) = conn.execute(
+            text("SELECT id FROM erp.fornecedores ORDER BY nome LIMIT 1")
+        ).one()
+        sku_id = uid("sku", _SKU_TRANSITO_CODE)
+        conn.execute(
+            text(
+                """
+                INSERT INTO erp.skus
+                  (id, produto_id, sku_code, cor, tamanho, gramatura, material,
+                   ativo, criado_em)
+                VALUES (:id, :produto_id, :code, 'branco', '70x140', NULL, NULL,
+                        TRUE, :agora)
+                """
+            ),
+            {
+                "id": sku_id,
+                "produto_id": produto_id,
+                "code": _SKU_TRANSITO_CODE,
+                "agora": agora,
+            },
+        )
+        for status, recebida, previsao in _PEDIDOS_TESTE_TRANSITO:
+            pedido_id = _pedido_id(status)
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO erp.pedidos_compra
+                      (id, fornecedor_id, status, data_prevista_entrega,
+                       valor_total_reais)
+                    VALUES (:id, :fornecedor_id, :status, :previsao, 0)
+                    """
+                ),
+                {
+                    "id": pedido_id,
+                    "fornecedor_id": fornecedor_id,
+                    "status": status,
+                    "previsao": previsao,
+                },
+            )
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO erp.pedidos_compra_itens
+                      (id, pedido_id, sku_id, quantidade, preco_unitario_reais,
+                       quantidade_recebida)
+                    VALUES (:id, :pedido_id, :sku_id, 100, 1, :recebida)
+                    """
+                ),
+                {
+                    "id": uid("pedido_item", f"{pedido_id}|0"),
+                    "pedido_id": pedido_id,
+                    "sku_id": sku_id,
+                    "recebida": recebida,
+                },
+            )
+        conn.execute(
+            text(
+                """
+                INSERT INTO erp.pedidos_compra_itens
+                  (id, pedido_id, sku_id, quantidade, preco_unitario_reais,
+                   quantidade_recebida)
+                VALUES (:id, :pedido_id, :sku_id, 999, 1, 0)
+                """
+            ),
+            {
+                "id": uid("pedido_item", "teste-transito|outro-sku"),
+                "pedido_id": _pedido_id("recebido_parcial"),
+                "sku_id": outro_sku_id,
+            },
+        )
+    try:
+        yield fornecedor_id
+    finally:
+        with get_engine().begin() as conn:
+            conn.execute(
+                text("DELETE FROM erp.pedidos_compra WHERE id = ANY(:ids)"),
+                {"ids": [_pedido_id(s) for s, _, _ in _PEDIDOS_TESTE_TRANSITO]},
+            )
+            conn.execute(
+                text("DELETE FROM erp.skus WHERE sku_code = :c"),
+                {"c": _SKU_TRANSITO_CODE},
+            )
+
+
+def test_itens_em_transito_de_filtra_status_e_pendente(
+    adapter: PostgresERPAdapter, fornecedor_com_pedidos_em_transito: UUID
+) -> None:
+    itens = adapter.itens_em_transito_de(_SKU_TRANSITO_CODE)
+
+    assert [(i.status, i.quantidade_pendente) for i in itens] == [
+        ("recebido_parcial", 60),
+        ("enviado", 100),
+        ("aprovado", 100),
+    ]
+    assert [i.pedido_id for i in itens] == [
+        _pedido_id("recebido_parcial"),
+        _pedido_id("enviado"),
+        _pedido_id("aprovado"),
+    ]
+    assert [i.data_prevista_entrega for i in itens] == [
+        date(2026, 10, 5),
+        date(2026, 11, 10),
+        None,
+    ]
+    assert all(i.fornecedor_id == fornecedor_com_pedidos_em_transito for i in itens)
+
+
+def test_itens_em_transito_de_contra_o_seed(adapter: PostgresERPAdapter) -> None:
+    with get_engine().connect() as conn:
+        codes = conn.execute(
+            text(
+                """
+                SELECT DISTINCT s.sku_code
+                FROM erp.pedidos_compra_itens i
+                JOIN erp.pedidos_compra p ON p.id = i.pedido_id
+                JOIN erp.skus s ON s.id = i.sku_id
+                WHERE p.status::text = ANY(:status)
+                """
+            ),
+            {"status": list(STATUS_EM_TRANSITO)},
+        ).scalars().all()
+    assert codes, "seed deve ter pedidos aprovado, enviado e recebido_parcial"
+
+    itens = [i for code in codes for i in adapter.itens_em_transito_de(code)]
+
+    assert {i.status for i in itens} == set(STATUS_EM_TRANSITO)
+    assert all(i.quantidade_pendente > 0 for i in itens)
+
+
+def test_itens_em_transito_de_sku_inexistente(adapter: PostgresERPAdapter) -> None:
+    assert adapter.itens_em_transito_de("NAO-EXISTE-XYZ") == []

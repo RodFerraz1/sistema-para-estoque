@@ -5,14 +5,16 @@ mesmo filtro de ativos e mesma ordenação.
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from tests.fakes import (
     make_estoque,
     make_fornecedor,
     make_fornecedor_sku,
+    make_item_pedido_compra,
     make_movimentacao,
+    make_pedido_compra,
     make_sku,
     make_venda,
     uid,
@@ -207,3 +209,38 @@ def test_movimentacoes_de_sku_inexistente() -> None:
     erp = InMemoryERPAdapter()
 
     assert erp.movimentacoes_de("NAO-EXISTE", datetime(2020, 1, 1, tzinfo=UTC)) == []
+
+
+def test_itens_em_transito_de_filtra_e_ordena_por_previsao() -> None:
+    sku = make_sku("TBC-001")
+    fornecedor = make_fornecedor()
+    sem_data = make_pedido_compra(fornecedor, "aprovado")
+    tardio = make_pedido_compra(
+        fornecedor, "enviado", data_prevista_entrega=date(2026, 11, 10)
+    )
+    cedo = make_pedido_compra(
+        fornecedor, "recebido_parcial", data_prevista_entrega=date(2026, 10, 5)
+    )
+    rascunho = make_pedido_compra(fornecedor, "rascunho")
+    erp = InMemoryERPAdapter(
+        skus=[sku],
+        pedidos_compra=[sem_data, tardio, cedo, rascunho],
+        itens_pedido_compra=[
+            make_item_pedido_compra(sem_data, sku, quantidade=10),
+            make_item_pedido_compra(tardio, sku, quantidade=20),
+            make_item_pedido_compra(cedo, sku, quantidade=30, quantidade_recebida=5),
+            make_item_pedido_compra(rascunho, sku, quantidade=40),
+        ],
+    )
+
+    itens = erp.itens_em_transito_de("TBC-001")
+
+    assert [(i.pedido_id, i.quantidade_pendente) for i in itens] == [
+        (cedo.id, 25),
+        (tardio.id, 20),
+        (sem_data.id, 10),
+    ]
+
+
+def test_itens_em_transito_de_sku_inexistente() -> None:
+    assert InMemoryERPAdapter().itens_em_transito_de("NAO-EXISTE") == []

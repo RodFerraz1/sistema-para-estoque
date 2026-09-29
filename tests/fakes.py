@@ -7,10 +7,15 @@ serem estáveis entre runs.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
+from src.erp_adapter.in_memory import (
+    ItemPedidoCompra,
+    PedidoCompra,
+    StatusPedidoCompra,
+)
 from src.inventory.schemas import Estoque, Movimentacao
 from src.sales.schemas import Venda
 
@@ -135,4 +140,34 @@ def make_movimentacao(
         referencia_tipo=None,
         referencia_id=None,
         observacao=None,
+    )
+
+
+def make_pedido_compra(
+    fornecedor: Fornecedor,
+    status: StatusPedidoCompra,
+    *,
+    key: str | None = None,
+    data_prevista_entrega: date | None = None,
+) -> PedidoCompra:
+    return PedidoCompra(
+        id=uid("pedido", key or f"{fornecedor.nome}|{status}"),
+        fornecedor_id=fornecedor.id,
+        status=status,
+        data_prevista_entrega=data_prevista_entrega,
+    )
+
+
+def make_item_pedido_compra(
+    pedido: PedidoCompra,
+    sku: SKU,
+    *,
+    quantidade: int,
+    quantidade_recebida: int = 0,
+) -> ItemPedidoCompra:
+    return ItemPedidoCompra(
+        pedido_id=pedido.id,
+        sku_id=sku.id,
+        quantidade=quantidade,
+        quantidade_recebida=quantidade_recebida,
     )

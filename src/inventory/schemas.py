@@ -1,7 +1,8 @@
 """DTOs de domínio do módulo `inventory`."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from typing import Literal, get_args
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -61,3 +62,26 @@ class SKUAbaixoDoPiso(BaseModel):
     sku_code: str
     produto_nome: str
     cobertura_meses: float
+
+
+StatusEmTransito = Literal["aprovado", "enviado", "recebido_parcial"]
+STATUS_EM_TRANSITO: tuple[str, ...] = get_args(StatusEmTransito)
+
+
+class ItemEmTransito(BaseModel):
+    """Item de pedido de compra aberto com quantidade ainda por chegar."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pedido_id: UUID
+    fornecedor_id: UUID
+    status: StatusEmTransito
+    quantidade_pendente: int
+    data_prevista_entrega: date | None
+
+
+class EmTransito(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    total_unidades: int
+    itens: list[ItemEmTransito]

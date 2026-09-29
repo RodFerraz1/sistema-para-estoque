@@ -13,7 +13,12 @@ from sqlalchemy.engine import Engine, Row
 
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.port import ERPAdapter
-from src.inventory.schemas import Estoque, Movimentacao
+from src.inventory.schemas import (
+    STATUS_EM_TRANSITO,
+    Estoque,
+    ItemEmTransito,
+    Movimentacao,
+)
 from src.sales.schemas import Venda
 
 
@@ -193,6 +198,37 @@ class PostgresERPAdapter(ERPAdapter):
                 referencia_tipo=r.referencia_tipo,
                 referencia_id=r.referencia_id,
                 observacao=r.observacao,
+            )
+            for r in rows
+        ]
+
+    def itens_em_transito_de(self, sku_code: str) -> list[ItemEmTransito]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT p.id AS pedido_id, p.fornecedor_id,
+                           p.status::text AS status,
+                           i.quantidade - i.quantidade_recebida AS quantidade_pendente,
+                           p.data_prevista_entrega
+                    FROM erp.pedidos_compra_itens i
+                    JOIN erp.pedidos_compra p ON p.id = i.pedido_id
+                    JOIN erp.skus s ON s.id = i.sku_id
+                    WHERE s.sku_code = :sku_code
+                      AND p.status::text = ANY(:status)
+                      AND i.quantidade > i.quantidade_recebida
+                    ORDER BY p.data_prevista_entrega NULLS LAST, p.id
+                    """
+                ),
+                {"sku_code": sku_code, "status": list(STATUS_EM_TRANSITO)},
+            ).all()
+        return [
+            ItemEmTransito(
+                pedido_id=r.pedido_id,
+                fornecedor_id=r.fornecedor_id,
+                status=r.status,
+                quantidade_pendente=r.quantidade_pendente,
+                data_prevista_entrega=r.data_prevista_entrega,
             )
             for r in rows
         ]

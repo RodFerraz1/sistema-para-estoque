@@ -5,16 +5,57 @@ Aceita DTOs de domínio e serve leituras filtradas. `Estoque` e
 `sku_code`; vínculo inativo é representado pela ausência na lista. Não
 valida consistência entre coleções: é responsabilidade do teste montar
 dados coerentes.
+
+`PedidoCompra` e `ItemPedidoCompra` espelham as linhas de
+`erp.pedidos_compra` e `erp.pedidos_compra_itens`. Não são DTOs de domínio:
+existem só para alimentar `itens_em_transito_de`.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from typing import Literal, cast
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
 
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.port import ERPAdapter
-from src.inventory.schemas import Estoque, Movimentacao
+from src.inventory.schemas import (
+    STATUS_EM_TRANSITO,
+    Estoque,
+    ItemEmTransito,
+    Movimentacao,
+    StatusEmTransito,
+)
 from src.sales.schemas import Venda
+
+
+StatusPedidoCompra = Literal[
+    "rascunho",
+    "aprovado",
+    "enviado",
+    "recebido_parcial",
+    "recebido_total",
+    "cancelado",
+]
+
+
+class PedidoCompra(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    fornecedor_id: UUID
+    status: StatusPedidoCompra
+    data_prevista_entrega: date | None
+
+
+class ItemPedidoCompra(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    pedido_id: UUID
+    sku_id: UUID
+    quantidade: int
+    quantidade_recebida: int
 
 
 class InMemoryERPAdapter(ERPAdapter):
@@ -27,6 +68,8 @@ class InMemoryERPAdapter(ERPAdapter):
         estoques: dict[str, Estoque] | None = None,
         movimentacoes: list[Movimentacao] | None = None,
         vendas: list[Venda] | None = None,
+        pedidos_compra: list[PedidoCompra] | None = None,
+        itens_pedido_compra: list[ItemPedidoCompra] | None = None,
     ) -> None:
         self.skus: list[SKU] = list(skus or [])
         self.fornecedores: list[Fornecedor] = list(fornecedores or [])
@@ -36,6 +79,10 @@ class InMemoryERPAdapter(ERPAdapter):
         self.estoques: dict[str, Estoque] = dict(estoques or {})
         self.movimentacoes: list[Movimentacao] = list(movimentacoes or [])
         self.vendas: list[Venda] = list(vendas or [])
+        self.pedidos_compra: list[PedidoCompra] = list(pedidos_compra or [])
+        self.itens_pedido_compra: list[ItemPedidoCompra] = list(
+            itens_pedido_compra or []
+        )
 
     def _sku_id(self, sku_code: str) -> UUID | None:
         return next((s.id for s in self.skus if s.sku_code == sku_code), None)
@@ -77,4 +124,31 @@ class InMemoryERPAdapter(ERPAdapter):
         return sorted(
             (m for m in self.movimentacoes if m.sku_id == sku_id and m.data >= desde),
             key=lambda m: m.data,
+        )
+
+    def itens_em_transito_de(self, sku_code: str) -> list[ItemEmTransito]:
+        sku_id = self._sku_id(sku_code)
+        pedidos = {
+            p.id: p for p in self.pedidos_compra if p.status in STATUS_EM_TRANSITO
+        }
+        itens = [
+            ItemEmTransito(
+                pedido_id=pedido.id,
+                fornecedor_id=pedido.fornecedor_id,
+                status=cast(StatusEmTransito, pedido.status),
+                quantidade_pendente=i.quantidade - i.quantidade_recebida,
+                data_prevista_entrega=pedido.data_prevista_entrega,
+            )
+            for i in self.itens_pedido_compra
+            if i.sku_id == sku_id
+            and i.quantidade > i.quantidade_recebida
+            and (pedido := pedidos.get(i.pedido_id)) is not None
+        ]
+        return sorted(
+            itens,
+            key=lambda i: (
+                i.data_prevista_entrega is None,
+                i.data_prevista_entrega or date.min,
+                i.pedido_id,
+            ),
         )
