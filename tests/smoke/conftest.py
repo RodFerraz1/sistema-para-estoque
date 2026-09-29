@@ -1,16 +1,18 @@
 """Fixtures do smoke test end-to-end.
 
 Sobe o app FastAPI contra o Postgres real (do `docker compose up`),
-com o schema `erp` migrado (`alembic upgrade head`) e o seed populado
-(`scripts.seed.run`). Se o banco não estiver acessível ou não estiver
-migrado, o suite inteiro é `skip` - o mesmo padrão do
-`tests/test_seed_smoke.py`.
+aplica as migrations (`alembic upgrade head`) e popula o seed
+(`scripts.seed.run`). Se o Postgres não estiver acessível, o suite
+inteiro é `skip`.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Iterator
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -18,28 +20,23 @@ from scripts.seed import run as run_seed
 from src.db.engine import get_engine
 from src.main import app
 
-pytestmark = pytest.mark.smoke
+ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
 
 
-def _db_ready() -> bool:
+def _postgres_up() -> bool:
     try:
         with get_engine().connect() as conn:
-            conn.execute(text("SELECT 1 FROM erp.skus LIMIT 1"))
+            conn.execute(text("SELECT 1"))
         return True
     except Exception:
         return False
 
 
-if not _db_ready():
-    pytest.skip(
-        "Postgres com schema erp precisa estar disponível "
-        "(docker compose up + alembic upgrade head)",
-        allow_module_level=True,
-    )
-
-
 @pytest.fixture(scope="session", autouse=True)
-def _seed_once() -> None:
+def _banco_migrado_e_populado() -> None:
+    if not _postgres_up():
+        pytest.skip("Postgres precisa estar disponível (docker compose up)")
+    command.upgrade(Config(str(ALEMBIC_INI)), "head")
     run_seed()
 
 
@@ -50,8 +47,7 @@ def client() -> Iterator[TestClient]:
 
 
 @pytest.fixture(scope="session")
-def sku_code(client: TestClient) -> str:
-    """Um `sku_code` real qualquer do seed, escolhido pelo endpoint público."""
+def sku_code() -> str:
     with get_engine().connect() as conn:
         row = conn.execute(
             text("SELECT sku_code FROM erp.skus ORDER BY sku_code LIMIT 1")

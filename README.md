@@ -41,9 +41,12 @@ Os testes se dividem em duas categorias:
 # Só unitários (rápido, offline)
 uv run pytest -m "not smoke"
 
-# Só smoke (requer docker compose up + alembic upgrade head)
+# Só smoke end-to-end (requer docker compose up; aplica migrations e seed sozinho,
+# o que apaga e recria os dados do schema erp no banco local)
 uv run pytest tests/smoke/
-# ou, equivalente, por marker (cobre também tests/test_seed_smoke.py):
+
+# Todos os testes marcados como smoke, incluindo tests/test_seed_smoke.py
+# (este exige alembic upgrade head antes)
 uv run pytest -m smoke
 
 # Tudo
@@ -61,42 +64,56 @@ uv run pytest
 | `GET` | `/skus/{sku_code}/sazonalidade` | Multiplicadores mês-a-mês (1 = neutro). |
 | `GET` | `/skus/{sku_code}/fornecedores` | Preço, MOQ e lead time por fornecedor. |
 
-`sku_code` é o código legível do SKU (ex.: `TBC-BEG-70140`), não o UUID.
+`sku_code` é o código legível do SKU (ex.: `CB-AZUL-CASAL-05`), não o UUID.
 
-### Exemplo: `GET /skus/TBC-BEG-70140/analise`
+Unidades monetárias: `preco_unitario_reais` vem em **centavos** (`7488` = R$ 74,88), enquanto `pedido_minimo_reais` vem em **reais inteiros** (`25000` = R$ 25.000).
+
+### Exemplo: `GET /skus/CB-AZUL-CASAL-05/analise`
 
 ```json
 {
-  "sku_code": "TBC-BEG-70140",
-  "produto_nome": "Toalha Banho Conforto",
-  "categoria": "felpudo",
+  "sku_code": "CB-AZUL-CASAL-05",
+  "produto_nome": "Colcha Bouti",
+  "categoria": "jogo_cama",
   "estoque": {
-    "quantidade_disponivel": 120,
-    "quantidade_reservada": 10,
+    "quantidade_disponivel": 90,
+    "quantidade_reservada": 11,
     "atualizado_em": "2026-09-01T00:00:00Z"
   },
   "giro": {
-    "unidades_por_mes": 30.0,
+    "unidades_por_mes": 32.0,
     "meses_considerados": 6
   },
   "cobertura": {
-    "meses": 4.0,
+    "meses": 2.8125,
     "sem_giro": false
   },
   "fornecedores": [
     {
-      "fornecedor_id": "5f3c1d8a-4b2e-5c9d-8f1a-9e2c7b6d4a01",
-      "fornecedor_nome": "Katrina Têxtil",
-      "preco_unitario_reais": 1800,
+      "fornecedor_id": "5ad64b40-3bf9-59f0-914f-c1ac3117be68",
+      "fornecedor_nome": "Verdela Home",
+      "preco_unitario_reais": 7488,
       "moq_unidades": 48,
-      "lead_time_dias_contratado": 35,
-      "lead_time_dias_observado": 38,
+      "lead_time_dias_contratado": 60,
+      "lead_time_dias_observado": 62,
+      "prazo_pagamento_padrao": "28/56",
+      "pedido_minimo_reais": 25000
+    },
+    {
+      "fornecedor_id": "a8429f54-2d78-535a-a5d9-f7e8a36dbef0",
+      "fornecedor_nome": "Aurora Home Center",
+      "preco_unitario_reais": 8148,
+      "moq_unidades": 48,
+      "lead_time_dias_contratado": 40,
+      "lead_time_dias_observado": 52,
       "prazo_pagamento_padrao": "30/60",
       "pedido_minimo_reais": 10000
     }
   ]
 }
 ```
+
+Os valores de giro e cobertura dependem da data em que o seed rodou.
 
 A documentação interativa (OpenAPI) fica em `http://localhost:8000/docs`.
 
@@ -108,13 +125,14 @@ A documentação interativa (OpenAPI) fica em `http://localhost:8000/docs`.
 src/
 ├── erp_adapter/   Port + PostgresERPAdapter + InMemoryERPAdapter (única fronteira com o ERP)
 ├── catalog/       SKU, produto, fornecedor
-├── inventory/     estoque atual, cobertura, movimentações, abaixo do piso
+├── inventory/     estoque atual, cobertura, abaixo do piso
 ├── sales/         giro médio, histórico de vendas, sazonalidade
+├── ficha_sku/     compõe a ficha completa de um SKU (usada por /analise)
 ├── api/           camada HTTP (FastAPI routers, DTOs de resposta)
-├── db/            engine, session, health-check
+├── db/            config, engine, health-check
 └── main.py        bootstrap FastAPI
 
-scripts/           seed.py + db-init (extensões Postgres)
+scripts/           seed.py, jev_check.py, db-init (extensões Postgres)
 alembic/           migrations versionadas
 tests/             fakes.py + testes cross-módulo + tests/smoke/ end-to-end
 ```
@@ -122,34 +140,38 @@ tests/             fakes.py + testes cross-módulo + tests/smoke/ end-to-end
 Grafo de dependência (setas: "depende de"):
 
 ```
-                    +-----+
-                    | api |
-                    +-----+
-                    /  |  \
-                   v   v   v
-             +---------+  +-----------+  +-------+
-             | catalog |  | inventory |  | sales |
-             +---------+  +-----------+  +-------+
-                    \        |           /
-                     \       v          /
-                      \  +-------+     /
-                       ->| sales |<---
-                         +-------+
-                             |
-                             v
-                       +-------------+
-                       | erp_adapter |
-                       +-------------+
-                             |
-                             v
-                       +-----------+
-                       | Postgres  |
-                       +-----------+
+                +-----+
+                | api |
+                +-----+
+                   |
+                   v
+             +-----------+
+             | ficha_sku |
+             +-----------+
+                   |
+     +-------------+-------------+
+     v             v             v
++---------+  +-----------+  +-------+
+| catalog |  | inventory |->| sales |
++---------+  +-----------+  +-------+
+     |             |             |
+     +-------------+-------------+
+                   v
+            +-------------+
+            | erp_adapter |
+            +-------------+
+                   |
+                   v
+             +----------+
+             | Postgres |
+             +----------+
 ```
 
-- `api` depende de `catalog`, `inventory`, `sales`.
-- `catalog`, `inventory`, `sales` dependem de `erp_adapter`.
+- `api` depende de `ficha_sku` (para `/analise`) e chama `catalog`, `inventory`, `sales` direto nos endpoints de leitura simples.
+- `ficha_sku` depende de `catalog`, `inventory`, `sales` e não fala com o `erp_adapter` direto.
 - `inventory` depende de `sales` (cobertura precisa de giro).
+- `catalog`, `inventory`, `sales` dependem de `erp_adapter`.
+- `erp_adapter` importa só os DTOs de domínio (`catalog.schemas`, `inventory.schemas`, `sales.schemas`) para devolvê-los prontos. Os serviços desses módulos ele não chama.
 - Nenhum outro caminho é permitido: `catalog` não chama `inventory`, `sales` não chama `catalog`, etc.
 
 A justificativa da organização por domínio (e não por camada técnica) e a política de fronteiras entre módulos estão em [`docs/adr/0001-monolito-modular-por-dominio.md`](docs/adr/0001-monolito-modular-por-dominio.md).
