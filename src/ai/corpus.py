@@ -37,16 +37,23 @@ class _Secao:
 
 
 def ler_corpus(pasta: Path) -> list[Trecho]:
-    trechos: list[Trecho] = []
-    for arquivo in sorted(pasta.rglob("*.md")):
-        if arquivo.name == "README.md":
-            continue
-        documento = arquivo.relative_to(pasta).as_posix()
-        trechos.extend(_ler_documento(documento, arquivo.read_text(encoding="utf-8")))
-    return trechos
+    return [
+        trecho
+        for documento, conteudo in ler_documentos(pasta).items()
+        for trecho in trechos_do_documento(documento, conteudo)
+    ]
 
 
-def _ler_documento(documento: str, conteudo: str) -> list[Trecho]:
+def ler_documentos(pasta: Path) -> dict[str, str]:
+    """Conteúdo de cada documento do corpus, pelo caminho relativo a `pasta`."""
+    return {
+        arquivo.relative_to(pasta).as_posix(): arquivo.read_text(encoding="utf-8")
+        for arquivo in sorted(pasta.rglob("*.md"))
+        if arquivo.name != "README.md"
+    }
+
+
+def trechos_do_documento(documento: str, conteudo: str) -> list[Trecho]:
     meta, corpo = _frontmatter(documento, conteudo)
     titulos_documento, secoes = _secoes(corpo)
     if len(titulos_documento) != 1:

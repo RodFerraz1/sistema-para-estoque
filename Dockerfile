@@ -3,6 +3,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
+    FASTEMBED_CACHE_PATH=/opt/fastembed \
     PATH=/opt/venv/bin:/root/.local/bin:$PATH
 
 RUN apt-get update \
@@ -17,6 +18,8 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
 RUN uv sync --frozen --no-dev
+
+RUN python -c "from src.ai.dependencies import get_embedder; get_embedder()"
 
 EXPOSE 8000
 

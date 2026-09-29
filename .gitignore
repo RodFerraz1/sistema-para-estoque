@@ -18,6 +18,9 @@ env/
 # uv
 .uv-cache/
 
+# Modelo de embedding baixado pelo fastembed
+.cache/
+
 # Pytest / coverage
 .pytest_cache/
 .coverage
