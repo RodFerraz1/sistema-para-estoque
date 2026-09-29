@@ -1,7 +1,7 @@
 """Testes unitários do módulo `purchasing`."""
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -11,7 +11,12 @@ from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.ficha_sku.service import FichaSKU
 from src.inventory.service import Inventory
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
-from src.politica_compra.schemas import PARAMETROS_V1, CriterioFornecedor, LeadTimeBase
+from src.politica_compra.schemas import (
+    PARAMETROS_V1,
+    CriterioFornecedor,
+    LeadTimeBase,
+    SazonalidadeModo,
+)
 from src.purchasing.schemas import LeadTimeOrigem, MotivoSemCompra, TipoAlerta
 from src.purchasing.service import Purchasing
 from src.sales.service import Sales
@@ -135,6 +140,7 @@ def test_exemplo_da_spec_numero_a_numero() -> None:
         TipoAlerta.RUPTURA_ANTES_DA_CHEGADA,
         TipoAlerta.ABAIXO_PEDIDO_MINIMO,
         TipoAlerta.LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO,
+        TipoAlerta.PERIODO_SAZONAL,
     ]
 
 
@@ -467,3 +473,96 @@ def test_sem_alerta_de_lead_time_quando_observado_nao_passa_do_contratado(
     purchasing = _purchasing(fornecedores_sku=[_katrina(lead_time_dias_observado=observado)])
 
     assert TipoAlerta.LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO not in _tipos(purchasing)
+
+
+def _vendendo_desde(dias_atras: int) -> Purchasing:
+    return _purchasing(vendas=[make_venda(SKU, NOW - timedelta(days=dias_atras), 100)])
+
+
+def test_sku_novo_sai_com_quantidade_zero_e_sem_calculo() -> None:
+    sugestao = _vendendo_desde(59).sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None
+    assert sugestao.quantidade == 0
+    assert sugestao.motivo == MotivoSemCompra.SKU_NOVO
+    assert sugestao.fornecedor is None
+    assert sugestao.valor_estimado_centavos == 0
+    assert sugestao.calculo is None
+    assert sugestao.alertas == []
+
+
+@pytest.mark.parametrize("dias_atras", [60, 61])
+def test_sku_com_historico_minimo_nao_e_novo(dias_atras: int) -> None:
+    sugestao = _vendendo_desde(dias_atras).sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None
+    assert sugestao.motivo is None
+    assert sugestao.quantidade > 0
+
+
+def test_sku_novo_vem_antes_de_sem_giro() -> None:
+    # Só vendeu no mês corrente: giro 0, mas o motivo é ser novo.
+    sugestao = _vendendo_desde(5).sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None
+    assert sugestao.motivo == MotivoSemCompra.SKU_NOVO
+
+
+def test_historico_minimo_vem_da_politica() -> None:
+    purchasing = _purchasing(
+        vendas=[make_venda(SKU, NOW - timedelta(days=59), 100)],
+        politicas=_politica(dias_historico_minimo=30),
+    )
+
+    sugestao = purchasing.sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None
+    assert sugestao.motivo is None
+
+
+def test_chegada_em_mes_quente_alerta_citando_meses_e_r2() -> None:
+    # Lead time de 62 dias a partir de 15/09: chega em 16/11, horizonte até 16/12.
+    sugestao = _purchasing().sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None
+    [alerta] = [a for a in sugestao.alertas if a.tipo == TipoAlerta.PERIODO_SAZONAL]
+    assert "novembro e dezembro" in alerta.mensagem
+    assert "R2" in alerta.mensagem
+    assert "2,0 meses" in alerta.mensagem
+    assert "ata" in alerta.mensagem
+
+
+@pytest.mark.parametrize(
+    "meses_quentes",
+    [
+        (5, 6),
+        # Outubro passa antes da chegada; janeiro fica depois do ciclo.
+        (10, 1),
+    ],
+)
+def test_sem_alerta_sazonal_fora_do_horizonte(meses_quentes: tuple[int, ...]) -> None:
+    purchasing = _purchasing(politicas=_politica(meses_quentes=meses_quentes))
+
+    assert TipoAlerta.PERIODO_SAZONAL not in _tipos(purchasing)
+
+
+def test_horizonte_sazonal_cruza_a_virada_do_ano() -> None:
+    # Lead time de 90 dias: chega em 14/12; ciclo de 2 meses vai até 12/02.
+    purchasing = _purchasing(
+        fornecedores_sku=[_katrina(lead_time_dias_observado=90)],
+        politicas=_politica(ciclo_compra_meses=2.0, meses_quentes=(1, 2, 12)),
+    )
+
+    sugestao = purchasing.sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None
+    [alerta] = [a for a in sugestao.alertas if a.tipo == TipoAlerta.PERIODO_SAZONAL]
+    assert "(dezembro, janeiro e fevereiro)" in alerta.mensagem
+
+
+def test_modo_ignorar_nunca_alerta_sazonalidade() -> None:
+    purchasing = _purchasing(
+        politicas=_politica(sazonalidade_modo=SazonalidadeModo.IGNORAR)
+    )
+
+    assert TipoAlerta.PERIODO_SAZONAL not in _tipos(purchasing)

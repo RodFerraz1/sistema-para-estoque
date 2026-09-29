@@ -9,6 +9,7 @@ from src.catalog.schemas import FornecedorParaSKU
 
 
 class MotivoSemCompra(StrEnum):
+    SKU_NOVO = "sku_novo"
     SEM_GIRO = "sem_giro"
     SEM_FORNECEDOR = "sem_fornecedor"
     ACIMA_DO_PONTO_DE_REPOSICAO = "acima_do_ponto_de_reposicao"
@@ -19,6 +20,7 @@ class TipoAlerta(StrEnum):
     VIOLA_TETO = "viola_teto"
     ABAIXO_PEDIDO_MINIMO = "abaixo_pedido_minimo"
     LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO = "lead_time_observado_acima_do_contratado"
+    PERIODO_SAZONAL = "periodo_sazonal"
 
 
 class LeadTimeOrigem(StrEnum):
@@ -54,7 +56,7 @@ class SugestaoPedido(BaseModel):
 
     Sempre existe: quando não há o que comprar, `quantidade` é 0 e `motivo`
     diz por quê. `calculo` fica ausente quando o motivo impede o cálculo
-    (sem giro, sem fornecedor).
+    (SKU novo, sem giro, sem fornecedor).
     """
 
     model_config = ConfigDict(frozen=True)

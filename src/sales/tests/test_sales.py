@@ -218,3 +218,21 @@ def test_sazonalidade_sku_inexistente_retorna_neutro() -> None:
 
     assert sazo.meses_considerados == 0
     assert sazo.multiplicadores == {m: 1.0 for m in range(1, 13)}
+
+
+def test_primeira_venda_e_a_mais_antiga_incluindo_o_mes_corrente() -> None:
+    sku = make_sku("A")
+    vendas = [
+        make_venda(sku, datetime(2026, 9, 10, tzinfo=UTC), 5),
+        make_venda(sku, datetime(2026, 9, 2, tzinfo=UTC), 5),
+    ]
+    sales = _sales_at_now(skus=[sku], vendas=vendas)
+
+    assert sales.primeira_venda(sku.sku_code) == datetime(2026, 9, 2, tzinfo=UTC)
+
+
+def test_primeira_venda_de_sku_sem_vendas_e_none() -> None:
+    sku = make_sku("A")
+    sales = _sales_at_now(skus=[sku], vendas=[])
+
+    assert sales.primeira_venda(sku.sku_code) is None

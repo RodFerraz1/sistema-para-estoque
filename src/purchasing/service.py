@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from src.catalog.schemas import FornecedorParaSKU
 from src.ficha_sku.service import FichaSKU
@@ -20,6 +20,7 @@ from src.politica_compra.schemas import (
     LeadTimeBase,
     ParametrosPolitica,
     PoliticaCompra,
+    SazonalidadeModo,
 )
 from src.purchasing.schemas import (
     Alerta,
@@ -190,12 +191,72 @@ def _alerta_lead_time_observado(escolhido: _Candidato) -> Alerta | None:
     )
 
 
-def _alertas(escolhido: _Candidato, parametros: ParametrosPolitica) -> list[Alerta]:
+_NOMES_DOS_MESES = (
+    "janeiro",
+    "fevereiro",
+    "março",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro",
+)
+
+
+def _meses_do_calendario(inicio: datetime, fim: datetime) -> list[int]:
+    """Meses (1-12) tocados de `inicio` a `fim`, inclusive, em ordem e sem repetir."""
+    meses: list[int] = []
+    ano, mes = inicio.year, inicio.month
+    while (ano, mes) <= (fim.year, fim.month) and mes not in meses:
+        meses.append(mes)
+        ano, mes = (ano + 1, 1) if mes == 12 else (ano, mes + 1)
+    return meses
+
+
+def _listar_por_extenso(nomes: list[str]) -> str:
+    if len(nomes) == 1:
+        return nomes[0]
+    return ", ".join(nomes[:-1]) + " e " + nomes[-1]
+
+
+def _alerta_periodo_sazonal(
+    escolhido: _Candidato, parametros: ParametrosPolitica, agora: datetime
+) -> Alerta | None:
+    if parametros.sazonalidade_modo == SazonalidadeModo.IGNORAR:
+        return None
+    chegada = agora + timedelta(days=escolhido.calculo.lead_time_dias)
+    fim_do_ciclo = chegada + timedelta(days=parametros.ciclo_compra_meses * DIAS_POR_MES)
+    quentes = [
+        m
+        for m in _meses_do_calendario(chegada, fim_do_ciclo)
+        if m in parametros.meses_quentes
+    ]
+    if not quentes:
+        return None
+    meses = _listar_por_extenso([_NOMES_DOS_MESES[m - 1] for m in quentes])
+    return Alerta(
+        tipo=TipoAlerta.PERIODO_SAZONAL,
+        mensagem=(
+            f"A compra chega em época forte ({meses}). Pela R2, dá "
+            f"pra comprar até {_formatar_meses(parametros.extra_sazonal_meses)} "
+            f"meses de estoque a mais, com registro em ata."
+        ),
+    )
+
+
+def _alertas(
+    escolhido: _Candidato, parametros: ParametrosPolitica, agora: datetime
+) -> list[Alerta]:
     alertas = [
         _alerta_ruptura(escolhido),
         _alerta_viola_teto(escolhido, parametros.teto_meses),
         _alerta_abaixo_pedido_minimo(escolhido),
         _alerta_lead_time_observado(escolhido),
+        _alerta_periodo_sazonal(escolhido, parametros, agora),
     ]
     return [a for a in alertas if a is not None]
 
@@ -234,6 +295,15 @@ class Purchasing:
         self._politicas = politicas
         self._now = now
 
+    def _agora(self) -> datetime:
+        return self._now or datetime.now(UTC)
+
+    def _sku_novo(self, sku_code: str, parametros: ParametrosPolitica, agora: datetime) -> bool:
+        primeira = self._sales.primeira_venda(sku_code)
+        if primeira is None:
+            return False
+        return agora - primeira < timedelta(days=parametros.dias_historico_minimo)
+
     def sugerir_pedido(self, sku_code: str) -> SugestaoPedido | None:
         """Sugestão calculada na hora com a política ativa.
 
@@ -243,7 +313,10 @@ class Purchasing:
         if ficha is None:
             return None
         politica = self._politicas.ativa()
+        agora = self._agora()
 
+        if self._sku_novo(sku_code, politica.parametros, agora):
+            return _sem_compra(sku_code, politica, MotivoSemCompra.SKU_NOVO)
         giro = ficha.giro.unidades_por_mes
         if giro == 0:
             return _sem_compra(sku_code, politica, MotivoSemCompra.SEM_GIRO)
@@ -276,6 +349,6 @@ class Purchasing:
             fornecedor=escolhido.fornecedor,
             valor_estimado_centavos=escolhido.valor_centavos,
             calculo=escolhido.calculo,
-            alertas=_alertas(escolhido, politica.parametros),
+            alertas=_alertas(escolhido, politica.parametros, agora),
             politica_versao=politica.versao,
         )

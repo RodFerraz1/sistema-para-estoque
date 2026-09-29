@@ -79,6 +79,11 @@ class Sales:
             total_unidades=total,
         )
 
+    def primeira_venda(self, sku_code: str) -> datetime | None:
+        """Data da venda mais antiga do SKU, ou `None` se nunca vendeu."""
+        vendas = self._erp.vendas_de(sku_code, _EPOCH)
+        return min((v.data for v in vendas), default=None)
+
     def historico_vendas(
         self, sku_code: str, meses: int = 12
     ) -> list[VendaMensal]:
