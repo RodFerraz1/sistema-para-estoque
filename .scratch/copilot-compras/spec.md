@@ -136,7 +136,7 @@ Script `scripts/seed.py`, executável via `uv run python -m scripts.seed`:
 - Semente fixa (`random.seed(42)`) para reprodutibilidade.
 - ~15 produtos distribuídos nas categorias `felpudo`, `jogo_cama`, `mesa`, `cozinha`.
 - ~80 SKUs (variações de cor/tamanho/gramatura).
-- 5 fornecedores (3 já descritos em `rag-seeds/fornecedores/` + 2 secundários).
+- 5 fornecedores (3 já descritos em `corpus/fornecedores/` + 2 secundários).
 - ~180 relações fornecedor-SKU com preços plausíveis.
 - Estoque snapshot coerente com cobertura entre 0.5 e 4 meses (variedade de casos).
 - 2 anos (24 meses) de movimentações e vendas com padrão sazonal (spike em novembro-dezembro pro Natal, bump em maio pro dia das mães, dip em fevereiro-março).
@@ -194,6 +194,6 @@ Sem prior art no repositório - este é o começo. Convenções ficam definidas 
 - Toda decisão sobre schema está em `.scratch/copilot-compras/erp-schema.md`. Se surgir tensão entre este spec e aquele documento, o schema doc é a referência - e neste caso um ADR é obrigatório antes de mudar.
 - Toda decisão sobre interfaces de módulo está em `.scratch/copilot-compras/module-interfaces.md`. Mesmo princípio.
 - Roadmap completo em `.scratch/copilot-compras/roadmap.md`. Este spec cobre M0, M1 e M2.
-- Corpus de documentos sintéticos (`.scratch/copilot-compras/rag-seeds/`) existe mas **não é usado** nesta fatia. Fica pra spec 03 (RAG).
+- Corpus de documentos sintéticos (`corpus/`) existe mas **não é usado** nesta fatia. Fica pra spec 03 (RAG).
 - O sistema é single-user por design (só o comprador chefe). Não vale investir em multi-user antes de M8.
 - Os nomes de fornecedores no seed devem coincidir com os do corpus RAG (Katrina Têxtil, Verdela Home, Malha Fina) para que specs futuras já encontrem consistência entre dado estruturado e documento não-estruturado.

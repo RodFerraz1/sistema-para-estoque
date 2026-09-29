@@ -11,7 +11,7 @@ A empresa da família que compra de fornecedores e revende ao pequeno varejo. Se
 _Avoid_: distribuidora, revendedor (são outras figuras), atacado, "loja".
 
 **Fornecedor**:
-Empresa (normalmente fábrica ou importadora têxtil) da qual o atacadista compra produtos pra revender. Ver `.scratch/copilot-compras/rag-seeds/fornecedores/` pros fornecedores sintéticos usados.
+Empresa (normalmente fábrica ou importadora têxtil) da qual o atacadista compra produtos pra revender. Ver `corpus/fornecedores/` pros fornecedores sintéticos usados.
 _Avoid_: vendor, parceiro, indústria.
 
 **SKU**:
@@ -51,7 +51,7 @@ Banco de dados sintético que simula o ERP real do atacadista (que é o Maos, se
 _Avoid_: banco (é ambíguo), simulador, mock.
 
 **Corpus**:
-Conjunto de documentos sintéticos (contratos, notas de reunião, relatórios de mercado, políticas) alimentados no RAG. Fica em `.scratch/copilot-compras/rag-seeds/`.
+Conjunto de documentos sintéticos (contratos, notas de reunião, relatórios de mercado, políticas) alimentados no RAG. Fica em `corpus/`, um documento markdown por arquivo com frontmatter YAML.
 _Avoid_: base de conhecimento, docs, arquivos.
 
 **Jev**:

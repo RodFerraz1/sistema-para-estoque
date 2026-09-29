@@ -1,4 +1,4 @@
-# RAG Seeds - Documentos sintéticos
+# Corpus - Documentos sintéticos
 
 Corpus sintético de partida pro RAG do Copilot de Compras. Tudo aqui é **fictício**: fornecedores, contratos, reuniões, relatórios. Nomes de empresas foram inventados de propósito pra não colidir com empresas reais.
 

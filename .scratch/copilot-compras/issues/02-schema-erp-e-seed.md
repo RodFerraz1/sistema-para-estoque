@@ -14,7 +14,7 @@ O ERP fake existe como schema no Postgres com as 9 tabelas definidas em `erp-sch
 - [x] Alembic configurado com migrations versionadas. `alembic upgrade head` cria os schemas `erp` e `copilot` (este vazio) e todas as 9 tabelas do schema `erp` conforme `erp-schema.md`.
 - [x] Constraints, chaves e enums do schema estão corretos (movimentacao tipo, pedido_compra status, PKs compostas em `fornecedores_skus`).
 - [x] Script `scripts/seed.py` executável via `uv run python -m scripts.seed`, com semente fixa (`random.seed(42)`) garantindo reprodutibilidade.
-- [x] Seed popula: ~15 produtos distribuídos em `felpudo`, `jogo_cama`, `mesa`, `cozinha`; ~80 SKUs (variações cor/tamanho/gramatura); 5 fornecedores incluindo Katrina Têxtil, Verdela Home e Malha Fina (nomes casam com o corpus RAG em `rag-seeds/fornecedores/`); ~180 relações fornecedor-SKU com preços plausíveis.
+- [x] Seed popula: ~15 produtos distribuídos em `felpudo`, `jogo_cama`, `mesa`, `cozinha`; ~80 SKUs (variações cor/tamanho/gramatura); 5 fornecedores incluindo Katrina Têxtil, Verdela Home e Malha Fina (nomes casam com o corpus RAG em `corpus/fornecedores/`); ~180 relações fornecedor-SKU com preços plausíveis.
 - [x] 2 anos (24 meses) de movimentações e vendas com padrão sazonal plausível: spike em nov-dez, bump em maio, dip em fev-mar. `estoque_snapshot` coerente com esse histórico e com cobertura entre 0.5 e 4 meses (variedade de casos).
 - [x] 15 pedidos de compra em estados variados (`recebido_total`, `enviado`, `rascunho`, etc).
 - [x] Seed é **idempotente**: rodar duas vezes seguidas resulta no mesmo estado final (limpa e repopula).

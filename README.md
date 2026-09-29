@@ -2,7 +2,7 @@
 
 Assistente de decisão de compras para um atacadista de cama, mesa e banho. A ideia final é usar LLM com RAG e tool use sobre dados de um ERP simulado para sugerir o que comprar, quanto, de quem e quando - sempre com humano aprovando. Vocabulário, decisões e restrições de domínio vivem em [`CONTEXT.md`](CONTEXT.md).
 
-> **Sistema em construção.** Esta fatia cobre M0-M3 do [roadmap](.scratch/copilot-compras/roadmap.md): fundação técnica, ERP fake com seed, primeira leitura útil de SKU (giro, cobertura, sazonalidade, fornecedores) e sugestão de pedido determinística com política de compra configurável. O módulo `ai` **ainda não existe**, e o corpus RAG (`.scratch/copilot-compras/rag-seeds/`) está guardado mas **não é usado**. Próximos passos: ver `.scratch/copilot-compras/roadmap.md`.
+> **Sistema em construção.** Esta fatia cobre M0-M3 do [roadmap](.scratch/copilot-compras/roadmap.md): fundação técnica, ERP fake com seed, primeira leitura útil de SKU (giro, cobertura, sazonalidade, fornecedores) e sugestão de pedido determinística com política de compra configurável. O corpus RAG fica em `corpus/` e o módulo `ai` por enquanto só o lê em trechos (início do M4); ele **ainda não é usado** pela API. Próximos passos: ver `.scratch/copilot-compras/roadmap.md`.
 
 ## Pré-requisitos
 
