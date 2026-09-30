@@ -74,6 +74,8 @@ Spec: `.scratch/rag-jev/spec.md`. Decisões base: ADR-0002 (Jev decide) e ADR-00
 
 **Saída visível**: "qual a situação do SKU TBC-BEG-70140?" gera resposta em texto, e o log mostra a intenção escolhida e a confiança.
 
+**Concluído em 2026-09-30.** O redator da Groq ainda descumpre regras das instruções (compara cobertura com teto e piso, inventa citação) e o limite de tokens por minuto do plano gratuito derruba perguntas seguidas no redator sem LLM (`.scratch/chat/issues/05-readme-e-smoke.md`).
+
 ## M6 - Sugestão com sinais do corpus
 
 - Intenção "pedido de sugestão" leva o código a chamar `purchasing.sugerir_pedido` (determinístico, do M3).
