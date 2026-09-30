@@ -3,11 +3,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from src.ai.chat import Copilot, RespostaCopilot
+from src.ai.chat import Copilot
 from src.ai.dependencies import get_copilot, get_registros_decisao
-from src.ai.identificacao import Identificacao
-from src.ai.registro import RegistroDecisao, RegistrosDecisao
-from src.ai.schemas import Entendimento, Escolha
+from src.ai.registro import RegistrosDecisao
+from src.ai.schemas import Entendimento, Escolha, Identificacao, RegistroDecisao, RespostaCopilot
 from src.api.conversores import ficha_to_response, sugestao_to_response, trecho_to_response
 from src.api.schemas import (
     EntendimentoResponse,

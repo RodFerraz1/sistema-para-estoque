@@ -19,6 +19,10 @@ Sua tarefa é só escrever a resposta, seguindo estas regras:
 """
 
 
+SEM_LLM_CONFIGURADO = "Não há LLM configurado para redigir a resposta."
+LLM_INDISPONIVEL = "O LLM que redige a resposta está indisponível no momento."
+
+
 class RedatorIndisponivel(Exception):
     pass
 
@@ -30,13 +34,14 @@ class Redator(Protocol):
     def redigir(self, pergunta: str, contexto: str) -> str: ...
 
 
-class RedatorSemLLM:
-    """Devolve o contexto sem redação, quando não há LLM configurado ou o LLM falhou."""
+class RedatorSemLLM(Redator):
+    """Devolve o contexto sem redação, aberto por `motivo`: não há LLM configurado
+    (padrão) ou o LLM configurado está indisponível."""
 
     nome = "sem_llm"
 
+    def __init__(self, motivo: str = SEM_LLM_CONFIGURADO) -> None:
+        self._motivo = motivo
+
     def redigir(self, pergunta: str, contexto: str) -> str:
-        return (
-            "Não há LLM configurado para redigir a resposta. "
-            f"Estes são os dados que o Copilot reuniu:\n\n{contexto}"
-        )
+        return f"{self._motivo} Estes são os dados que o Copilot reuniu:\n\n{contexto}"

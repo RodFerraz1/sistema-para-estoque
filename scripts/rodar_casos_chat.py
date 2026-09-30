@@ -1,7 +1,8 @@
 """Rodada dos casos de `evals/casos.json` pelo chat inteiro (M5, ticket 05).
 
-Monta o `Copilot` como o `POST /chat` (Jev real, redator configurado no `.env`,
-ERP, política e corpus do Postgres) e responde as perguntas dos casos. Cada
+Monta o `Copilot` pelo mesmo `get_copilot` do `POST /chat` (Jev real, redator
+configurado no `.env`, ERP, política e corpus do Postgres) e responde as
+perguntas dos casos. Cada
 resposta grava um registro de decisão em `copilot.registros_decisao`, como no
 chat. Imprime por caso a intenção esperada e a escolhida, a confiança, a faixa,
 a ação, os SKUs, o redator e a duração, e no fim o total por faixa e por ação.
@@ -9,6 +10,7 @@ a ação, os SKUs, o redator e a duração, e no fim o total por faixa e por aç
     uv run python -m scripts.rodar_casos_chat               # precisa de JEV_KEY, do seed e do corpus ingerido
     uv run python -m scripts.rodar_casos_chat --respostas   # imprime também o texto de cada resposta
     uv run python -m scripts.rodar_casos_chat --pausa 30    # espera entre os casos (limite de tokens por minuto da Groq)
+    uv run python -m scripts.rodar_casos_chat --sem-llm     # troca o redator pelo RedatorSemLLM
 """
 from __future__ import annotations
 
@@ -18,46 +20,14 @@ from collections import Counter
 from pathlib import Path
 from time import perf_counter, sleep
 
-from src.ai.busca import BuscaContexto
-from src.ai.chat import Copilot, RespostaCopilot
-from src.ai.dependencies import (
-    get_decision_model,
-    get_embedder,
-    get_redator,
-    get_registros_decisao,
-    get_trechos_repositorio,
-)
-from src.catalog.service import Catalog
+from scripts.dependencias import resolver
+from src.ai.dependencies import get_copilot, get_redator
+from src.ai.redator import RedatorSemLLM
+from src.ai.schemas import RespostaCopilot
 from src.db.config import get_settings
-from src.erp_adapter.dependencies import get_erp_adapter
-from src.ficha_sku.service import FichaSKU
-from src.inventory.service import Inventory
-from src.politica_compra.dependencies import get_politica_compra_repositorio
-from src.purchasing.service import Purchasing
-from src.sales.service import Sales
 
 RAIZ = Path(__file__).resolve().parents[1]
 CASOS = RAIZ / "evals" / "casos.json"
-
-
-def montar_copilot() -> Copilot:
-    decisao = get_decision_model()
-    erp = get_erp_adapter()
-    catalog = Catalog(erp)
-    sales = Sales(erp)
-    inventory = Inventory(erp, sales)
-    ficha_sku = FichaSKU(catalog, inventory, sales)
-    politicas = get_politica_compra_repositorio()
-    return Copilot(
-        decisao,
-        catalog,
-        ficha_sku,
-        Purchasing(ficha_sku, inventory, sales, politicas),
-        politicas,
-        BuscaContexto(get_embedder(), get_trechos_repositorio(), decisao),
-        get_redator(),
-        get_registros_decisao(),
-    )
 
 
 def linha(caso: dict, resposta: RespostaCopilot, segundos: float) -> str:
@@ -79,12 +49,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--respostas", action="store_true", help="imprime também o texto de cada resposta")
     parser.add_argument("--pausa", type=float, default=0.0, help="segundos de espera entre um caso e o seguinte")
+    parser.add_argument("--sem-llm", action="store_true", help="troca o redator pelo RedatorSemLLM")
     args = parser.parse_args()
 
     if not get_settings().jev_key:
         raise SystemExit("JEV_KEY vazio no .env")
     casos = json.loads(CASOS.read_text(encoding="utf-8"))
-    copilot = montar_copilot()
+    copilot = resolver(get_copilot, {get_redator: RedatorSemLLM} if args.sem_llm else None)
 
     faixas: Counter[str] = Counter()
     acoes: Counter[str] = Counter()

@@ -35,3 +35,5 @@ Cada pergunta respondida pelo chat fica registrada com as respostas cruas do Jev
 - **Contrato** em `src/ai/tests/test_registro.py`, contra in-memory e Postgres (fixture com tabela temporária de backup, como a do `TrechosRepositorio`, para não apagar registros do banco de desenvolvimento).
 - **Conferido no banco local**: `alembic upgrade head`, `downgrade -1` e `upgrade head` de novo. O smoke `tests/smoke/test_chat.py` (Jev e Groq reais) passou e o registro apareceu em `GET /chat/registros` com as probabilidades do Jev, redator `groq:openai/gpt-oss-120b` e 2,3 s.
 - **Testes**: `uv run pytest -q -m "not externo"` com 440 passando (eram 414).
+
+**2026-09-30 (revisão):** na revisão de código do M5, `RegistroDecisao` foi para `src/ai/schemas.py` e `InMemoryRegistrosDecisao` para `src/ai/in_memory.py`, como os outros adapters em memória do `ai`; `registro.py` ficou só com o port `RegistrosDecisao`. A docstring da migration `0004` fala em registro de decisão, não em "log" (schema igual). Lista completa no ticket 03.

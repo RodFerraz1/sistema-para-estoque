@@ -1,12 +1,16 @@
 """DTOs de domínio do módulo `ai`."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.catalog.schemas import SKU
+from src.ficha_sku.schemas import Ficha
+from src.politica_compra.schemas import PoliticaCompra
+from src.purchasing.schemas import SugestaoPedido
 
 Classificacao = Literal["aceito", "conflitante", "descartado"]
 MotivoDescarte = Literal["injecao", "irrelevante", "sem_evidencia"]
@@ -14,6 +18,7 @@ Probabilidade = Annotated[float, Field(ge=0, le=1)]
 Intencao = Literal["situacao_sku", "sugestao_compra", "politica_ou_fornecedor", "fora_de_escopo"]
 Faixa = Literal["alta", "media", "baixa"]
 Acao = Literal["respondeu", "confirmou_e_respondeu", "pediu_esclarecimento", "fora_de_escopo"]
+OrigemIdentificacao = Literal["codigo", "produto", "nenhum"]
 NENHUM_PRODUTO = "nenhum"
 
 
@@ -124,3 +129,70 @@ class ProdutoCatalogo(BaseModel):
     tamanhos: list[str]
     prefixo: str
     skus: list[SKU]
+
+
+class Identificacao(BaseModel):
+    """SKUs de uma pergunta do chat. `total_skus` conta os identificados antes do corte
+    em `MAX_SKUS_POR_RESPOSTA`."""
+
+    model_config = ConfigDict(frozen=True)
+
+    skus: list[str]
+    total_skus: int
+    origem: OrigemIdentificacao
+    produto: str | None
+    candidatos: list[str]
+
+
+class Montagem(BaseModel):
+    """Dados que o código reuniu para responder uma pergunta do chat."""
+
+    model_config = ConfigDict(frozen=True)
+
+    fichas: list[Ficha] = []
+    sugestoes: list[SugestaoPedido] = []
+    politica: PoliticaCompra | None = None
+    trechos: list[TrechoClassificado] = []
+    conflitos: list[ConflitoEntreTrechos] = []
+    observacoes: list[str] = []
+
+
+class RespostaCopilot(BaseModel):
+    """`trechos` são os que foram ao redator. `redator` é nulo quando a resposta é
+    feita em código (esclarecimento ou fora de escopo)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    resposta: str
+    acao: Acao
+    faixa: Faixa
+    entendimento: Entendimento
+    identificacao: Identificacao | None
+    fichas: list[Ficha]
+    sugestoes: list[SugestaoPedido]
+    trechos: list[TrechoClassificado]
+    conflitos: list[ConflitoEntreTrechos]
+    redator: str | None
+    registro_id: UUID
+
+
+class RegistroDecisao(BaseModel):
+    """O que fica gravado de cada pergunta respondida pelo chat. `intencao` e
+    `confianca` repetem o `entendimento` para o M8 filtrar sem abrir o jsonb.
+    `trechos` são os ids que foram ao redator."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    criado_em: datetime
+    pergunta: str
+    intencao: Intencao
+    confianca: Probabilidade
+    faixa: Faixa
+    acao: Acao
+    skus: list[str]
+    entendimento: Entendimento
+    trechos: list[str]
+    redator: str | None
+    resposta: str
+    duracao_ms: int

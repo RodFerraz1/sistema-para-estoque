@@ -12,20 +12,27 @@ from datetime import UTC, datetime
 from typing import get_args
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict
-
 from src.ai.busca import BuscaContexto
-from src.ai.contexto import Montagem, renderizar_contexto
+from src.ai.contexto import renderizar_contexto
 from src.ai.decisao import DecisionModel
-from src.ai.identificacao import Identificacao, identificar_skus, produtos_do_catalogo
-from src.ai.redator import Redator, RedatorIndisponivel, RedatorSemLLM
-from src.ai.registro import RegistroDecisao, RegistrosDecisao
-from src.ai.schemas import Acao, ConflitoEntreTrechos, Entendimento, Faixa, Intencao, TrechoClassificado
+from src.ai.identificacao import identificar_skus, produtos_do_catalogo
+from src.ai.redator import LLM_INDISPONIVEL, Redator, RedatorIndisponivel, RedatorSemLLM
+from src.ai.registro import RegistrosDecisao
+from src.ai.schemas import (
+    Acao,
+    ConflitoEntreTrechos,
+    Entendimento,
+    Faixa,
+    Identificacao,
+    Intencao,
+    Montagem,
+    RegistroDecisao,
+    RespostaCopilot,
+    TrechoClassificado,
+)
 from src.catalog.service import Catalog
-from src.ficha_sku.schemas import Ficha
 from src.ficha_sku.service import FichaSKU, SKUSemEstoque
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
-from src.purchasing.schemas import SugestaoPedido
 from src.purchasing.service import Purchasing
 
 @dataclass(frozen=True)
@@ -43,7 +50,7 @@ MAX_TRECHOS_NO_CONTEXTO = 10
 DESCRICOES_INTENCAO: dict[Intencao, str] = {
     "situacao_sku": "ver a situação de um SKU (estoque, giro e cobertura)",
     "sugestao_compra": "uma sugestão de compra",
-    "politica_ou_fornecedor": "saber da política de compra ou de um fornecedor",
+    "politica_ou_fornecedor": "saber da política de compra e dos fornecedores",
     "fora_de_escopo": "algo fora das compras",
 }
 RESPOSTA_FORA_DE_ESCOPO = (
@@ -58,25 +65,6 @@ OBSERVACAO_SUGESTAO_SEM_SKU = (
     "Nenhum SKU do catálogo foi identificado na pergunta: a quantidade da sugestão depende de um "
     "SKU do catálogo (código, ou nome do produto com cor e tamanho)."
 )
-
-
-class RespostaCopilot(BaseModel):
-    """`trechos` são os que foram ao redator. `redator` é nulo quando a resposta é
-    feita em código (esclarecimento ou fora de escopo)."""
-
-    model_config = ConfigDict(frozen=True)
-
-    resposta: str
-    acao: Acao
-    faixa: Faixa
-    entendimento: Entendimento
-    identificacao: Identificacao | None
-    fichas: list[Ficha]
-    sugestoes: list[SugestaoPedido]
-    trechos: list[TrechoClassificado]
-    conflitos: list[ConflitoEntreTrechos]
-    redator: str | None
-    registro_id: UUID
 
 
 class Copilot:
@@ -116,8 +104,12 @@ class Copilot:
         faixa = _faixa(entendimento.intencao.confianca)
         intencao = entendimento.intencao.escolha
 
-        def resposta_em_codigo(
-            texto: str, acao: Acao, identificacao: Identificacao | None = None
+        def resposta_copilot(
+            texto: str,
+            acao: Acao,
+            identificacao: Identificacao | None = None,
+            montagem: Montagem = Montagem(),
+            redator: str | None = None,
         ) -> RespostaCopilot:
             return RespostaCopilot(
                 resposta=texto,
@@ -125,45 +117,33 @@ class Copilot:
                 faixa=faixa,
                 entendimento=entendimento,
                 identificacao=identificacao,
-                fichas=[],
-                sugestoes=[],
-                trechos=[],
-                conflitos=[],
-                redator=None,
+                fichas=montagem.fichas,
+                sugestoes=montagem.sugestoes,
+                trechos=montagem.trechos,
+                conflitos=montagem.conflitos,
+                redator=redator,
                 registro_id=registro_id,
             )
 
         if faixa == "baixa":
-            return resposta_em_codigo(_esclarecimento_de_intencao(entendimento), "pediu_esclarecimento")
+            return resposta_copilot(_esclarecimento_de_intencao(entendimento), "pediu_esclarecimento")
         if intencao == "fora_de_escopo":
-            return resposta_em_codigo(RESPOSTA_FORA_DE_ESCOPO, "fora_de_escopo")
+            return resposta_copilot(RESPOSTA_FORA_DE_ESCOPO, "fora_de_escopo")
 
         identificacao = None
         if intencao in ("situacao_sku", "sugestao_compra"):
             identificacao = identificar_skus(pergunta, entendimento, produtos)
             if intencao == "situacao_sku" and not identificacao.skus:
-                return resposta_em_codigo(
+                return resposta_copilot(
                     _esclarecimento_de_sku(identificacao.candidatos), "pediu_esclarecimento", identificacao
                 )
 
         montagem = self._montar(pergunta, intencao, identificacao)
         redacao, redator = self._redigir(pergunta, montagem)
         if faixa == "alta":
-            resposta, acao = redacao, "respondeu"
-        else:
-            resposta, acao = f"{_confirmacao(intencao)}\n\n{redacao}", "confirmou_e_respondeu"
-        return RespostaCopilot(
-            resposta=resposta,
-            acao=acao,
-            faixa=faixa,
-            entendimento=entendimento,
-            identificacao=identificacao,
-            fichas=montagem.fichas,
-            sugestoes=montagem.sugestoes,
-            trechos=montagem.trechos,
-            conflitos=montagem.conflitos,
-            redator=redator,
-            registro_id=registro_id,
+            return resposta_copilot(redacao, "respondeu", identificacao, montagem, redator)
+        return resposta_copilot(
+            f"{_confirmacao(intencao)}\n\n{redacao}", "confirmou_e_respondeu", identificacao, montagem, redator
         )
 
     def _montar(
@@ -211,7 +191,7 @@ class Copilot:
         try:
             return self._redator.redigir(pergunta, renderizar_contexto(montagem)), self._redator.nome
         except RedatorIndisponivel:
-            sem_llm = RedatorSemLLM()
+            sem_llm = RedatorSemLLM(LLM_INDISPONIVEL)
             observacao = f"O redator {self._redator.nome} falhou; a resposta vai sem redação."
             montagem = montagem.model_copy(update={"observacoes": [*montagem.observacoes, observacao]})
             return sem_llm.redigir(pergunta, renderizar_contexto(montagem)), sem_llm.nome
@@ -263,7 +243,7 @@ def _esclarecimento_de_intencao(entendimento: Entendimento) -> str:
     )[:2]
     return (
         "Não entendi bem o que você precisa. "
-        f"Você quer {DESCRICOES_INTENCAO[primeira]} ou {DESCRICOES_INTENCAO[segunda]}? "
+        f"Você quer {_por_extenso([DESCRICOES_INTENCAO[primeira], DESCRICOES_INTENCAO[segunda]])}? "
         "Pode reformular a pergunta?"
     )
 

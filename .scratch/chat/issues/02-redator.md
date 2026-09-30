@@ -32,3 +32,10 @@ O LLM entra só como redator: recebe a pergunta e um contexto já montado pelo c
 - **`GroqRedator(chave, modelo, base_url, *, transport=None)`**: o `transport` existe para os testes. Além de erro HTTP, timeout e conteúdo vazio, falha de conexão e resposta fora do formato também viram `RedatorIndisponivel`. O texto volta sem espaços nas pontas. A mensagem do usuário leva `# Contexto` e depois `# Pergunta do comprador chefe`.
 - **`get_redator()`** guarda o `GroqRedator` em `lru_cache`, como o `_jev`.
 - **Testes**: `uv run pytest -q -m "not externo"` com 382 passando e 1 pulado (eram 350).
+
+**2026-09-30 (revisão):** ajustes da revisão de código do M5 que tocam este ticket (lista completa no ticket 03):
+
+- `GroqRedator` e `RedatorSemLLM` declaram o port (`class GroqRedator(Redator)`), como o `JevDecisionModel(DecisionModel)`. O `RedatorGravador` de `tests/fakes.py` também, com `nome` virando property.
+- `Montagem` foi para `src/ai/schemas.py`.
+- Contexto numa unidade só: cobertura, teto e pisos em meses, a unidade da cobertura no CONTEXT.md (os pisos, guardados em dias, são divididos por `DIAS_POR_MES`, como no `Inventory.abaixo_do_piso`). Com a política na montagem, a cobertura da ficha já sai comparada: "abaixo do piso de alerta da política", "entre o piso de alerta e o teto da política" ou "acima do teto da política". A comparação é com o piso de alerta porque é o piso da cobertura atual (o de reposição vale para a chegada da compra); no piso ainda não está abaixo, como no `abaixo_do_piso`. Risco pequeno: com uma casa decimal, cobertura e piso podem sair com o mesmo número (ex: 0,66 e 0,67 viram 0,7) e a frase dizer "abaixo"; a frase é a que vale.
+- `RedatorSemLLM(motivo=SEM_LLM_CONFIGURADO)`: o texto de abertura agora é verdadeiro nos dois casos. Sem chave, "Não há LLM configurado para redigir a resposta."; na queda do redator, o `Copilot` usa `LLM_INDISPONIVEL`, "O LLM que redige a resposta está indisponível no momento.".

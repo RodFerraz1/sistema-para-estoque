@@ -40,3 +40,5 @@ Fecha o M5: smoke do `/chat` contra Postgres e o Jev real, README com o chat e o
   - c07 e c10 opinam ("a antecipação parece vantajosa", "a proposta é viável"), c08 manda o comprador calcular o volume. Não aprovam pedido, mas ficam perto da regra 7.
   - Acertos: c12 (aprovação de R$ 80 mil pela faixa 3), c13 (teto de 3 meses e exceção sazonal de até 5), c14 (contesta a premissa de que a Verdela atrasa) e c15 (sem exclusividade, com as datas dos trechos) responderam com a fonte certa.
   - Hífen não separável (U+2011) nos códigos de SKU de novo (c01 e o exemplo do README).
+
+**2026-09-30 (revisão):** na revisão de código do M5, `scripts/rodar_casos_chat.py` deixou de repetir a composição do `get_copilot`: resolve o próprio `get_copilot` com `scripts/dependencias.py:resolver` e ganhou `--sem-llm`. A queda do redator por 429 agora abre com "O LLM que redige a resposta está indisponível no momento." (README atualizado). O smoke troca o redator com `lambda: RedatorSemLLM()`, porque o `RedatorSemLLM` agora recebe o motivo no construtor e o FastAPI leria esse parâmetro como query. Lista completa no ticket 03.

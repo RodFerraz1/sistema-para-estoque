@@ -16,8 +16,7 @@ from src.ai.dependencies import (
     get_registros_decisao,
     get_trechos_repositorio,
 )
-from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel
-from src.ai.registro import InMemoryRegistrosDecisao
+from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel, InMemoryRegistrosDecisao
 from src.ai.schemas import Entendimento
 from src.erp_adapter.dependencies import get_erp_adapter
 from src.erp_adapter.in_memory import InMemoryERPAdapter
@@ -174,6 +173,7 @@ def test_esclarecimento_vem_sem_redator(client: TestClient) -> None:
     [
         pytest.param({}, id="sem-pergunta"),
         pytest.param({"pergunta": ""}, id="pergunta-vazia"),
+        pytest.param({"pergunta": "  \n\t "}, id="pergunta-so-com-espacos"),
         pytest.param({"pergunta": "x" * 1001}, id="pergunta-com-1001-caracteres"),
     ],
 )

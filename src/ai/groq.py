@@ -3,14 +3,14 @@ from __future__ import annotations
 
 import httpx2
 
-from src.ai.redator import INSTRUCOES_REDATOR, RedatorIndisponivel
+from src.ai.redator import INSTRUCOES_REDATOR, Redator, RedatorIndisponivel
 
 TEMPERATURA = 0.2
 MAX_TOKENS = 2048
 TIMEOUT_SEGUNDOS = 30.0
 
 
-class GroqRedator:
+class GroqRedator(Redator):
     def __init__(
         self,
         chave: str,

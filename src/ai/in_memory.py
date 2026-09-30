@@ -9,6 +9,7 @@ from typing import TypedDict
 
 from src.ai.decisao import DecisaoIndisponivel, DecisionModel
 from src.ai.embeddings import DIMENSAO
+from src.ai.registro import RegistrosDecisao
 from src.ai.repositorio import TrechosRepositorio
 from src.ai.schemas import (
     NENHUM_PRODUTO,
@@ -17,6 +18,7 @@ from src.ai.schemas import (
     Entendimento,
     Escolha,
     ProdutoCatalogo,
+    RegistroDecisao,
     Trecho,
     TrechoIndexado,
     TrechoRecuperado,
@@ -173,3 +175,15 @@ class InMemoryDecisionModel(DecisionModel):
 
     def _conflitam(self, a: str, b: str) -> float:
         return self._conflitos.get((a, b), self._conflitos.get((b, a), self._conflito_padrao))
+
+
+class InMemoryRegistrosDecisao(RegistrosDecisao):
+    def __init__(self) -> None:
+        self._registros: list[RegistroDecisao] = []
+
+    def gravar(self, registro: RegistroDecisao) -> None:
+        self._registros.append(registro)
+
+    def listar(self, limite: int) -> list[RegistroDecisao]:
+        recentes = sorted(reversed(self._registros), key=lambda r: r.criado_em, reverse=True)
+        return recentes[:limite]

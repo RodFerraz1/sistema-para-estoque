@@ -15,7 +15,9 @@ import pytest
 from sqlalchemy import text
 
 from src.ai.postgres import PostgresRegistrosDecisao
-from src.ai.registro import InMemoryRegistrosDecisao, RegistroDecisao, RegistrosDecisao
+from src.ai.in_memory import InMemoryRegistrosDecisao
+from src.ai.registro import RegistrosDecisao
+from src.ai.schemas import RegistroDecisao
 from src.db.engine import get_engine
 from tests.fakes import make_entendimento
 

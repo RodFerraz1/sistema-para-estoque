@@ -12,9 +12,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Engine
 
 from src.ai.embeddings import DIMENSAO
-from src.ai.registro import RegistroDecisao, RegistrosDecisao
+from src.ai.registro import RegistrosDecisao
 from src.ai.repositorio import TrechosRepositorio
-from src.ai.schemas import TrechoIndexado, TrechoRecuperado
+from src.ai.schemas import RegistroDecisao, TrechoIndexado, TrechoRecuperado
 
 _CAMPOS_TRECHO = ("id", "documento", "titulo", "tipo", "data", "tags", "texto")
 

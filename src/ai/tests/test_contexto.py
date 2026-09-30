@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from src.ai.contexto import AVISO_TRECHOS, Montagem, renderizar_contexto
-from src.ai.schemas import AvaliacaoTrecho, Classificacao, ConflitoEntreTrechos, TrechoClassificado
+import pytest
+
+from src.ai.contexto import AVISO_TRECHOS, renderizar_contexto
+from src.ai.schemas import AvaliacaoTrecho, Classificacao, ConflitoEntreTrechos, Montagem, TrechoClassificado
 from src.ficha_sku.schemas import Ficha
 from src.inventory.schemas import Cobertura
 from src.politica_compra.schemas import PARAMETROS_V1, PoliticaCompra
@@ -123,6 +125,22 @@ def test_ficha_traz_os_dados_do_sku_com_numeros_no_formato_brasileiro() -> None:
     ) in contexto
 
 
+@pytest.mark.parametrize(
+    ("meses", "texto"),
+    [
+        pytest.param(0.5, "- Cobertura: 0,5 meses, abaixo do piso de alerta da política", id="abaixo-do-piso"),
+        pytest.param(20 / 30, "- Cobertura: 0,7 meses, entre o piso de alerta e o teto da política", id="no-piso"),
+        pytest.param(3.0, "- Cobertura: 3,0 meses, entre o piso de alerta e o teto da política", id="no-teto"),
+        pytest.param(3.2, "- Cobertura: 3,2 meses, acima do teto da política", id="acima-do-teto"),
+    ],
+)
+def test_ficha_com_politica_compara_a_cobertura_com_o_piso_de_alerta_e_o_teto(meses: float, texto: str) -> None:
+    contexto = renderizar_contexto(Montagem(fichas=[ficha(cobertura=meses)], politica=POLITICA))
+
+    assert texto in contexto
+    assert "dias" not in contexto.split("- Fornecedores:")[0]
+
+
 def test_ficha_sem_giro_diz_que_a_cobertura_e_indefinida() -> None:
     contexto = renderizar_contexto(Montagem(fichas=[ficha(giro=0.0, cobertura=None)]))
 
@@ -183,8 +201,8 @@ def test_politica_traz_os_parametros_com_meses_em_decimal() -> None:
     contexto = renderizar_contexto(Montagem(politica=POLITICA))
 
     assert "- Teto: 3,0 meses de cobertura quando a compra chega" in contexto
-    assert "- Piso de alerta: 20 dias de cobertura" in contexto
-    assert "- Piso de reposição: 30 dias de cobertura quando a compra chega" in contexto
+    assert "- Piso de alerta: 0,7 meses de cobertura" in contexto
+    assert "- Piso de reposição: 1,0 mês de cobertura quando a compra chega" in contexto
     assert "- Ciclo de compra: 1,0 mês de giro por compra" in contexto
     assert "- Lead time base: observado" in contexto
     assert "- Critério de fornecedor: menor preço" in contexto

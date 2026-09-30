@@ -9,33 +9,15 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Callable, Sequence
-from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
-
-from src.ai.schemas import NENHUM_PRODUTO, Entendimento, ProdutoCatalogo
+from src.ai.schemas import NENHUM_PRODUTO, Entendimento, Identificacao, OrigemIdentificacao, ProdutoCatalogo
 from src.catalog.schemas import SKU
 
 LIMIAR_PRODUTO = 0.60
 MAX_SKUS_POR_RESPOSTA = 12
 PROBABILIDADE_MINIMA_CANDIDATO = 0.15
 MAX_CANDIDATOS = 3
-
-OrigemIdentificacao = Literal["codigo", "produto", "nenhum"]
-
-
-class Identificacao(BaseModel):
-    """`total_skus` conta os SKUs identificados antes do corte em `MAX_SKUS_POR_RESPOSTA`."""
-
-    model_config = ConfigDict(frozen=True)
-
-    skus: list[str]
-    total_skus: int
-    origem: OrigemIdentificacao
-    produto: str | None
-    candidatos: list[str]
-
 
 def produtos_do_catalogo(skus: Sequence[SKU]) -> list[ProdutoCatalogo]:
     por_produto: dict[UUID, list[SKU]] = {}

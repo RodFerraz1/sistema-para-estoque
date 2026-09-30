@@ -1,4 +1,4 @@
-"""Create copilot.registros_decisao for the chat decision log.
+"""Create copilot.registros_decisao, one registro de decisão per chat question.
 
 Revision ID: 0004_registros_decisao
 Revises: 0003_trechos_corpus

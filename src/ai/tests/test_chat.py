@@ -15,10 +15,9 @@ from src.ai.chat import (
 )
 from src.ai.decisao import DecisaoIndisponivel
 from src.ai.identificacao import MAX_SKUS_POR_RESPOSTA
-from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel, Probabilidades
+from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel, InMemoryRegistrosDecisao, Probabilidades
 from src.ai.redator import Redator
-from src.ai.registro import InMemoryRegistrosDecisao, RegistroDecisao
-from src.ai.schemas import Entendimento, Trecho
+from src.ai.schemas import Entendimento, RegistroDecisao, Trecho
 from src.catalog.schemas import SKU
 from src.catalog.service import Catalog
 from src.erp_adapter.in_memory import InMemoryERPAdapter
@@ -318,7 +317,7 @@ def test_faixa_media_comeca_confirmando_o_entendimento() -> None:
     resposta = copilot(make_entendimento("politica_ou_fornecedor", 0.6), redator=redator).responder(PERGUNTA)
 
     assert resposta.resposta == (
-        "Entendi que você quer saber da política de compra ou de um fornecedor. "
+        "Entendi que você quer saber da política de compra e dos fornecedores. "
         "Se não for isso, reformule a pergunta.\n\nLead time de 45 dias."
     )
     assert resposta.redator == "gravador"
@@ -341,7 +340,7 @@ def test_faixa_baixa_pede_esclarecimento_com_as_duas_intencoes_mais_provaveis() 
 
     assert resposta.resposta == (
         "Não entendi bem o que você precisa. Você quer ver a situação de um SKU (estoque, giro e cobertura) "
-        "ou saber da política de compra ou de um fornecedor? Pode reformular a pergunta?"
+        "ou saber da política de compra e dos fornecedores? Pode reformular a pergunta?"
     )
     assert resposta.acao == "pediu_esclarecimento"
     assert resposta.faixa == "baixa"
@@ -359,7 +358,7 @@ def test_queda_do_redator_cai_no_sem_llm_com_a_observacao() -> None:
 
     assert resposta.acao == "respondeu"
     assert resposta.redator == "sem_llm"
-    assert resposta.resposta.startswith("Não há LLM configurado para redigir a resposta.")
+    assert resposta.resposta.startswith("O LLM que redige a resposta está indisponível no momento.")
     assert "### TBC-BEGE-70140-01" in resposta.resposta
     assert resposta.resposta.endswith("- O redator groq:modelo falhou; a resposta vai sem redação.")
 

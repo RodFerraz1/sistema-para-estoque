@@ -13,7 +13,7 @@ from uuid import UUID
 
 from src.ai.embeddings import Embedder
 from src.ai.in_memory import InMemoryTrechosRepositorio
-from src.ai.redator import RedatorIndisponivel
+from src.ai.redator import Redator, RedatorIndisponivel
 from src.ai.schemas import NENHUM_PRODUTO, Entendimento, Escolha, Intencao, Trecho, TrechoIndexado
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.in_memory import (
@@ -234,15 +234,19 @@ def make_entendimento(
     )
 
 
-class RedatorGravador:
+class RedatorGravador(Redator):
     """Redator que guarda o que recebeu e devolve `texto`. Com `falhar`, lança
     `RedatorIndisponivel` como um LLM fora do ar."""
 
     def __init__(self, texto: str = "Resposta redigida.", *, nome: str = "gravador", falhar: bool = False) -> None:
-        self.nome = nome
+        self._nome = nome
         self.chamadas: list[tuple[str, str]] = []
         self._texto = texto
         self._falhar = falhar
+
+    @property
+    def nome(self) -> str:
+        return self._nome
 
     def redigir(self, pergunta: str, contexto: str) -> str:
         self.chamadas.append((pergunta, contexto))

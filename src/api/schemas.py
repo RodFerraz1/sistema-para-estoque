@@ -7,10 +7,20 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated
 
-from src.ai.identificacao import OrigemIdentificacao
-from src.ai.schemas import Acao, Classificacao, ConflitoEntreTrechos, Faixa, Intencao, MotivoDescarte, Probabilidade
+from pydantic import BaseModel, ConfigDict, StringConstraints
+
+from src.ai.schemas import (
+    Acao,
+    Classificacao,
+    ConflitoEntreTrechos,
+    Faixa,
+    Intencao,
+    MotivoDescarte,
+    OrigemIdentificacao,
+    Probabilidade,
+)
 from src.inventory.schemas import Cobertura, Estoque
 from src.politica_compra.schemas import ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
@@ -121,7 +131,7 @@ class ResultadoBuscaResponse(BaseModel):
 
 
 class PerguntaChatRequest(BaseModel):
-    pergunta: str = Field(min_length=1, max_length=1000)
+    pergunta: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
 
 
 class EscolhaResponse(BaseModel):

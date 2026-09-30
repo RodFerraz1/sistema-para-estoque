@@ -39,3 +39,18 @@ O comprador pergunta em `POST /chat` e recebe texto. O `Copilot` pede o entendim
   - "Quem ganhou o jogo ontem?": `fora_de_escopo` 1,00, resposta fixa em 0,3 s.
 - **Para o ticket 04**: todo caminho de `responder` termina num `return RespostaCopilot(...)` (esclarecimento de intenção, fora de escopo, esclarecimento de SKU e redação). O jeito mais simples de gravar um registro por pergunta é renomear o corpo atual para um `_decidir` e, em `responder`, medir a duração, gravar e devolver `resposta.model_copy(update={"registro_id": ...})`. `DecisaoIndisponivel` sai antes, então já fica sem registro.
 - **Testes**: `uv run pytest -q -m "not externo"` com 414 passando (eram 382 e 1 pulado; o `externo_llm` da Groq agora roda com a chave). `-m externo` com 5 passando.
+
+**2026-09-30 (revisão):** ajustes da revisão de código do M5:
+
+1. DTOs públicos em `src/ai/schemas.py` (regra de ouro de `module-interfaces.md`): `RespostaCopilot`, `Identificacao`, `OrigemIdentificacao`, `RegistroDecisao` e `Montagem`. Sem import circular: `schemas.py` passa a importar só DTOs de `ficha_sku`, `purchasing` e `politica_compra`, que não importam o `ai`. `src/api/schemas.py` e `src/api/chat.py` importam de `src.ai.schemas`.
+2. `InMemoryRegistrosDecisao` foi para `src/ai/in_memory.py`; `registro.py` ficou só com o port.
+3. `GroqRedator(Redator)` e `RedatorSemLLM(Redator)`, como `JevDecisionModel(DecisionModel)`.
+4. Uma função só monta a `RespostaCopilot` em `_decidir` (resposta em código e redação).
+5. `scripts/rodar_casos_chat.py` monta o `Copilot` pelo próprio `get_copilot`, com `scripts/dependencias.py:resolver`, que resolve os `Depends(...)` como o FastAPI numa requisição (cada dependência uma vez) e aceita trocas como o `dependency_overrides`. Ganhou `--sem-llm`, que troca o redator pelo `RedatorSemLLM`.
+6. Docstring da migration `0004` fala em registro de decisão, não em "log".
+7. Contexto numa unidade só (meses) e cobertura da ficha já comparada com o piso de alerta e o teto (detalhes no ticket 02).
+8. Queda do redator abre com "O LLM que redige a resposta está indisponível no momento." em vez de "Não há LLM configurado".
+9. "Ou" duplo no esclarecimento de intenção: a descrição de `politica_ou_fornecedor` virou "saber da política de compra e dos fornecedores" (spec l.129 atualizada) e as duas descrições são juntadas pelo `_por_extenso`, o mesmo do esclarecimento de SKU.
+10. `PerguntaChatRequest` tira os espaços das pontas antes de validar (`StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)`): pergunta só com espaços dá 422, e a pergunta chega ao `Copilot` sem espaços nas pontas.
+
+Spec e README acompanham (texto do `RedatorSemLLM`, unidades do contexto, árvore do módulo). Testes: `uv run pytest -q -m "not externo"` com 447 passando (eram 440); `-m externo` com 6 e `-m externo_llm` com 2 passando.

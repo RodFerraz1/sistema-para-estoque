@@ -22,7 +22,7 @@ PERGUNTA = "Qual a situação do SKU TBC-BEGE-70140-01?"
 
 @pytest.fixture
 def sem_llm() -> Iterator[None]:
-    app.dependency_overrides[get_redator] = RedatorSemLLM
+    app.dependency_overrides[get_redator] = lambda: RedatorSemLLM()
     yield
     app.dependency_overrides.pop(get_redator, None)
 
