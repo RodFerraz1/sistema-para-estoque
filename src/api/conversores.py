@@ -1,12 +1,13 @@
 """Conversores de DTOs de domínio para DTOs HTTP, usados por mais de um router."""
 from __future__ import annotations
 
-from src.ai.schemas import TrechoClassificado
+from src.ai.schemas import SinalCorpus, TrechoClassificado
 from src.api.schemas import (
     AnaliseSKUResponse,
     AvaliacaoTrechoResponse,
     FornecedorResponse,
     GiroResponse,
+    SinalCorpusResponse,
     SugestaoPedidoResponse,
     TrechoClassificadoResponse,
 )
@@ -57,6 +58,15 @@ def sugestao_to_response(sugestao: SugestaoPedido) -> SugestaoPedidoResponse:
         calculo=sugestao.calculo,
         alertas=sugestao.alertas,
         politica_versao=sugestao.politica_versao,
+    )
+
+
+def sinal_to_response(sinal: SinalCorpus) -> SinalCorpusResponse:
+    return SinalCorpusResponse(
+        tipo=sinal.tipo,
+        mensagem=sinal.mensagem,
+        trechos=sinal.trechos,
+        probabilidade=sinal.probabilidade,
     )
 
 

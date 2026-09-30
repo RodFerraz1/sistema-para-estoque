@@ -20,6 +20,7 @@ from src.ai.schemas import (
     MotivoDescarte,
     OrigemIdentificacao,
     Probabilidade,
+    TipoSinal,
 )
 from src.inventory.schemas import Cobertura, Estoque
 from src.politica_compra.schemas import ParametrosPolitica
@@ -94,6 +95,15 @@ class SugestaoPedidoResponse(BaseModel):
     calculo: MemoriaCalculo | None
     alertas: list[Alerta]
     politica_versao: int
+
+
+class SinalCorpusResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    tipo: TipoSinal
+    mensagem: str
+    trechos: list[str]
+    probabilidade: Probabilidade
 
 
 class AvaliacaoTrechoResponse(BaseModel):

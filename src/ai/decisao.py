@@ -10,9 +10,11 @@ from typing import Protocol
 
 from src.ai.schemas import (
     AvaliacaoConflito,
+    AvaliacaoSinais,
     AvaliacaoTrecho,
     Entendimento,
     ProdutoCatalogo,
+    ProdutoDoSinal,
     Trecho,
 )
 
@@ -33,3 +35,7 @@ class DecisionModel(Protocol):
     def avaliar_conflitos(
         self, pares: Sequence[tuple[Trecho, Trecho]]
     ) -> list[AvaliacaoConflito]: ...
+
+    def avaliar_sinais(
+        self, fornecedor: str, produto: ProdutoDoSinal, trechos: Sequence[Trecho]
+    ) -> list[AvaliacaoSinais]: ...

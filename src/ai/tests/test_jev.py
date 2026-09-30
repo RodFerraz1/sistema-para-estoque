@@ -16,8 +16,9 @@ from src.ai.busca import LIMIARES
 from src.ai.corpus import ler_corpus
 from src.ai.decisao import DecisaoIndisponivel
 from src.ai.identificacao import LIMIAR_PRODUTO, produtos_do_catalogo
-from src.ai.jev import JevDecisionModel, criar_cliente
-from src.ai.schemas import Trecho
+from src.ai.jev import PERGUNTAS_SINAIS, JevDecisionModel, criar_cliente
+from src.ai.schemas import ProdutoDoSinal, Trecho
+from src.ai.sinais import LIMIARES_SINAIS
 from src.db.config import get_settings
 from tests.fakes import make_sku, make_trecho
 
@@ -303,6 +304,75 @@ def test_erro_do_sdk_num_par_vira_decisao_indisponivel_para_o_lote_todo() -> Non
         JevDecisionModel(cliente).avaliar_conflitos(pares)
 
 
+TOALHA = ProdutoDoSinal(nome="Toalha Banho Conforto", categoria="felpudo")
+
+
+def test_sinais_vao_um_request_por_trecho_com_fornecedor_produto_e_trecho_no_state() -> None:
+    cliente = ClienteFalso()
+    revisao = make_trecho(
+        "reunioes/q1.md#katrina",
+        "Lead time real ficou em 62 dias.",
+        titulo="Revisão Q1/2025 > Katrina Têxtil",
+        tipo="reuniao",
+        data=date(2025, 3, 14),
+    )
+
+    JevDecisionModel(cliente).avaliar_sinais("Katrina Têxtil", TOALHA, [revisao])
+
+    assert [(state, sorted(perguntas)) for state, perguntas in cliente.pedidos] == [
+        (
+            {
+                "fornecedor": "Katrina Têxtil",
+                "produto": {"nome": "Toalha Banho Conforto", "categoria": "felpudo"},
+                "trecho": {
+                    "titulo": "Revisão Q1/2025 > Katrina Têxtil",
+                    "tipo": "reuniao",
+                    "data": "2025-03-14",
+                    "texto": "Lead time real ficou em 62 dias.",
+                },
+            },
+            ["atraso_do_fornecedor", "demanda_sazonal", "encalhe"],
+        )
+    ]
+
+
+def test_perguntas_de_sinais_sao_as_da_spec() -> None:
+    cliente = ClienteFalso()
+
+    JevDecisionModel(cliente).avaliar_sinais("Katrina Têxtil", TOALHA, [make_trecho("a.md#s", "Texto.")])
+
+    [(_, perguntas)] = cliente.pedidos
+    assert perguntas == PERGUNTAS_SINAIS
+    assert {nome: p.instructions for nome, p in perguntas.items()} == {
+        "atraso_do_fornecedor": "O `trecho` relata que o fornecedor `fornecedor` atrasou entregas ou entregou depois do prazo combinado?",
+        "demanda_sazonal": "O `trecho` relata que o `produto` ou a categoria dele vende mais numa data comemorativa ou época do ano?",
+        "encalhe": "O `trecho` relata que o `produto` ou a categoria dele encalhou ou sobrou em estoque depois de uma compra?",
+    }
+    assert all(isinstance(p, Noul) and set(p.criteria) == {"true", "false"} for p in perguntas.values())
+
+
+def test_cada_resposta_de_sinais_vira_o_campo_de_mesmo_nome_na_ordem_dos_trechos() -> None:
+    cliente = ClienteFalso(
+        {"atraso_do_fornecedor": 0.93, "demanda_sazonal": 0.12, "encalhe": 0.05}, modelo="jev-1.13.1"
+    )
+    trechos = [make_trecho(f"a.md#s{i}", f"Texto {i}.") for i in range(12)]
+
+    avaliacoes = JevDecisionModel(cliente).avaliar_sinais("Katrina Têxtil", TOALHA, trechos)
+
+    assert [a.trecho_id for a in avaliacoes] == [t.id for t in trechos]
+    assert {
+        (a.atraso_do_fornecedor, a.demanda_sazonal, a.encalhe, a.modelo) for a in avaliacoes
+    } == {(0.93, 0.12, 0.05, "jev-1.13.1")}
+
+
+def test_erro_do_sdk_num_trecho_dos_sinais_vira_decisao_indisponivel_para_o_lote_todo() -> None:
+    cliente = ClienteFalso(falha_no_texto="Texto 3.")
+    trechos = [make_trecho(f"a.md#s{i}", f"Texto {i}.") for i in range(6)]
+
+    with pytest.raises(DecisaoIndisponivel, match="timed out"):
+        JevDecisionModel(cliente).avaliar_sinais("Katrina Têxtil", TOALHA, trechos)
+
+
 @pytest.fixture
 def jev_real() -> Iterator[JevDecisionModel]:
     settings = get_settings()
@@ -354,3 +424,20 @@ def test_jev_real_entende_a_situacao_da_toalha_conforto_branca(jev_real: JevDeci
     assert entendimento.produto.escolha == "Toalha Banho Conforto"
     assert entendimento.produto.confianca >= LIMIAR_PRODUTO
     assert set(entendimento.produto.probabilidades) == {p.nome for p in PRODUTOS} | {"nenhum"}
+
+
+@pytest.mark.externo
+def test_jev_real_ve_o_atraso_da_katrina_so_para_a_katrina(jev_real: JevDecisionModel) -> None:
+    revisao_q1 = next(
+        t for t in ler_corpus(RAIZ / "corpus") if t.id == "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil"
+    )
+
+    [da_katrina] = jev_real.avaliar_sinais("Katrina Têxtil", TOALHA, [revisao_q1])
+    [da_malha_fina] = jev_real.avaliar_sinais(
+        "Malha Fina", ProdutoDoSinal(nome="Pano de Prato Estampado", categoria="cozinha"), [revisao_q1]
+    )
+
+    assert da_katrina.modelo == "jev-1.13.0"
+    assert da_katrina.atraso_do_fornecedor > LIMIARES_SINAIS.atraso_do_fornecedor
+    assert da_katrina.encalhe <= LIMIARES_SINAIS.encalhe
+    assert da_malha_fina.atraso_do_fornecedor <= LIMIARES_SINAIS.atraso_do_fornecedor

@@ -14,6 +14,7 @@ from src.ai.postgres import PostgresRegistrosDecisao, PostgresTrechosRepositorio
 from src.ai.redator import Redator, RedatorSemLLM
 from src.ai.registro import RegistrosDecisao
 from src.ai.repositorio import TrechosRepositorio
+from src.ai.sinais import SinaisCorpus
 from src.catalog.dependencies import get_catalog
 from src.catalog.service import Catalog
 from src.db.config import get_settings
@@ -70,6 +71,13 @@ def get_busca_contexto(
     decisao: DecisionModel = Depends(get_decision_model),
 ) -> BuscaContexto:
     return BuscaContexto(embedder, repositorio, decisao)
+
+
+def get_sinais_corpus(
+    busca: BuscaContexto = Depends(get_busca_contexto),
+    decisao: DecisionModel = Depends(get_decision_model),
+) -> SinaisCorpus:
+    return SinaisCorpus(busca, decisao)
 
 
 def get_copilot(

@@ -86,6 +86,10 @@ _Avoid_: frequência, periodicidade.
 Resultado determinístico de `purchasing` para um SKU: quantidade, fornecedor, memória de cálculo, alertas e versão da política usada. Quando não há compra, quantidade zero com motivo. Nunca vira pedido de compra sem aprovação do comprador chefe.
 _Avoid_: recomendação, pedido sugerido, proposta.
 
+**Sinal (do corpus)**:
+O que os documentos do corpus relatam sobre o fornecedor e o produto de uma sugestão de pedido: atraso do fornecedor, venda forte do produto numa época do ano ou encalhe do produto (ou da categoria dele) numa compra anterior. O Jev responde trecho a trecho e o código transforma em sinal o que passa do limiar, com os trechos de origem. Acompanha a sugestão e nunca altera a quantidade.
+_Avoid_: alerta (é o que o `purchasing` calcula a partir do ERP), insight, risco.
+
 **Onboarding**:
 Sequência de perguntas em linguagem de comprador que preenche a política de compra. Rascunho em `.scratch/sugestao-compra/perguntas-comprador.md`.
 _Avoid_: setup, configuração inicial.

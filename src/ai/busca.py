@@ -47,7 +47,7 @@ class BuscaContexto:
         self._repositorio = repositorio
         self._decisao = decisao
 
-    def buscar(self, pergunta: str, k: int = K_PADRAO) -> ResultadoBusca:
+    def buscar(self, pergunta: str, k: int = K_PADRAO, com_conflitos: bool = True) -> ResultadoBusca:
         [vetor] = self._embedder.embed([pergunta])
         recuperados = self._repositorio.buscar_similares(vetor, k)
         if not recuperados:
@@ -61,7 +61,7 @@ class BuscaContexto:
             pergunta=pergunta,
             modelo=avaliacoes[recuperados[0].id].modelo,
             trechos=trechos,
-            conflitos=self._conflitos(trechos),
+            conflitos=self._conflitos(trechos) if com_conflitos else [],
         )
 
     def _conflitos(self, trechos: list[TrechoClassificado]) -> list[ConflitoEntreTrechos]:

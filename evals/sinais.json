@@ -1,0 +1,332 @@
+[
+  {
+    "id": "s01",
+    "fornecedor": "Katrina Têxtil",
+    "produto": {
+      "nome": "Toalha Banho Conforto",
+      "categoria": "felpudo"
+    },
+    "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+    "esperado": {
+      "atraso_do_fornecedor": true,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Lead time real de 62 dias contra 45 contratados, terceiro trimestre seguido."
+  },
+  {
+    "id": "s02",
+    "fornecedor": "Katrina Têxtil",
+    "produto": {
+      "nome": "Jogo de Cama Percal 200 fios",
+      "categoria": "jogo_cama"
+    },
+    "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+    "esperado": {
+      "atraso_do_fornecedor": true,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Prometido 45 dias, observado 55-65."
+  },
+  {
+    "id": "s03",
+    "fornecedor": "Katrina Têxtil",
+    "produto": {
+      "nome": "Toalha Rosto Conforto",
+      "categoria": "felpudo"
+    },
+    "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento",
+    "esperado": {
+      "atraso_do_fornecedor": true,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Prazo real acima do contratado da Katrina já é padrão."
+  },
+  {
+    "id": "s04",
+    "fornecedor": "Malha Fina",
+    "produto": {
+      "nome": "Pano de Prato Estampado",
+      "categoria": "cozinha"
+    },
+    "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Fornecedor trocado: o atraso relatado é da Katrina, não da Malha Fina."
+  },
+  {
+    "id": "s05",
+    "fornecedor": "Verdela Home",
+    "produto": {
+      "nome": "Jogo de Cama Percal 300 fios",
+      "categoria": "jogo_cama"
+    },
+    "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Fornecedor trocado: o gap de lead time é da Katrina."
+  },
+  {
+    "id": "s06",
+    "fornecedor": "Verdela Home",
+    "produto": {
+      "nome": "Jogo de Cama Percal 300 fios",
+      "categoria": "jogo_cama"
+    },
+    "trecho_id": "fornecedores/verdela-home.md#lead-time",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "A Verdela cumpre o prometido, sem histórico de atraso."
+  },
+  {
+    "id": "s07",
+    "fornecedor": "Malha Fina",
+    "produto": {
+      "nome": "Guardanapo Tecido",
+      "categoria": "mesa"
+    },
+    "trecho_id": "fornecedores/malha-fina-textil.md#lead-time",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Malha Fina observada em 20-25 dias para 20 prometidos, descrita como confiável."
+  },
+  {
+    "id": "s08",
+    "fornecedor": "Katrina Têxtil",
+    "produto": {
+      "nome": "Toalha Banho Conforto",
+      "categoria": "felpudo"
+    },
+    "trecho_id": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Quem atrasou o pedido de Natal foi o atacadista; a nota diz que a Katrina cumpre a cláusula 3 em setembro-outubro."
+  },
+  {
+    "id": "s09",
+    "fornecedor": "Katrina Têxtil",
+    "produto": {
+      "nome": "Jogo de Cama Percal 200 fios",
+      "categoria": "jogo_cama"
+    },
+    "trecho_id": "reunioes/2024-11-natal-king-size.md#contexto",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": true,
+      "encalhe": false
+    },
+    "motivo": "Pico de venda do percal 200 king em dezembro, ~2,4x o mês médio."
+  },
+  {
+    "id": "s10",
+    "fornecedor": "Verdela Home",
+    "produto": {
+      "nome": "Jogo de Cama Percal 300 fios",
+      "categoria": "jogo_cama"
+    },
+    "trecho_id": "reunioes/2024-11-natal-king-size.md#contexto",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": true,
+      "encalhe": false
+    },
+    "motivo": "Mesma categoria (jogo de cama) com pico de venda no Natal; o fornecedor não importa para a sazonalidade."
+  },
+  {
+    "id": "s11",
+    "fornecedor": "Katrina Têxtil",
+    "produto": {
+      "nome": "Jogo de Cama Percal 200 fios",
+      "categoria": "jogo_cama"
+    },
+    "trecho_id": "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": true,
+      "encalhe": false
+    },
+    "motivo": "Venda de dezembro do percal 200 king cumpriu 108% do previsto, com estoque confortável depois (não encalhou)."
+  },
+  {
+    "id": "s12",
+    "fornecedor": "Malha Fina",
+    "produto": {
+      "nome": "Toalha de Mesa Retangular",
+      "categoria": "mesa"
+    },
+    "trecho_id": "mercado/tendencia-cama-mesa-banho-2026.md#movimento-macro",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": true,
+      "encalhe": false
+    },
+    "motivo": "Vendas de cama, mesa e banho concentradas em dia das mães, Black Friday, Natal e volta às aulas."
+  },
+  {
+    "id": "s13",
+    "fornecedor": "Malha Fina",
+    "produto": {
+      "nome": "Pano de Prato Estampado",
+      "categoria": "cozinha"
+    },
+    "trecho_id": "reunioes/2024-11-natal-king-size.md#contexto",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Produto trocado: o pico de Natal é de jogo de cama, não de pano de prato (cozinha)."
+  },
+  {
+    "id": "s14",
+    "fornecedor": "Katrina Têxtil",
+    "produto": {
+      "nome": "Toalha Banho Conforto",
+      "categoria": "felpudo"
+    },
+    "trecho_id": "fornecedores/katrina-textil.md#sazonalidade-e-capacidade",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Fala da capacidade e da fila da fábrica por época, não de venda do produto nem de atraso de entrega."
+  },
+  {
+    "id": "s15",
+    "fornecedor": "Verdela Home",
+    "produto": {
+      "nome": "Jogo de Cama Percal 300 fios",
+      "categoria": "jogo_cama"
+    },
+    "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": true
+    },
+    "motivo": "Linha Veraneio (jogo de cama) vendeu 61% do previsto e foi liquidada; sobraram 180."
+  },
+  {
+    "id": "s16",
+    "fornecedor": "Verdela Home",
+    "produto": {
+      "nome": "Edredom Duplaface",
+      "categoria": "jogo_cama"
+    },
+    "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#introducao",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": true
+    },
+    "motivo": "Sobraram 180 conjuntos da linha Veraneio; mesma categoria (jogo_cama) do edredom."
+  },
+  {
+    "id": "s17",
+    "fornecedor": "Katrina Têxtil",
+    "produto": {
+      "nome": "Jogo de Cama Percal 200 fios",
+      "categoria": "jogo_cama"
+    },
+    "trecho_id": "fornecedores/katrina-textil.md#linhas-ativas",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": true
+    },
+    "motivo": "Percal 200 king com histórico de estoque parado em algumas coleções."
+  },
+  {
+    "id": "s18",
+    "fornecedor": "Katrina Têxtil",
+    "produto": {
+      "nome": "Toalha Banho Conforto",
+      "categoria": "felpudo"
+    },
+    "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Produto trocado: o encalhe é de jogo de cama, não de toalha (felpudo)."
+  },
+  {
+    "id": "s19",
+    "fornecedor": "Katrina Têxtil",
+    "produto": {
+      "nome": "Jogo de Cama Percal 200 fios",
+      "categoria": "jogo_cama"
+    },
+    "trecho_id": "reunioes/2024-11-natal-king-size.md#riscos-aceitos",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Encalhe só como risco hipotético (se a demanda cair), não como fato."
+  },
+  {
+    "id": "s20",
+    "fornecedor": "Katrina Têxtil",
+    "produto": {
+      "nome": "Toalha Banho Conforto",
+      "categoria": "felpudo"
+    },
+    "trecho_id": "politicas/estoque-e-giro.md#principios",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Princípio genérico da política, sem relato de encalhe nem de venda por época."
+  },
+  {
+    "id": "s21",
+    "fornecedor": "Verdela Home",
+    "produto": {
+      "nome": "Colcha Bouti",
+      "categoria": "jogo_cama"
+    },
+    "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#causas-identificadas",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": true
+    },
+    "motivo": "Causas do encalhe da Veraneio (jogo de cama), com liquidações; mesma categoria da colcha."
+  },
+  {
+    "id": "s22",
+    "fornecedor": "Malha Fina",
+    "produto": {
+      "nome": "Toalha de Mesa Redonda",
+      "categoria": "mesa"
+    },
+    "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#prejuizo-estimado",
+    "esperado": {
+      "atraso_do_fornecedor": false,
+      "demanda_sazonal": false,
+      "encalhe": false
+    },
+    "motivo": "Produto trocado: prejuízo do encalhe de jogo de cama, não de toalha de mesa."
+  }
+]

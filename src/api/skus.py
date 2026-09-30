@@ -3,10 +3,18 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from src.api.conversores import ficha_to_response, fornecedor_to_response, sugestao_to_response
+from src.ai.dependencies import get_sinais_corpus
+from src.ai.sinais import SinaisCorpus
+from src.api.conversores import (
+    ficha_to_response,
+    fornecedor_to_response,
+    sinal_to_response,
+    sugestao_to_response,
+)
 from src.api.schemas import (
     AnaliseSKUResponse,
     FornecedorResponse,
+    SinalCorpusResponse,
     SKUAbaixoDoPisoResponse,
     SugestaoPedidoResponse,
     VendaMensalResponse,
@@ -96,6 +104,25 @@ def sugestao_compra(
     if sugestao is None:
         raise _sku_nao_encontrado(sku_code)
     return sugestao_to_response(sugestao)
+
+
+@router.get("/{sku_code}/sugestao-compra/sinais", response_model=list[SinalCorpusResponse])
+def sinais_da_sugestao_compra(
+    sku_code: str,
+    catalog: Catalog = Depends(get_catalog),
+    purchasing: Purchasing = Depends(get_purchasing),
+    sinais_corpus: SinaisCorpus = Depends(get_sinais_corpus),
+) -> list[SinalCorpusResponse]:
+    """Sinais do corpus sobre o fornecedor e o produto da sugestão. Lista vazia quando a
+    sugestão não tem fornecedor; 503 sem o Jev."""
+    sku = _sku_ou_404(catalog, sku_code)
+    try:
+        sugestao = purchasing.sugerir_pedido(sku_code)
+    except SKUSemEstoque as e:
+        raise _sku_sem_estoque(e) from e
+    if sugestao is None:
+        raise _sku_nao_encontrado(sku_code)
+    return [sinal_to_response(s) for s in sinais_corpus.para_sugestao(sugestao, sku)]
 
 
 @router.get("/{sku_code}/vendas", response_model=list[VendaMensalResponse])

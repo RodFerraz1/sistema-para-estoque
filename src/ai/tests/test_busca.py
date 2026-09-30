@@ -291,3 +291,16 @@ def test_jev_indisponivel_no_conflito_propaga_sem_resultado_parcial() -> None:
 
     with pytest.raises(DecisaoIndisponivel):
         busca(trechos, decisao).buscar(PERGUNTA)
+
+
+def test_sem_conflitos_nao_pergunta_sobre_conflito_e_devolve_lista_vazia() -> None:
+    trechos = [
+        make_trecho("contrato.md#prazos", "lead time da Katrina"),
+        make_trecho("revisao.md#katrina", "lead time da Katrina em dias"),
+    ]
+    decisao = InMemoryDecisionModel(padrao=ACEITO, falhar_conflitos=True)
+
+    resultado = busca(trechos, decisao).buscar(PERGUNTA, com_conflitos=False)
+
+    assert [t.classificacao for t in resultado.trechos] == ["aceito", "aceito"]
+    assert resultado.conflitos == []

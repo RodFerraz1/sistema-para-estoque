@@ -3,7 +3,8 @@
 As perguntas de intenção e de trecho são as da rodada 2 do spike, em PT, com
 que as faixas do chat e os `LIMIARES` da busca foram calibrados. A de produto
 foi medida por `scripts/avaliar_entendimento.py`, que calibrou o
-`LIMIAR_PRODUTO`. Mudar a redação exige medir de novo.
+`LIMIAR_PRODUTO`, e as de sinais por `scripts/avaliar_sinais.py`, que calibrou
+os `LIMIARES_SINAIS`. Mudar a redação exige medir de novo.
 """
 from __future__ import annotations
 
@@ -27,10 +28,12 @@ from src.ai.decisao import DecisaoIndisponivel, DecisionModel
 from src.ai.schemas import (
     NENHUM_PRODUTO,
     AvaliacaoConflito,
+    AvaliacaoSinais,
     AvaliacaoTrecho,
     Entendimento,
     Escolha,
     ProdutoCatalogo,
+    ProdutoDoSinal,
     Trecho,
 )
 
@@ -105,6 +108,31 @@ PERGUNTAS_CONFLITO: dict[str, Question] = {
 }
 
 
+PERGUNTAS_SINAIS: dict[str, Question] = {
+    "atraso_do_fornecedor": Noul(
+        instructions="O `trecho` relata que o fornecedor `fornecedor` atrasou entregas ou entregou depois do prazo combinado?",
+        criteria={
+            "true": "O trecho conta atraso, entrega fora do prazo ou lead time real maior que o contratado desse mesmo fornecedor.",
+            "false": "O trecho não fala de entrega desse fornecedor, fala de outro fornecedor ou diz que ele cumpre os prazos.",
+        },
+    ),
+    "demanda_sazonal": Noul(
+        instructions="O `trecho` relata que o `produto` ou a categoria dele vende mais numa data comemorativa ou época do ano?",
+        criteria={
+            "true": "O trecho cita venda maior desse produto ou da categoria dele no Natal, no Dia das Mães, no inverno, no verão ou em outra época.",
+            "false": "O trecho não fala de venda por época desse produto nem da categoria dele.",
+        },
+    ),
+    "encalhe": Noul(
+        instructions="O `trecho` relata que o `produto` ou a categoria dele encalhou ou sobrou em estoque depois de uma compra?",
+        criteria={
+            "true": "O trecho conta que uma compra desse produto ou da categoria dele vendeu abaixo do esperado, ficou parada ou precisou de liquidação.",
+            "false": "O trecho não fala de sobra de estoque desse produto nem da categoria dele.",
+        },
+    ),
+}
+
+
 class ClienteSystemOne(Protocol):
     def system_one(
         self, state: JSONContent, questions: Mapping[str, Question]
@@ -175,6 +203,29 @@ class JevDecisionModel(DecisionModel):
             trecho_a=trecho_a.id,
             trecho_b=trecho_b.id,
             conflitam=resposta.nouls["conflitam"].noul,
+            modelo=resposta.model,
+        )
+
+
+    def avaliar_sinais(
+        self, fornecedor: str, produto: ProdutoDoSinal, trechos: Sequence[Trecho]
+    ) -> list[AvaliacaoSinais]:
+        return _em_paralelo(lambda trecho: self._avaliar_sinais(fornecedor, produto, trecho), trechos)
+
+    def _avaliar_sinais(self, fornecedor: str, produto: ProdutoDoSinal, trecho: Trecho) -> AvaliacaoSinais:
+        resposta = self._cliente.system_one(
+            {
+                "fornecedor": fornecedor,
+                "produto": produto.model_dump(),
+                "trecho": _trecho_para_o_state(trecho),
+            },
+            PERGUNTAS_SINAIS,
+        )
+        return AvaliacaoSinais(
+            trecho_id=trecho.id,
+            atraso_do_fornecedor=resposta.nouls["atraso_do_fornecedor"].noul,
+            demanda_sazonal=resposta.nouls["demanda_sazonal"].noul,
+            encalhe=resposta.nouls["encalhe"].noul,
             modelo=resposta.model,
         )
 

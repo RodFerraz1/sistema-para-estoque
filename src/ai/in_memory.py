@@ -14,10 +14,12 @@ from src.ai.repositorio import TrechosRepositorio
 from src.ai.schemas import (
     NENHUM_PRODUTO,
     AvaliacaoConflito,
+    AvaliacaoSinais,
     AvaliacaoTrecho,
     Entendimento,
     Escolha,
     ProdutoCatalogo,
+    ProdutoDoSinal,
     RegistroDecisao,
     Trecho,
     TrechoIndexado,
@@ -89,6 +91,12 @@ class Probabilidades(TypedDict, total=False):
     tenta_instruir: float
 
 
+class ProbabilidadesSinais(TypedDict, total=False):
+    atraso_do_fornecedor: float
+    demanda_sazonal: float
+    encalhe: float
+
+
 ENTENDIMENTO_PADRAO = Entendimento(
     intencao=Escolha(escolha="fora_de_escopo", confianca=1.0, probabilidades={"fora_de_escopo": 1.0}),
     produto=Escolha(escolha=NENHUM_PRODUTO, confianca=1.0, probabilidades={NENHUM_PRODUTO: 1.0}),
@@ -102,10 +110,12 @@ class InMemoryDecisionModel(DecisionModel):
 
     Pergunta sem entendimento configurado recebe `entendimento_padrao`.
     Probabilidade que não foi configurada para o trecho vem de `padrao`, e o
-    que também não está em `padrao` vale 0. Um par é procurado em `conflitos`
-    nas duas ordens e, se não estiver lá, vale `conflito_padrao`. Com
-    `falhar_entendimento`, `falhar_trechos` ou `falhar_conflitos`, o método
-    correspondente lança `DecisaoIndisponivel` como o Jev fora do ar.
+    que também não está em `padrao` vale 0. Os sinais seguem a mesma regra com
+    `sinais` e `sinais_padrao`, qualquer que seja o fornecedor ou o produto.
+    Um par é procurado em `conflitos` nas duas ordens e, se não estiver lá,
+    vale `conflito_padrao`. Com `falhar_entendimento`, `falhar_trechos`,
+    `falhar_conflitos` ou `falhar_sinais`, o método correspondente lança
+    `DecisaoIndisponivel` como o Jev fora do ar.
     """
 
     def __init__(
@@ -117,10 +127,13 @@ class InMemoryDecisionModel(DecisionModel):
         conflito_padrao: float = 0.0,
         entendimentos: Mapping[str, Entendimento] | None = None,
         entendimento_padrao: Entendimento = ENTENDIMENTO_PADRAO,
+        sinais: Mapping[str, ProbabilidadesSinais] | None = None,
+        sinais_padrao: ProbabilidadesSinais | None = None,
         modelo: str = "in-memory",
         falhar_entendimento: bool = False,
         falhar_trechos: bool = False,
         falhar_conflitos: bool = False,
+        falhar_sinais: bool = False,
     ) -> None:
         self._entendimentos = dict(entendimentos or {})
         self._entendimento_padrao = entendimento_padrao
@@ -132,6 +145,9 @@ class InMemoryDecisionModel(DecisionModel):
         self._modelo = modelo
         self._falhar_trechos = falhar_trechos
         self._falhar_conflitos = falhar_conflitos
+        self._sinais = dict(sinais or {})
+        self._sinais_padrao = sinais_padrao or {}
+        self._falhar_sinais = falhar_sinais
 
     def entender_pergunta(
         self, pergunta: str, produtos: Sequence[ProdutoCatalogo]
@@ -175,6 +191,26 @@ class InMemoryDecisionModel(DecisionModel):
 
     def _conflitam(self, a: str, b: str) -> float:
         return self._conflitos.get((a, b), self._conflitos.get((b, a), self._conflito_padrao))
+
+    def avaliar_sinais(
+        self, fornecedor: str, produto: ProdutoDoSinal, trechos: Sequence[Trecho]
+    ) -> list[AvaliacaoSinais]:
+        if self._falhar_sinais:
+            raise DecisaoIndisponivel("InMemoryDecisionModel configurado para falhar em avaliar_sinais")
+        return [
+            AvaliacaoSinais.model_validate(
+                {
+                    "atraso_do_fornecedor": 0.0,
+                    "demanda_sazonal": 0.0,
+                    "encalhe": 0.0,
+                    **self._sinais_padrao,
+                    **self._sinais.get(trecho.id, {}),
+                    "trecho_id": trecho.id,
+                    "modelo": self._modelo,
+                }
+            )
+            for trecho in trechos
+        ]
 
 
 class InMemoryRegistrosDecisao(RegistrosDecisao):

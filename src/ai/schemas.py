@@ -19,6 +19,7 @@ Intencao = Literal["situacao_sku", "sugestao_compra", "politica_ou_fornecedor", 
 Faixa = Literal["alta", "media", "baixa"]
 Acao = Literal["respondeu", "confirmou_e_respondeu", "pediu_esclarecimento", "fora_de_escopo"]
 OrigemIdentificacao = Literal["codigo", "produto", "nenhum"]
+TipoSinal = Literal["atraso_do_fornecedor", "demanda_sazonal", "encalhe"]
 NENHUM_PRODUTO = "nenhum"
 
 
@@ -142,6 +143,46 @@ class Identificacao(BaseModel):
     origem: OrigemIdentificacao
     produto: str | None
     candidatos: list[str]
+
+
+class ProdutoDoSinal(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    nome: str
+    categoria: str
+
+
+class AvaliacaoSinais(BaseModel):
+    """Probabilidades que o modelo de decisão deu para um trecho relatar cada sinal
+    sobre o fornecedor e o produto de uma sugestão."""
+
+    model_config = ConfigDict(frozen=True)
+
+    trecho_id: str
+    atraso_do_fornecedor: Probabilidade
+    demanda_sazonal: Probabilidade
+    encalhe: Probabilidade
+    modelo: str
+
+
+class SinalCorpus(BaseModel):
+    """O que o corpus relata sobre o fornecedor ou o produto de uma sugestão.
+    `trechos` são os ids de origem, do mais provável ao menos provável, e
+    `probabilidade` é a maior entre eles. Nunca altera a quantidade sugerida."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tipo: TipoSinal
+    mensagem: str
+    trechos: list[str]
+    probabilidade: Probabilidade
+
+
+class SugestaoComSinais(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    sugestao: SugestaoPedido
+    sinais: list[SinalCorpus]
 
 
 class Montagem(BaseModel):
