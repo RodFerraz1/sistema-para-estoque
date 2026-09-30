@@ -4,11 +4,12 @@ Camada API compõe DTOs dos módulos em respostas amigáveis.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from src.ai.schemas import Classificacao, ConflitoEntreTrechos, MotivoDescarte
 from src.inventory.schemas import Cobertura, Estoque
 from src.politica_compra.schemas import ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
@@ -82,3 +83,37 @@ class SugestaoPedidoResponse(BaseModel):
     calculo: MemoriaCalculo | None
     alertas: list[Alerta]
     politica_versao: int
+
+
+class AvaliacaoTrechoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    relevante: float
+    tem_evidencia: float
+    contradiz_premissa: float
+    tenta_instruir: float
+
+
+class TrechoClassificadoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    documento: str
+    titulo: str
+    tipo: str
+    data: date
+    tags: list[str]
+    texto: str
+    similaridade: float
+    classificacao: Classificacao
+    motivo_descarte: MotivoDescarte | None
+    avaliacao: AvaliacaoTrechoResponse
+
+
+class ResultadoBuscaResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    pergunta: str
+    modelo: str | None
+    trechos: list[TrechoClassificadoResponse]
+    conflitos: list[ConflitoEntreTrechos]

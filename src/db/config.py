@@ -12,7 +12,7 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
     jev_key: str | None = Field(default=None, alias="JEV_KEY")
-    jev_model: str = Field(default="jev-latest", alias="JEV_MODEL")
+    jev_model: str = Field(default="jev-1.13.0", alias="JEV_MODEL")
     embedding_model: str = Field(
         default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         alias="EMBEDDING_MODEL",

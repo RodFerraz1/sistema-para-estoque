@@ -2,8 +2,12 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
+
+Classificacao = Literal["aceito", "conflitante", "descartado"]
+MotivoDescarte = Literal["injecao", "irrelevante", "sem_evidencia"]
 
 
 class Trecho(BaseModel):
@@ -24,6 +28,42 @@ class TrechoIndexado(Trecho):
 
 class TrechoRecuperado(Trecho):
     similaridade: float
+
+
+class AvaliacaoTrecho(BaseModel):
+    """Probabilidades de 0 a 1 que o modelo de decisão deu para um trecho diante da pergunta."""
+
+    model_config = ConfigDict(frozen=True)
+
+    trecho_id: str
+    relevante: float
+    tem_evidencia: float
+    contradiz_premissa: float
+    tenta_instruir: float
+    modelo: str
+
+
+class TrechoClassificado(TrechoRecuperado):
+    classificacao: Classificacao
+    motivo_descarte: MotivoDescarte | None
+    avaliacao: AvaliacaoTrecho
+
+
+class ConflitoEntreTrechos(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    trecho_a: str
+    trecho_b: str
+    probabilidade: float
+
+
+class ResultadoBusca(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    pergunta: str
+    modelo: str | None
+    trechos: list[TrechoClassificado]
+    conflitos: list[ConflitoEntreTrechos]
 
 
 class RelatorioIngestao(BaseModel):
