@@ -14,7 +14,7 @@ from src.ai.in_memory import (
     InMemoryTrechosRepositorio,
     Probabilidades,
 )
-from src.ai.schemas import Trecho, TrechoIndexado
+from src.ai.schemas import ResultadoBusca, Trecho, TrechoIndexado
 
 PERGUNTA = "lead time da Katrina"
 
@@ -212,3 +212,107 @@ def test_busca_avalia_so_os_k_mais_parecidos() -> None:
     resultado = busca(trechos, InMemoryDecisionModel()).buscar(PERGUNTA, k=2)
 
     assert {t.id for t in resultado.trechos} == {"a.md#1", "b.md#2"}
+
+
+ACEITO: Probabilidades = {"relevante": 0.9, "tem_evidencia": 0.9}
+
+
+def conflitos(resultado: ResultadoBusca) -> list[tuple[str, str, float]]:
+    return [(c.trecho_a, c.trecho_b, c.probabilidade) for c in resultado.conflitos]
+
+
+def test_par_de_documentos_diferentes_acima_do_limiar_vira_conflito() -> None:
+    trechos = [
+        trecho("contrato.md#prazos", "lead time da Katrina"),
+        trecho("revisao.md#katrina", "lead time da Katrina em dias"),
+    ]
+    decisao = InMemoryDecisionModel(
+        padrao=ACEITO, conflitos={("revisao.md#katrina", "contrato.md#prazos"): 0.62}
+    )
+
+    resultado = busca(trechos, decisao).buscar(PERGUNTA)
+
+    assert conflitos(resultado) == [("contrato.md#prazos", "revisao.md#katrina", 0.62)]
+
+
+def test_trechos_do_mesmo_documento_nao_formam_par() -> None:
+    trechos = [
+        trecho("contrato.md#prazos", "lead time da Katrina"),
+        trecho("contrato.md#notas", "lead time da Katrina em dias"),
+        trecho("revisao.md#katrina", "lead time da Katrina em dias corridos"),
+    ]
+    decisao = InMemoryDecisionModel(padrao=ACEITO, conflito_padrao=0.9)
+
+    resultado = busca(trechos, decisao).buscar(PERGUNTA)
+
+    assert conflitos(resultado) == [
+        ("contrato.md#prazos", "revisao.md#katrina", 0.9),
+        ("contrato.md#notas", "revisao.md#katrina", 0.9),
+    ]
+
+
+def test_so_aceitos_e_conflitantes_formam_par() -> None:
+    trechos = [
+        trecho("contrato.md#prazos", "lead time da Katrina"),
+        trecho("revisao.md#katrina", "lead time da Katrina em dias"),
+        trecho("ata.md#decisoes", "lead time da Katrina em dias corridos"),
+    ]
+    decisao = InMemoryDecisionModel(
+        {
+            "contrato.md#prazos": ACEITO,
+            "revisao.md#katrina": {"contradiz_premissa": 0.95},
+            "ata.md#decisoes": {**ACEITO, "tenta_instruir": 0.95},
+        },
+        conflito_padrao=0.9,
+    )
+
+    resultado = busca(trechos, decisao).buscar(PERGUNTA)
+
+    assert [t.classificacao for t in resultado.trechos] == ["aceito", "conflitante", "descartado"]
+    assert conflitos(resultado) == [("contrato.md#prazos", "revisao.md#katrina", 0.9)]
+
+
+def test_so_os_6_trechos_mais_parecidos_formam_pares() -> None:
+    trechos = [trecho(f"doc{i}.md#s", "lead time da Katrina" + " em dias" * i) for i in range(7)]
+    decisao = InMemoryDecisionModel(padrao=ACEITO, conflito_padrao=0.9)
+
+    resultado = busca(trechos, decisao).buscar(PERGUNTA)
+
+    assert len(resultado.conflitos) == 15
+    assert {id for a, b, _ in conflitos(resultado) for id in (a, b)} == {
+        f"doc{i}.md#s" for i in range(6)
+    }
+
+
+def test_par_exatamente_no_limiar_nao_vira_conflito() -> None:
+    trechos = [
+        trecho("contrato.md#prazos", "lead time da Katrina"),
+        trecho("revisao.md#katrina", "lead time da Katrina em dias"),
+    ]
+    decisao = InMemoryDecisionModel(padrao=ACEITO, conflito_padrao=LIMIARES.conflito)
+
+    assert busca(trechos, decisao).buscar(PERGUNTA).conflitos == []
+
+
+def test_sem_par_elegivel_nao_pergunta_sobre_conflito() -> None:
+    trechos = [
+        trecho("contrato.md#prazos", "lead time da Katrina"),
+        trecho("contrato.md#notas", "lead time da Katrina em dias"),
+        trecho("revisao.md#katrina", "lead time da Katrina em dias corridos"),
+    ]
+    decisao = InMemoryDecisionModel(
+        {"contrato.md#prazos": ACEITO, "contrato.md#notas": ACEITO}, falhar_conflitos=True
+    )
+
+    assert busca(trechos, decisao).buscar(PERGUNTA).conflitos == []
+
+
+def test_jev_indisponivel_no_conflito_propaga_sem_resultado_parcial() -> None:
+    trechos = [
+        trecho("contrato.md#prazos", "lead time da Katrina"),
+        trecho("revisao.md#katrina", "lead time da Katrina em dias"),
+    ]
+    decisao = InMemoryDecisionModel(padrao=ACEITO, falhar_conflitos=True)
+
+    with pytest.raises(DecisaoIndisponivel):
+        busca(trechos, decisao).buscar(PERGUNTA)

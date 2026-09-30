@@ -136,8 +136,44 @@ def test_sem_k_avalia_os_30_mais_parecidos(client: TestClient) -> None:
     assert len(response.json()["trechos"]) == 30
 
 
-def test_jev_indisponivel_da_503(client: TestClient) -> None:
-    preparar([trecho("a.md#s")], InMemoryDecisionModel(falhar_trechos=True))
+def test_busca_devolve_os_conflitos_entre_trechos(client: TestClient) -> None:
+    preparar(
+        [
+            trecho("contratos/katrina.md#prazos", "lead time da Katrina"),
+            trecho("reunioes/q1.md#katrina", "lead time da Katrina em dias"),
+        ],
+        InMemoryDecisionModel(
+            padrao={"relevante": 0.9, "tem_evidencia": 0.9},
+            conflitos={("contratos/katrina.md#prazos", "reunioes/q1.md#katrina"): 0.62},
+        ),
+    )
+
+    response = client.get("/rag/busca", params={"q": PERGUNTA})
+
+    assert response.status_code == 200
+    assert response.json()["conflitos"] == [
+        {
+            "trecho_a": "contratos/katrina.md#prazos",
+            "trecho_b": "reunioes/q1.md#katrina",
+            "probabilidade": 0.62,
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "decisao",
+    [
+        pytest.param(InMemoryDecisionModel(falhar_trechos=True), id="nos-trechos"),
+        pytest.param(
+            InMemoryDecisionModel(
+                padrao={"relevante": 0.9, "tem_evidencia": 0.9}, falhar_conflitos=True
+            ),
+            id="no-conflito",
+        ),
+    ],
+)
+def test_jev_indisponivel_da_503(client: TestClient, decisao: InMemoryDecisionModel) -> None:
+    preparar([trecho("a.md#s"), trecho("b.md#s", "lead time da Katrina em dias")], decisao)
 
     response = client.get("/rag/busca", params={"q": PERGUNTA})
 

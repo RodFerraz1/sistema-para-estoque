@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import combinations
 
 from src.ai.decisao import DecisionModel
 from src.ai.embeddings import Embedder
@@ -9,6 +10,7 @@ from src.ai.repositorio import TrechosRepositorio
 from src.ai.schemas import (
     AvaliacaoTrecho,
     Classificacao,
+    ConflitoEntreTrechos,
     MotivoDescarte,
     ResultadoBusca,
     TrechoClassificado,
@@ -16,6 +18,7 @@ from src.ai.schemas import (
 )
 
 K_PADRAO = 30
+MAX_TRECHOS_CONFLITO = 6
 
 
 @dataclass(frozen=True)
@@ -26,9 +29,12 @@ class Limiares:
     contradiz_premissa: float
     relevante: float
     evidencia: float
+    conflito: float
 
 
-LIMIARES = Limiares(injecao=0.50, contradiz_premissa=0.85, relevante=0.55, evidencia=0.15)
+LIMIARES = Limiares(
+    injecao=0.50, contradiz_premissa=0.85, relevante=0.55, evidencia=0.15, conflito=0.10
+)
 
 _ORDEM: dict[Classificacao, int] = {"aceito": 0, "conflitante": 1, "descartado": 2}
 
@@ -55,8 +61,27 @@ class BuscaContexto:
             pergunta=pergunta,
             modelo=avaliacoes[recuperados[0].id].modelo,
             trechos=trechos,
-            conflitos=[],
+            conflitos=self._conflitos(trechos),
         )
+
+    def _conflitos(self, trechos: list[TrechoClassificado]) -> list[ConflitoEntreTrechos]:
+        elegiveis = sorted(
+            (t for t in trechos if t.classificacao != "descartado"),
+            key=lambda t: t.similaridade,
+            reverse=True,
+        )[:MAX_TRECHOS_CONFLITO]
+        pares = [(a, b) for a, b in combinations(elegiveis, 2) if a.documento != b.documento]
+        if not pares:
+            return []
+        return [
+            ConflitoEntreTrechos(
+                trecho_a=avaliacao.trecho_a,
+                trecho_b=avaliacao.trecho_b,
+                probabilidade=avaliacao.conflitam,
+            )
+            for avaliacao in self._decisao.avaliar_conflitos(pares)
+            if avaliacao.conflitam > LIMIARES.conflito
+        ]
 
 
 def _classificar(trecho: TrechoRecuperado, avaliacao: AvaliacaoTrecho) -> TrechoClassificado:

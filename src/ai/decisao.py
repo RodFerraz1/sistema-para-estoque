@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol
 
-from src.ai.schemas import AvaliacaoTrecho, Trecho
+from src.ai.schemas import AvaliacaoConflito, AvaliacaoTrecho, Trecho
 
 
 class DecisaoIndisponivel(Exception):
@@ -19,3 +19,7 @@ class DecisionModel(Protocol):
     def avaliar_trechos(
         self, pergunta: str, trechos: Sequence[Trecho]
     ) -> list[AvaliacaoTrecho]: ...
+
+    def avaliar_conflitos(
+        self, pares: Sequence[tuple[Trecho, Trecho]]
+    ) -> list[AvaliacaoConflito]: ...

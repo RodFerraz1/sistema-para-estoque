@@ -43,6 +43,17 @@ class AvaliacaoTrecho(BaseModel):
     modelo: str
 
 
+class AvaliacaoConflito(BaseModel):
+    """Probabilidade de 0 a 1 que o modelo de decisão deu para os dois trechos se contradizerem."""
+
+    model_config = ConfigDict(frozen=True)
+
+    trecho_a: str
+    trecho_b: str
+    conflitam: float
+    modelo: str
+
+
 class TrechoClassificado(TrechoRecuperado):
     classificacao: Classificacao
     motivo_descarte: MotivoDescarte | None
