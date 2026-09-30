@@ -8,10 +8,10 @@ import pytest
 
 from src.ai.busca import BuscaContexto
 from src.ai.chat import (
-    AVISO_SEM_SINAIS,
     AVISO_SEM_VERIFICACAO,
     FAIXAS,
     MAX_TRECHOS_NO_CONTEXTO,
+    OBSERVACAO_SEM_SINAIS,
     RESPOSTA_FORA_DE_ESCOPO,
     Copilot,
 )
@@ -22,10 +22,9 @@ from src.ai.in_memory import (
     InMemoryDecisionModel,
     InMemoryRegistrosDecisao,
     Probabilidades,
-    ProbabilidadesSinais,
 )
 from src.ai.redator import Redator, RedatorSemLLM
-from src.ai.schemas import AvaliacaoTrecho, Entendimento, Escolha, RegistroDecisao, Relacao, Trecho
+from src.ai.schemas import AvaliacaoTrecho, Entendimento, Escolha, RegistroDecisao, Relacao, SinaisDoSKU, TipoSinal, Trecho
 from src.ai.sinais import SinaisCorpus
 from src.catalog.schemas import SKU
 from src.catalog.service import Catalog
@@ -99,7 +98,7 @@ def copilot(
     trechos: list[Trecho] | None = None,
     avaliacoes: Mapping[str, Probabilidades] | None = None,
     conflitos: Mapping[tuple[str, str], float] | None = None,
-    sinais: Mapping[str, ProbabilidadesSinais] | None = None,
+    sinais: Mapping[str, Mapping[TipoSinal, float]] | None = None,
     citacoes: Mapping[str, Escolha[Relacao]] | None = None,
     falhar_entendimento: bool = False,
     falhar_busca: bool = False,
@@ -585,7 +584,7 @@ def test_sugestao_de_compra_traz_os_sinais_no_contexto_e_na_resposta() -> None:
 
 
 def test_sinais_nao_mudam_a_quantidade_da_sugestao() -> None:
-    def quantidade(sinais: Mapping[str, ProbabilidadesSinais]) -> int:
+    def quantidade(sinais: Mapping[str, Mapping[TipoSinal, float]]) -> int:
         resposta = copilot(
             make_entendimento("sugestao_compra", 0.95),
             trechos=[make_trecho(LEAD_TIME)],
@@ -642,7 +641,7 @@ def test_trecho_de_origem_que_nao_coube_no_contexto_ainda_e_verificado_e_nao_inv
     assert resposta.resposta == f"A Katrina atrasa [{fora}]."
 
 
-def test_jev_fora_do_ar_nos_sinais_responde_sem_sinais_e_com_aviso() -> None:
+def test_jev_fora_do_ar_nos_sinais_responde_sem_sinais_e_com_a_observacao_no_contexto() -> None:
     redator = RedatorGravador("Compre 120 unidades.")
 
     resposta = copilot(
@@ -653,12 +652,15 @@ def test_jev_fora_do_ar_nos_sinais_responde_sem_sinais_e_com_aviso() -> None:
         falhar_sinais=True,
     ).responder(SUGESTAO)
 
-    assert [s.sinais for s in resposta.sugestoes] == [[]]
-    assert resposta.resposta == f"Compre 120 unidades.\n\n{AVISO_SEM_SINAIS}"
-    assert AVISO_SEM_SINAIS == (
-        "Observação: não consegui calcular os sinais do corpus agora, então a sugestão vem sem eles."
+    assert [s.sinais for s in resposta.sugestoes] == [None]
+    assert resposta.resposta == "Compre 120 unidades."
+    contexto = contexto_de(redator)
+    assert f"## Observações\n\n- {OBSERVACAO_SEM_SINAIS}" in contexto
+    assert "Sinais do corpus" not in contexto
+    assert OBSERVACAO_SEM_SINAIS == (
+        "Não foi possível calcular os sinais do corpus agora (o modelo de decisão está indisponível), "
+        "então as sugestões vêm sem eles."
     )
-    assert "Sinais do corpus" not in contexto_de(redator)
 
 
 def test_resposta_redigida_por_llm_tem_as_citacoes_verificadas_e_marcadas() -> None:
@@ -692,7 +694,7 @@ def test_citacao_de_id_fora_do_contexto_e_inventada_sem_chamar_o_jev() -> None:
 
     [citacao] = resposta.citacoes
     assert (citacao.veredito, citacao.confianca) == ("inventada", None)
-    assert resposta.resposta == f"O prazo é de 45 dias [{inventado} - fonte inexistente]."
+    assert resposta.resposta == f"O prazo é de 45 dias [{inventado} - trecho inexistente]."
 
 
 def test_jev_fora_do_ar_na_verificacao_marca_as_citacoes_como_incertas_e_avisa() -> None:
@@ -779,11 +781,18 @@ def test_registro_guarda_os_sinais_e_as_citacoes() -> None:
     assert [c.veredito for c in registro.citacoes] == ["confirmada"]
 
 
-def test_registro_sem_sinal_nao_guarda_o_sku() -> None:
-    registros = InMemoryRegistrosDecisao()
+def test_registro_distingue_sinais_calculados_sem_sinal_de_sinais_nao_calculados() -> None:
+    def sinais_registrados(falhar_sinais: bool) -> list[SinaisDoSKU]:
+        registros = InMemoryRegistrosDecisao()
+        copilot(
+            make_entendimento("sugestao_compra", 0.95),
+            trechos=[make_trecho(LEAD_TIME)],
+            avaliacoes={LEAD_TIME: ACEITO},
+            falhar_sinais=falhar_sinais,
+            registros=registros,
+        ).responder(SUGESTAO)
+        [registro] = registros.listar(10)
+        return registro.sinais
 
-    copilot(make_entendimento("sugestao_compra", 0.95), registros=registros).responder(SUGESTAO)
-
-    [registro] = registros.listar(10)
-    assert registro.skus == ["TBC-BEGE-70140-01"]
-    assert registro.sinais == []
+    assert sinais_registrados(falhar_sinais=False) == [SinaisDoSKU(sku_code="TBC-BEGE-70140-01", sinais=[])]
+    assert sinais_registrados(falhar_sinais=True) == [SinaisDoSKU(sku_code="TBC-BEGE-70140-01", sinais=None)]

@@ -75,13 +75,16 @@ def sinal_to_response(sinal: SinalCorpus) -> SinalCorpusResponse:
 
 def sugestao_com_sinais_to_response(com_sinais: SugestaoComSinais) -> SugestaoComSinaisResponse:
     return SugestaoComSinaisResponse(
-        sugestao=sugestao_to_response(com_sinais.sugestao),
-        sinais=[sinal_to_response(s) for s in com_sinais.sinais],
+        sugestao=sugestao_to_response(com_sinais.sugestao), sinais=_sinais_to_response(com_sinais.sinais)
     )
 
 
 def sinais_do_sku_to_response(sinais: SinaisDoSKU) -> SinaisDoSKUResponse:
-    return SinaisDoSKUResponse(sku_code=sinais.sku_code, sinais=[sinal_to_response(s) for s in sinais.sinais])
+    return SinaisDoSKUResponse(sku_code=sinais.sku_code, sinais=_sinais_to_response(sinais.sinais))
+
+
+def _sinais_to_response(sinais: list[SinalCorpus] | None) -> list[SinalCorpusResponse] | None:
+    return None if sinais is None else [sinal_to_response(s) for s in sinais]
 
 
 def verificacao_to_response(verificacao: VerificacaoCitacao) -> VerificacaoCitacaoResponse:

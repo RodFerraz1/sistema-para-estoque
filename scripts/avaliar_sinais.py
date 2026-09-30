@@ -69,7 +69,7 @@ def varrer_limiar(tipo: TipoSinal, casos: list[dict], por_caso: dict[str, Avalia
     for limiar in LIMIARES:
         falsos_positivos = falsos_negativos = 0
         for caso in casos:
-            sinal = getattr(por_caso[caso["id"]], tipo) > limiar
+            sinal = por_caso[caso["id"]].probabilidades[tipo] > limiar
             esperado = caso["esperado"][tipo]
             falsos_positivos += sinal and not esperado
             falsos_negativos += esperado and not sinal
@@ -92,10 +92,10 @@ def relatorio(resultado: dict, casos: list[dict]) -> str:
     for tipo in TIPOS:
         positivos = sum(caso["esperado"][tipo] for caso in casos)
         linhas.append(f"\n## {tipo} ({positivos} positivos em {len(casos)} casos)")
-        for caso in sorted(casos, key=lambda c: getattr(por_caso[c["id"]], tipo), reverse=True):
+        for caso in sorted(casos, key=lambda c: por_caso[c["id"]].probabilidades[tipo], reverse=True):
             rotulo = "sim" if caso["esperado"][tipo] else "não"
             linhas.append(
-                f"  {getattr(por_caso[caso['id']], tipo):.2f}  esperado {rotulo}  {caso['id']} "
+                f"  {por_caso[caso['id']].probabilidades[tipo]:.2f}  esperado {rotulo}  {caso['id']} "
                 f"{caso['fornecedor']} / {caso['produto']['nome']} x {caso['trecho_id']}"
             )
         varredura = varrer_limiar(tipo, casos, por_caso)
@@ -107,8 +107,8 @@ def relatorio(resultado: dict, casos: list[dict]) -> str:
         escolhidos[tipo] = escolher_limiar(varredura)
         linhas.append(f"  {tipo}: {escolhidos[tipo]:.2f} (mais acertos; no empate, o mais alto)")
 
-    argumentos = ", ".join(f"{tipo}={escolhidos[tipo]:.2f}" for tipo in TIPOS)
-    linhas.append(f"\nLIMIARES_SINAIS = LimiaresSinais({argumentos})")
+    limiares = ", ".join(f'"{tipo}": {escolhidos[tipo]:.2f}' for tipo in TIPOS)
+    linhas.append(f"\nLIMIARES_SINAIS = {{{limiares}}}")
     return "\n".join(linhas)
 
 

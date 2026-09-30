@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Protocol
+from typing import Protocol, get_args
 
 import httpx2
 from typesafe_sdk import (
@@ -36,6 +36,7 @@ from src.ai.schemas import (
     Escolha,
     ProdutoCatalogo,
     ProdutoDoSinal,
+    TipoSinal,
     Trecho,
 )
 
@@ -236,9 +237,7 @@ class JevDecisionModel(DecisionModel):
         )
         return AvaliacaoSinais(
             trecho_id=trecho.id,
-            atraso_do_fornecedor=resposta.nouls["atraso_do_fornecedor"].noul,
-            demanda_sazonal=resposta.nouls["demanda_sazonal"].noul,
-            encalhe=resposta.nouls["encalhe"].noul,
+            probabilidades={tipo: resposta.nouls[tipo].noul for tipo in get_args(TipoSinal)},
             modelo=resposta.model,
         )
 

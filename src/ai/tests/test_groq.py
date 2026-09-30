@@ -73,6 +73,7 @@ def test_resposta_vira_o_texto_da_mensagem() -> None:
 
     assert redator.redigir("Pergunta", CONTEXTO) == "Tem 120 unidades."
     assert redator.nome == f"groq:{MODELO}"
+    assert redator.usa_llm
 
 
 @pytest.mark.parametrize("status", [401, 429, 500, 503])

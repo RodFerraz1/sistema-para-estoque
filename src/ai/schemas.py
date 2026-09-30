@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.catalog.schemas import SKU
 from src.ficha_sku.schemas import Ficha
@@ -155,16 +155,21 @@ class ProdutoDoSinal(BaseModel):
 
 
 class AvaliacaoSinais(BaseModel):
-    """Probabilidades que o modelo de decisão deu para um trecho relatar cada sinal
-    sobre o fornecedor e o produto de uma sugestão."""
+    """Probabilidades que o modelo de decisão deu para um trecho relatar cada tipo de
+    sinal sobre o fornecedor e o produto de uma sugestão, uma por `TipoSinal`."""
 
     model_config = ConfigDict(frozen=True)
 
     trecho_id: str
-    atraso_do_fornecedor: Probabilidade
-    demanda_sazonal: Probabilidade
-    encalhe: Probabilidade
+    probabilidades: dict[TipoSinal, Probabilidade]
     modelo: str
+
+    @field_validator("probabilidades")
+    @classmethod
+    def _um_por_tipo(cls, probabilidades: dict[TipoSinal, float]) -> dict[TipoSinal, float]:
+        if faltando := set(get_args(TipoSinal)) - probabilidades.keys():
+            raise ValueError(f"sem probabilidade para {sorted(faltando)}")
+        return probabilidades
 
 
 class SinalCorpus(BaseModel):
@@ -181,27 +186,33 @@ class SinalCorpus(BaseModel):
 
 
 class SugestaoComSinais(BaseModel):
+    """`sinais` é nulo quando não foram calculados (modelo de decisão fora do ar) e
+    lista vazia quando foram calculados sem nenhum sinal ou a sugestão não tem
+    fornecedor."""
+
     model_config = ConfigDict(frozen=True)
 
     sugestao: SugestaoPedido
-    sinais: list[SinalCorpus]
+    sinais: list[SinalCorpus] | None
 
 
 class SinaisDasSugestoes(BaseModel):
-    """Sinais por `sku_code` e os trechos que deram origem a algum deles, sem
-    repetição, na ordem em que aparecem nos sinais."""
+    """Sinais por `sku_code`, um item por sugestão, e os trechos que deram origem a
+    algum deles, sem repetição, na ordem em que aparecem nos sinais."""
 
     model_config = ConfigDict(frozen=True)
 
     por_sku: dict[str, list[SinalCorpus]]
-    trechos: list[TrechoClassificado]
+    trechos_de_origem: list[TrechoClassificado]
 
 
 class SinaisDoSKU(BaseModel):
+    """`sinais` nulo quando não foram calculados, como em `SugestaoComSinais`."""
+
     model_config = ConfigDict(frozen=True)
 
     sku_code: str
-    sinais: list[SinalCorpus]
+    sinais: list[SinalCorpus] | None
 
 
 class Citacao(BaseModel):
@@ -237,6 +248,18 @@ class VerificacaoCitacao(BaseModel):
     afirmacao: str
     veredito: Veredito
     confianca: Probabilidade | None
+
+
+class CitacoesConferidas(BaseModel):
+    """O texto com as citações não confirmadas marcadas e a verificação de cada uma.
+    `decisao_indisponivel` diz que o modelo de decisão caiu e as citações do contexto
+    ficaram `incerta` sem ser avaliadas."""
+
+    model_config = ConfigDict(frozen=True)
+
+    texto: str
+    verificacoes: list[VerificacaoCitacao]
+    decisao_indisponivel: bool
 
 
 class Montagem(BaseModel):
@@ -276,8 +299,8 @@ class RespostaCopilot(BaseModel):
 class RegistroDecisao(BaseModel):
     """O que fica gravado de cada pergunta respondida pelo chat. `intencao` e
     `confianca` repetem o `entendimento` para o M8 filtrar sem abrir o jsonb.
-    `trechos` são os ids que foram ao redator. `sinais` só traz os SKUs com algum
-    sinal."""
+    `trechos` são os ids que foram ao redator. `sinais` traz um item por sugestão,
+    com `sinais` nulo quando não foram calculados."""
 
     model_config = ConfigDict(frozen=True)
 

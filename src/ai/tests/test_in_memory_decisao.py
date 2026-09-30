@@ -44,16 +44,13 @@ def test_sinais_configurados_por_trecho_com_padrao_e_zero_no_resto() -> None:
         "Katrina Têxtil", TOALHA, [make_trecho("a.md#atraso"), make_trecho("b.md#outro")]
     )
 
-    assert (atraso.trecho_id, atraso.atraso_do_fornecedor, atraso.demanda_sazonal, atraso.encalhe) == (
+    assert (atraso.trecho_id, atraso.probabilidades) == (
         "a.md#atraso",
-        0.9,
-        0.0,
-        0.3,
+        {"atraso_do_fornecedor": 0.9, "demanda_sazonal": 0.0, "encalhe": 0.3},
     )
-    assert (outro.trecho_id, outro.atraso_do_fornecedor, outro.encalhe, outro.modelo) == (
+    assert (outro.trecho_id, outro.probabilidades, outro.modelo) == (
         "b.md#outro",
-        0.0,
-        0.3,
+        {"atraso_do_fornecedor": 0.0, "demanda_sazonal": 0.0, "encalhe": 0.3},
         "jev-1.13.0",
     )
 

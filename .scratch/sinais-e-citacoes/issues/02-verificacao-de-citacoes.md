@@ -39,3 +39,9 @@ O código extrai de um texto redigido cada citação `[id]` com a frase que a co
 - **Termo novo** no `CONTEXT.md`: **Citação**, com os cinco vereditos.
 - **Para o ticket 03**: verificar só a redação, antes de prefixar a confirmação da faixa média; `conferir_citacoes(redacao, montagem.trechos, decisao)` e `marcar_citacoes(redacao, verificacoes)`; na `DecisaoIndisponivel`, `decidir_vereditos(extrair_citacoes(redacao), {t.id for t in montagem.trechos}, [])`.
 - **Testes**: `uv run pytest -q -m "not externo"` com 535 passando (eram 478). `-m "externo and not externo_llm"` com 8 passando, entre eles o novo `test_jev_real_confirma_o_prazo_do_contrato_e_nao_o_numero_trocado`.
+
+**2026-09-30 (revisão):** ajustes da revisão de código do M6:
+
+1. `conferir_citacoes(texto, trechos, decisao) -> CitacoesConferidas` (`texto` marcado, `verificacoes`, `decisao_indisponivel`), DTO em `src/ai/schemas.py`. A queda do Jev passou do `Copilot` para cá: não propaga mais `DecisaoIndisponivel`, deixa `incerta` as citações do contexto (as inventadas continuam inventadas) e avisa em `decisao_indisponivel`. O chat chama só essa função.
+2. Marca de `inventada`: `[<id> - trecho inexistente]` em vez de "fonte inexistente" (o `CONTEXT.md` pede evitar "fonte" ao falar de Citação).
+3. Spec atualizada: citação sozinha numa linha herda a última afirmação (`ultima_afirmacao`) e a assinatura de `conferir_citacoes`.

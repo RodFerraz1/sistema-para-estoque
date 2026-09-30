@@ -108,17 +108,21 @@ class SinalCorpusResponse(BaseModel):
 
 
 class SugestaoComSinaisResponse(BaseModel):
+    """`sinais` nulo quando não foram calculados (Jev fora do ar)."""
+
     model_config = ConfigDict(frozen=True)
 
     sugestao: SugestaoPedidoResponse
-    sinais: list[SinalCorpusResponse]
+    sinais: list[SinalCorpusResponse] | None
 
 
 class SinaisDoSKUResponse(BaseModel):
+    """`sinais` nulo quando não foram calculados (Jev fora do ar)."""
+
     model_config = ConfigDict(frozen=True)
 
     sku_code: str
-    sinais: list[SinalCorpusResponse]
+    sinais: list[SinalCorpusResponse] | None
 
 
 class VerificacaoCitacaoResponse(BaseModel):

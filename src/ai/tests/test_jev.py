@@ -352,7 +352,7 @@ def test_perguntas_de_sinais_sao_as_da_spec() -> None:
     assert all(isinstance(p, Noul) and set(p.criteria) == {"true", "false"} for p in perguntas.values())
 
 
-def test_cada_resposta_de_sinais_vira_o_campo_de_mesmo_nome_na_ordem_dos_trechos() -> None:
+def test_cada_resposta_de_sinais_vira_a_probabilidade_do_tipo_de_mesmo_nome_na_ordem_dos_trechos() -> None:
     cliente = ClienteFalso(
         {"atraso_do_fornecedor": 0.93, "demanda_sazonal": 0.12, "encalhe": 0.05}, modelo="jev-1.13.1"
     )
@@ -361,9 +361,11 @@ def test_cada_resposta_de_sinais_vira_o_campo_de_mesmo_nome_na_ordem_dos_trechos
     avaliacoes = JevDecisionModel(cliente).avaliar_sinais("Katrina Têxtil", TOALHA, trechos)
 
     assert [a.trecho_id for a in avaliacoes] == [t.id for t in trechos]
-    assert {
-        (a.atraso_do_fornecedor, a.demanda_sazonal, a.encalhe, a.modelo) for a in avaliacoes
-    } == {(0.93, 0.12, 0.05, "jev-1.13.1")}
+    assert all(
+        a.probabilidades == {"atraso_do_fornecedor": 0.93, "demanda_sazonal": 0.12, "encalhe": 0.05}
+        and a.modelo == "jev-1.13.1"
+        for a in avaliacoes
+    )
 
 
 def test_erro_do_sdk_num_trecho_dos_sinais_vira_decisao_indisponivel_para_o_lote_todo() -> None:
@@ -512,9 +514,9 @@ def test_jev_real_ve_o_atraso_da_katrina_so_para_a_katrina(jev_real: JevDecision
     )
 
     assert da_katrina.modelo == "jev-1.13.0"
-    assert da_katrina.atraso_do_fornecedor > LIMIARES_SINAIS.atraso_do_fornecedor
-    assert da_katrina.encalhe <= LIMIARES_SINAIS.encalhe
-    assert da_malha_fina.atraso_do_fornecedor <= LIMIARES_SINAIS.atraso_do_fornecedor
+    assert da_katrina.probabilidades["atraso_do_fornecedor"] > LIMIARES_SINAIS["atraso_do_fornecedor"]
+    assert da_katrina.probabilidades["encalhe"] <= LIMIARES_SINAIS["encalhe"]
+    assert da_malha_fina.probabilidades["atraso_do_fornecedor"] <= LIMIARES_SINAIS["atraso_do_fornecedor"]
 
 
 @pytest.mark.externo

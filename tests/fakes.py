@@ -243,6 +243,8 @@ class RedatorGravador(Redator):
     """Redator que guarda o que recebeu e devolve `texto`. Com `falhar`, lança
     `RedatorIndisponivel` como um LLM fora do ar."""
 
+    usa_llm = True
+
     def __init__(self, texto: str = "Resposta redigida.", *, nome: str = "gravador", falhar: bool = False) -> None:
         self._nome = nome
         self.chamadas: list[tuple[str, str]] = []

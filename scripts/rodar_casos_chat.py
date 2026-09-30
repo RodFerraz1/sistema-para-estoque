@@ -47,9 +47,13 @@ def linha(caso: dict, resposta: RespostaCopilot, segundos: float) -> str:
         f"redator {resposta.redator or '-'}, {segundos:.1f} s\n"
         f"     SKUs: {skus}\n"
         f"     Sinais: {sinais or '-'}\n"
-        f"     Citações: {', '.join(f'{v} {n}' for v, n in vereditos.most_common()) or '-'}\n"
+        f"     Citações: {_contagem(vereditos) or '-'}\n"
         f"     {caso['pergunta']}"
     )
+
+
+def _contagem(contador: Counter[str]) -> str:
+    return ", ".join(f"{chave} {n}" for chave, n in contador.most_common())
 
 
 def main() -> None:
@@ -84,8 +88,8 @@ def main() -> None:
 
     print(f"Intenção: {acertos}/{len(casos)}")
     print("Faixas: " + ", ".join(f"{f} {faixas[f]}" for f in ("alta", "media", "baixa")))
-    print("Ações: " + ", ".join(f"{a} {n}" for a, n in acoes.most_common()))
-    print("Citações: " + (", ".join(f"{v} {n}" for v, n in vereditos.most_common()) or "nenhuma"))
+    print(f"Ações: {_contagem(acoes)}")
+    print(f"Citações: {_contagem(vereditos) or 'nenhuma'}")
 
 
 if __name__ == "__main__":

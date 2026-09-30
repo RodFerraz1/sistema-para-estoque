@@ -337,3 +337,22 @@ def test_chat_de_sugestao_devolve_os_sinais_e_as_citacoes_e_grava_os_dois(client
     assert registro["sinais"] == [{"sku_code": "TBC-BEGE-70140-01", "sinais": sugestao["sinais"]}]
     assert registro["citacoes"] == body["citacoes"]
     assert registros.listar(1)[0].citacoes[0].veredito == "confirmada"
+
+
+def test_chat_de_sugestao_com_o_jev_fora_do_ar_nos_sinais_devolve_e_grava_sinais_nulos(client: TestClient) -> None:
+    preparar(
+        jev(
+            make_entendimento("sugestao_compra", 0.95),
+            padrao={"relevante": 0.9, "tem_evidencia": 0.9},
+            falhar_sinais=True,
+        ),
+        RedatorGravador("Compre 120 unidades."),
+    )
+
+    response = client.post("/chat", json={"pergunta": "Quanto comprar do TBC-BEGE-70140-01?"})
+
+    assert response.status_code == 200
+    [sugestao] = response.json()["sugestoes"]
+    assert sugestao["sinais"] is None
+    [registro] = client.get("/chat/registros").json()
+    assert registro["sinais"] == [{"sku_code": "TBC-BEGE-70140-01", "sinais": None}]

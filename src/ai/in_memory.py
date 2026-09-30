@@ -5,7 +5,7 @@ import hashlib
 import math
 import re
 from collections.abc import Mapping, Sequence
-from typing import TypedDict
+from typing import TypedDict, get_args
 
 from src.ai.decisao import DecisaoIndisponivel, DecisionModel
 from src.ai.embeddings import DIMENSAO
@@ -23,6 +23,7 @@ from src.ai.schemas import (
     ProdutoDoSinal,
     RegistroDecisao,
     Relacao,
+    TipoSinal,
     Trecho,
     TrechoIndexado,
     TrechoRecuperado,
@@ -93,12 +94,6 @@ class Probabilidades(TypedDict, total=False):
     tenta_instruir: float
 
 
-class ProbabilidadesSinais(TypedDict, total=False):
-    atraso_do_fornecedor: float
-    demanda_sazonal: float
-    encalhe: float
-
-
 ENTENDIMENTO_PADRAO = Entendimento(
     intencao=Escolha(escolha="fora_de_escopo", confianca=1.0, probabilidades={"fora_de_escopo": 1.0}),
     produto=Escolha(escolha=NENHUM_PRODUTO, confianca=1.0, probabilidades={NENHUM_PRODUTO: 1.0}),
@@ -134,8 +129,8 @@ class InMemoryDecisionModel(DecisionModel):
         conflito_padrao: float = 0.0,
         entendimentos: Mapping[str, Entendimento] | None = None,
         entendimento_padrao: Entendimento = ENTENDIMENTO_PADRAO,
-        sinais: Mapping[str, ProbabilidadesSinais] | None = None,
-        sinais_padrao: ProbabilidadesSinais | None = None,
+        sinais: Mapping[str, Mapping[TipoSinal, float]] | None = None,
+        sinais_padrao: Mapping[TipoSinal, float] | None = None,
         citacoes: Mapping[str, Escolha[Relacao]] | None = None,
         citacao_padrao: Escolha[Relacao] = CITACAO_PADRAO,
         modelo: str = "in-memory",
@@ -211,16 +206,14 @@ class InMemoryDecisionModel(DecisionModel):
         if self._falhar_sinais:
             raise DecisaoIndisponivel("InMemoryDecisionModel configurado para falhar em avaliar_sinais")
         return [
-            AvaliacaoSinais.model_validate(
-                {
-                    "atraso_do_fornecedor": 0.0,
-                    "demanda_sazonal": 0.0,
-                    "encalhe": 0.0,
+            AvaliacaoSinais(
+                trecho_id=trecho.id,
+                probabilidades={
+                    **dict.fromkeys(get_args(TipoSinal), 0.0),
                     **self._sinais_padrao,
                     **self._sinais.get(trecho.id, {}),
-                    "trecho_id": trecho.id,
-                    "modelo": self._modelo,
-                }
+                },
+                modelo=self._modelo,
             )
             for trecho in trechos
         ]

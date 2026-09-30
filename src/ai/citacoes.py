@@ -13,8 +13,15 @@ import re
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
-from src.ai.decisao import DecisionModel
-from src.ai.schemas import AvaliacaoCitacao, Citacao, Trecho, Veredito, VerificacaoCitacao
+from src.ai.decisao import DecisaoIndisponivel, DecisionModel
+from src.ai.schemas import (
+    AvaliacaoCitacao,
+    Citacao,
+    CitacoesConferidas,
+    Trecho,
+    Veredito,
+    VerificacaoCitacao,
+)
 
 # Calibrado por `scripts/avaliar_citacoes.py` com o jev-1.13.0: o menor limiar sem
 # `confirmada` errada (`.scratch/sinais-e-citacoes/issues/02-verificacao-de-citacoes.md`).
@@ -29,7 +36,7 @@ _MARCAS: dict[Veredito, str] = {
     "sem_suporte": "não confirmada",
     "incerta": "não confirmada",
     "contradita": "o trecho diz o contrário",
-    "inventada": "fonte inexistente",
+    "inventada": "trecho inexistente",
 }
 
 _HIFENS = "\u2010\u2011\u2012\u2013\u2212"
@@ -113,15 +120,23 @@ def decidir_vereditos(
     return verificacoes
 
 
-def conferir_citacoes(texto: str, trechos: Sequence[Trecho], decisao: DecisionModel) -> list[VerificacaoCitacao]:
-    """Uma verificação por citação do `texto`, contra os `trechos` que foram ao redator.
-    Só as citações de trechos do contexto com afirmação vão ao modelo de decisão, uma vez
-    por par. Propaga `DecisaoIndisponivel`."""
+def conferir_citacoes(texto: str, trechos: Sequence[Trecho], decisao: DecisionModel) -> CitacoesConferidas:
+    """Verifica cada citação do `texto` contra os `trechos` que o redator podia citar e
+    marca no texto as não confirmadas. Só as citações de trechos do contexto com
+    afirmação vão ao modelo de decisão, uma vez por par. Com ele fora do ar, essas
+    ficam `incerta` e as inventadas continuam inventadas."""
     citacoes = extrair_citacoes(texto)
     por_id = {trecho.id: trecho for trecho in trechos}
     pares = [(c.afirmacao, por_id[c.trecho_id]) for c in citacoes if c.trecho_id in por_id and c.afirmacao]
-    avaliacoes = decisao.verificar_citacoes(pares) if pares else []
-    return decidir_vereditos(citacoes, por_id.keys(), avaliacoes)
+    indisponivel = False
+    try:
+        avaliacoes = decisao.verificar_citacoes(pares) if pares else []
+    except DecisaoIndisponivel:
+        avaliacoes, indisponivel = [], True
+    verificacoes = decidir_vereditos(citacoes, por_id.keys(), avaliacoes)
+    return CitacoesConferidas(
+        texto=marcar_citacoes(texto, verificacoes), verificacoes=verificacoes, decisao_indisponivel=indisponivel
+    )
 
 
 def _colchetes(texto: str) -> list[_Colchete]:

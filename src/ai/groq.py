@@ -11,6 +11,8 @@ TIMEOUT_SEGUNDOS = 30.0
 
 
 class GroqRedator(Redator):
+    usa_llm = True
+
     def __init__(
         self,
         chave: str,

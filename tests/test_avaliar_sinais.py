@@ -53,7 +53,7 @@ def test_rodar_grava_uma_avaliacao_por_caso_com_o_trecho_do_caso() -> None:
 
     assert list(por_caso) == ["s01", "s02", "s03", "s04"]
     assert por_caso["s02"].trecho_id == "a.md#atraso-fraco"
-    assert por_caso["s02"].atraso_do_fornecedor == 0.62
+    assert por_caso["s02"].probabilidades["atraso_do_fornecedor"] == 0.62
 
 
 def test_varredura_conta_acertos_e_erros_com_o_limiar_estrito() -> None:
@@ -78,4 +78,4 @@ def test_relatorio_mostra_o_limiar_escolhido_de_cada_tipo() -> None:
     assert "Modelo: jev-1.13.0" in texto
     assert "atraso_do_fornecedor: 0.60" in texto
     assert "encalhe: 0.85" in texto
-    assert "LIMIARES_SINAIS = LimiaresSinais(atraso_do_fornecedor=0.60, demanda_sazonal=0.90, encalhe=0.85)" in texto
+    assert 'LIMIARES_SINAIS = {"atraso_do_fornecedor": 0.60, "demanda_sazonal": 0.90, "encalhe": 0.85}' in texto

@@ -16,6 +16,7 @@ def test_redator_sem_llm_devolve_os_dados_montados_sem_redacao() -> None:
     resposta = redator.redigir("Como tá a toalha?", "## Observações\n\n- Nada.")
 
     assert redator.nome == "sem_llm"
+    assert not redator.usa_llm
     assert resposta == (
         "Não há LLM configurado para redigir a resposta. Estes são os dados que o Copilot reuniu:"
         "\n\n## Observações\n\n- Nada."

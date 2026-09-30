@@ -156,7 +156,9 @@ def test_sinais_e_citacoes_voltam_inteiros(registros: RegistrosDecisao) -> None:
                     probabilidade=0.96,
                 )
             ],
-        )
+        ),
+        SinaisDoSKU(sku_code="TBC-BRAN-70140-02", sinais=[]),
+        SinaisDoSKU(sku_code="JDCP-BRAN-CASAL-01", sinais=None),
     ]
     citacoes = [
         VerificacaoCitacao(

@@ -16,7 +16,7 @@ from typing import get_args
 from uuid import UUID, uuid4
 
 from src.ai.busca import BuscaContexto
-from src.ai.citacoes import conferir_citacoes, decidir_vereditos, extrair_citacoes, marcar_citacoes
+from src.ai.citacoes import conferir_citacoes
 from src.ai.contexto import renderizar_contexto
 from src.ai.decisao import DecisaoIndisponivel, DecisionModel
 from src.ai.identificacao import identificar_skus, produtos_do_catalogo
@@ -77,21 +77,22 @@ OBSERVACAO_SUGESTAO_SEM_SKU = (
     "Nenhum SKU do catálogo foi identificado na pergunta: a quantidade da sugestão depende de um "
     "SKU do catálogo (código, ou nome do produto com cor e tamanho)."
 )
-AVISO_SEM_SINAIS = "Observação: não consegui calcular os sinais do corpus agora, então a sugestão vem sem eles."
+OBSERVACAO_SEM_SINAIS = (
+    "Não foi possível calcular os sinais do corpus agora (o modelo de decisão está indisponível), "
+    "então as sugestões vêm sem eles."
+)
 AVISO_SEM_VERIFICACAO = (
     "Observação: não consegui verificar as citações agora, então elas vêm marcadas como não confirmadas."
 )
 
 
 @dataclass(frozen=True)
-class _Dados:
-    """A montagem que vai ao redator, os trechos que ele pode citar (os do contexto e
-    os de origem dos sinais que não couberam nele, cujos ids aparecem nos sinais) e os
-    avisos que o código acrescenta ao fim da resposta."""
+class _MontagemComCitaveis:
+    """A montagem que vai ao redator e os trechos que ele pode citar: os do contexto e
+    os de origem dos sinais que não couberam nele, cujos ids aparecem nos sinais."""
 
     montagem: Montagem
     citaveis: list[Trecho]
-    avisos: list[str]
 
 
 class Copilot:
@@ -169,22 +170,23 @@ class Copilot:
                     _esclarecimento_de_sku(identificacao.candidatos), "pediu_esclarecimento", identificacao
                 )
 
-        dados = self._montar(pergunta, intencao, identificacao, produtos)
-        redacao, redator = self._redigir(pergunta, dados.montagem)
+        montado = self._montar(pergunta, intencao, identificacao, produtos)
+        texto, redator = self._redigir(pergunta, montado.montagem)
         citacoes: list[VerificacaoCitacao] = []
-        avisos = dados.avisos
-        if redator != RedatorSemLLM.nome:
-            redacao, citacoes, avisos_da_verificacao = self._verificar(redacao, dados.citaveis)
-            avisos = [*avisos, *avisos_da_verificacao]
-        texto = "\n\n".join([redacao, *avisos])
+        if redator.usa_llm:
+            # Só a redação é verificada: a confirmação da faixa média e o aviso são do código.
+            conferidas = conferir_citacoes(texto, montado.citaveis, self._decisao)
+            texto, citacoes = conferidas.texto, conferidas.verificacoes
+            if conferidas.decisao_indisponivel:
+                texto = f"{texto}\n\n{AVISO_SEM_VERIFICACAO}"
         if faixa == "alta":
-            return resposta_copilot(texto, "respondeu", identificacao, dados.montagem, redator, citacoes)
+            return resposta_copilot(texto, "respondeu", identificacao, montado.montagem, redator.nome, citacoes)
         return resposta_copilot(
             f"{_confirmacao(intencao)}\n\n{texto}",
             "confirmou_e_respondeu",
             identificacao,
-            dados.montagem,
-            redator,
+            montado.montagem,
+            redator.nome,
             citacoes,
         )
 
@@ -194,7 +196,7 @@ class Copilot:
         intencao: Intencao,
         identificacao: Identificacao | None,
         produtos: Sequence[ProdutoCatalogo],
-    ) -> _Dados:
+    ) -> _MontagemComCitaveis:
         skus = identificacao.skus if identificacao else []
         observacoes: list[str] = []
         if identificacao and identificacao.total_skus > len(skus):
@@ -205,49 +207,45 @@ class Copilot:
 
         if intencao == "situacao_sku":
             fichas = _por_sku(skus, self._ficha_sku.completa, observacoes)
-            return _Dados(Montagem(fichas=fichas, politica=self._politicas.ativa(), observacoes=observacoes), [], [])
+            return _MontagemComCitaveis(
+                Montagem(fichas=fichas, politica=self._politicas.ativa(), observacoes=observacoes), []
+            )
 
         if intencao == "sugestao_compra":
             if not skus:
                 observacoes.append(OBSERVACAO_SUGESTAO_SEM_SKU)
             sugestoes = _por_sku(skus, self._purchasing.sugerir_pedido, observacoes)
             da_pergunta, conflitos = self._buscar(pergunta)
-            sinais, avisos = self._calcular_sinais(sugestoes, produtos)
+            sinais = self._calcular_sinais(sugestoes, produtos)
+            if sinais is None:
+                observacoes.append(OBSERVACAO_SEM_SINAIS)
             ids = {t.id for t in da_pergunta}
-            de_sinais = [t for t in sinais.trechos if t.id not in ids]
+            de_sinais = [] if sinais is None else [t for t in sinais.trechos_de_origem if t.id not in ids]
+            citaveis = [*da_pergunta, *de_sinais]
             montagem = Montagem(
-                sugestoes=[SugestaoComSinais(sugestao=s, sinais=sinais.por_sku.get(s.sku_code, [])) for s in sugestoes],
+                sugestoes=[
+                    SugestaoComSinais(sugestao=s, sinais=None if sinais is None else sinais.por_sku[s.sku_code])
+                    for s in sugestoes
+                ],
                 politica=self._politicas.ativa(),
-                trechos=[*da_pergunta, *de_sinais][:MAX_TRECHOS_NO_CONTEXTO],
+                trechos=citaveis[:MAX_TRECHOS_NO_CONTEXTO],
                 conflitos=conflitos,
                 observacoes=observacoes,
             )
-            return _Dados(montagem, [*da_pergunta, *de_sinais], avisos)
+            return _MontagemComCitaveis(montagem, citaveis)
 
         trechos, conflitos = self._buscar(pergunta)
-        return _Dados(Montagem(trechos=trechos, conflitos=conflitos, observacoes=observacoes), trechos, [])
+        return _MontagemComCitaveis(Montagem(trechos=trechos, conflitos=conflitos, observacoes=observacoes), trechos)
 
     def _calcular_sinais(
         self, sugestoes: Sequence[SugestaoPedido], produtos: Sequence[ProdutoCatalogo]
-    ) -> tuple[SinaisDasSugestoes, list[str]]:
-        """O Jev fora do ar nos sinais não derruba a resposta: ela sai sem sinais e com um aviso."""
+    ) -> SinaisDasSugestoes | None:
+        """Nulo com o Jev fora do ar, que não derruba a resposta: ela sai sem sinais."""
         por_codigo = {sku.sku_code: sku for produto in produtos for sku in produto.skus}
         try:
-            return self._sinais.para_sugestoes_com_trechos([(s, por_codigo[s.sku_code]) for s in sugestoes]), []
+            return self._sinais.para_sugestoes([(s, por_codigo[s.sku_code]) for s in sugestoes])
         except DecisaoIndisponivel:
-            return SinaisDasSugestoes(por_sku={}, trechos=[]), [AVISO_SEM_SINAIS]
-
-    def _verificar(
-        self, redacao: str, citaveis: Sequence[Trecho]
-    ) -> tuple[str, list[VerificacaoCitacao], list[str]]:
-        """Verifica só a redação, antes da confirmação e dos avisos. O Jev fora do ar
-        deixa as citações `incerta` (as inventadas continuam inventadas) e acrescenta um aviso."""
-        try:
-            verificacoes, avisos = conferir_citacoes(redacao, citaveis, self._decisao), []
-        except DecisaoIndisponivel:
-            ids = {t.id for t in citaveis}
-            verificacoes, avisos = decidir_vereditos(extrair_citacoes(redacao), ids, []), [AVISO_SEM_VERIFICACAO]
-        return marcar_citacoes(redacao, verificacoes), verificacoes, avisos
+            return None
 
     def _buscar(self, pergunta: str) -> tuple[list[TrechoClassificado], list[ConflitoEntreTrechos]]:
         resultado = self._busca.buscar(pergunta)
@@ -259,14 +257,15 @@ class Copilot:
         conflitos = [c for c in resultado.conflitos if c.trecho_a in ids and c.trecho_b in ids]
         return trechos, conflitos
 
-    def _redigir(self, pergunta: str, montagem: Montagem) -> tuple[str, str]:
+    def _redigir(self, pergunta: str, montagem: Montagem) -> tuple[str, Redator]:
+        """O texto e o redator que o escreveu, que é o `RedatorSemLLM` na queda do configurado."""
         try:
-            return self._redator.redigir(pergunta, renderizar_contexto(montagem)), self._redator.nome
+            return self._redator.redigir(pergunta, renderizar_contexto(montagem)), self._redator
         except RedatorIndisponivel:
             sem_llm = RedatorSemLLM(LLM_INDISPONIVEL)
             observacao = f"O redator {self._redator.nome} falhou; a resposta vai sem redação."
             montagem = montagem.model_copy(update={"observacoes": [*montagem.observacoes, observacao]})
-            return sem_llm.redigir(pergunta, renderizar_contexto(montagem)), sem_llm.nome
+            return sem_llm.redigir(pergunta, renderizar_contexto(montagem)), sem_llm
 
 
 def _registro(pergunta: str, resposta: RespostaCopilot, duracao_ms: int) -> RegistroDecisao:
@@ -284,7 +283,7 @@ def _registro(pergunta: str, resposta: RespostaCopilot, duracao_ms: int) -> Regi
         redator=resposta.redator,
         resposta=resposta.resposta,
         duracao_ms=duracao_ms,
-        sinais=[SinaisDoSKU(sku_code=s.sugestao.sku_code, sinais=s.sinais) for s in resposta.sugestoes if s.sinais],
+        sinais=[SinaisDoSKU(sku_code=s.sugestao.sku_code, sinais=s.sinais) for s in resposta.sugestoes],
         citacoes=resposta.citacoes,
     )
 

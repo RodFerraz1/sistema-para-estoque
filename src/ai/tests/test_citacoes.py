@@ -241,7 +241,7 @@ def verificacao(trecho_id: str, afirmacao: str, resultado: Veredito) -> Verifica
         ("sem_suporte", f"[{LEAD_TIME} - não confirmada]"),
         ("incerta", f"[{LEAD_TIME} - não confirmada]"),
         ("contradita", f"[{LEAD_TIME} - o trecho diz o contrário]"),
-        ("inventada", f"[{LEAD_TIME} - fonte inexistente]"),
+        ("inventada", f"[{LEAD_TIME} - trecho inexistente]"),
     ],
 )
 def test_marcacao_de_cada_veredito(resultado: Veredito, marcado: str) -> None:
@@ -291,7 +291,7 @@ def test_colchete_com_varios_ids_e_reescrito_com_a_marca_de_cada_um() -> None:
         ],
     )
 
-    assert marcada == f"A Katrina atrasa[{PRAZOS}; {LEAD_TIME} - fonte inexistente]."
+    assert marcada == f"A Katrina atrasa[{PRAZOS}; {LEAD_TIME} - trecho inexistente]."
 
 
 class DecisaoGravadora(InMemoryDecisionModel):
@@ -313,28 +313,50 @@ def test_conferir_pergunta_uma_vez_por_par_e_decide_o_veredito_de_cada_citacao()
         f"A Verdela atrasa [{VERDELA}; inventado.md#x]."
     )
 
-    verificacoes = conferir_citacoes(texto, [make_trecho(LEAD_TIME), make_trecho(VERDELA), make_trecho(PRAZOS)], decisao)
+    conferidas = conferir_citacoes(texto, [make_trecho(LEAD_TIME), make_trecho(VERDELA), make_trecho(PRAZOS)], decisao)
 
     assert decisao.pares == [
         ("A Katrina atrasa e o contrato pede 45 dias.", LEAD_TIME),
         ("A Katrina atrasa e o contrato pede 45 dias.", PRAZOS),
         ("A Verdela atrasa.", VERDELA),
     ]
-    assert [(v.trecho_id, v.veredito) for v in verificacoes] == [
+    assert [(v.trecho_id, v.veredito) for v in conferidas.verificacoes] == [
         (LEAD_TIME, "confirmada"),
         (PRAZOS, "sem_suporte"),
         (VERDELA, "incerta"),
         ("inventado.md#x", "inventada"),
     ]
+    assert conferidas.texto == (
+        f"A Katrina atrasa [{LEAD_TIME}] e o contrato pede 45 dias [{PRAZOS} - não confirmada]. "
+        f"A Verdela atrasa [{VERDELA} - não confirmada; inventado.md#x - trecho inexistente]."
+    )
+    assert not conferidas.decisao_indisponivel
 
 
 def test_conferir_nao_chama_o_modelo_sem_citacao_do_contexto_nem_com_afirmacao_vazia() -> None:
     decisao = InMemoryDecisionModel(falhar_citacoes=True)
     texto = f"[{LEAD_TIME}]\nA Katrina atrasa [inventado.md#x]."
 
-    verificacoes = conferir_citacoes(texto, [make_trecho(LEAD_TIME)], decisao)
+    conferidas = conferir_citacoes(texto, [make_trecho(LEAD_TIME)], decisao)
 
-    assert [(v.trecho_id, v.veredito) for v in verificacoes] == [
+    assert [(v.trecho_id, v.veredito) for v in conferidas.verificacoes] == [
         (LEAD_TIME, "incerta"),
         ("inventado.md#x", "inventada"),
     ]
+    assert not conferidas.decisao_indisponivel
+
+
+def test_conferir_com_o_modelo_fora_do_ar_deixa_incertas_as_do_contexto_e_avisa_a_queda() -> None:
+    decisao = InMemoryDecisionModel(falhar_citacoes=True)
+    texto = f"A Katrina atrasa [{LEAD_TIME}]. O prazo é de 45 dias [inventado.md#x]."
+
+    conferidas = conferir_citacoes(texto, [make_trecho(LEAD_TIME)], decisao)
+
+    assert conferidas.decisao_indisponivel
+    assert [(v.trecho_id, v.veredito, v.confianca) for v in conferidas.verificacoes] == [
+        (LEAD_TIME, "incerta", None),
+        ("inventado.md#x", "inventada", None),
+    ]
+    assert conferidas.texto == (
+        f"A Katrina atrasa [{LEAD_TIME} - não confirmada]. O prazo é de 45 dias [inventado.md#x - trecho inexistente]."
+    )

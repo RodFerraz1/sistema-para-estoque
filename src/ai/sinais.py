@@ -24,18 +24,23 @@ from src.purchasing.schemas import SugestaoPedido
 K_SINAIS = 15
 MAX_TRECHOS_SINAIS = 10
 
+# Calibrados por `scripts/avaliar_sinais.py` com o jev-1.13.0
+# (`.scratch/sinais-e-citacoes/issues/01-sinais-do-corpus.md`).
+LIMIARES_SINAIS: dict[TipoSinal, float] = {"atraso_do_fornecedor": 0.90, "demanda_sazonal": 0.80, "encalhe": 0.60}
+
+_MENSAGENS: dict[TipoSinal, str] = {
+    "atraso_do_fornecedor": "Os documentos relatam atraso de entrega da {fornecedor}.",
+    "demanda_sazonal": "Os documentos relatam venda forte de {produto} em alguma época do ano.",
+    "encalhe": "Os documentos relatam encalhe de {produto} ou da categoria dele numa compra anterior.",
+}
+
 
 @dataclass(frozen=True)
-class LimiaresSinais:
-    """Calibrados por `scripts/avaliar_sinais.py` com o jev-1.13.0
-    (`.scratch/sinais-e-citacoes/issues/01-sinais-do-corpus.md`)."""
+class _SinaisDoPar:
+    """Os sinais de um par (fornecedor, produto) e os trechos que foram ao modelo de decisão."""
 
-    atraso_do_fornecedor: float
-    demanda_sazonal: float
-    encalhe: float
-
-
-LIMIARES_SINAIS = LimiaresSinais(atraso_do_fornecedor=0.90, demanda_sazonal=0.80, encalhe=0.60)
+    sinais: list[SinalCorpus]
+    avaliados: list[TrechoClassificado]
 
 
 class SinaisCorpus:
@@ -47,19 +52,13 @@ class SinaisCorpus:
         """Sugestão sem fornecedor não tem sinal. Propaga `DecisaoIndisponivel`."""
         if sugestao.fornecedor is None:
             return []
-        sinais, _ = self._sinais(sugestao.fornecedor.fornecedor_nome, _produto(sku))
-        return sinais
+        return self._sinais(sugestao.fornecedor.fornecedor_nome, _produto(sku)).sinais
 
-    def para_sugestoes(
-        self, pares: Sequence[tuple[SugestaoPedido, SKU]]
-    ) -> dict[str, list[SinalCorpus]]:
-        """Sinais por `sku_code`, calculados uma vez por par (fornecedor, produto)."""
-        return self.para_sugestoes_com_trechos(pares).por_sku
-
-    def para_sugestoes_com_trechos(self, pares: Sequence[tuple[SugestaoPedido, SKU]]) -> SinaisDasSugestoes:
-        """Como `para_sugestoes`, com os trechos de origem dos sinais, para quem precisa
-        mostrar ou citar esses trechos."""
-        calculados: dict[tuple[str, ProdutoDoSinal], tuple[list[SinalCorpus], list[TrechoClassificado]]] = {}
+    def para_sugestoes(self, pares: Sequence[tuple[SugestaoPedido, SKU]]) -> SinaisDasSugestoes:
+        """Sinais por `sku_code`, calculados uma vez por par (fornecedor, produto), com os
+        trechos de origem para quem precisa mostrar ou citar esses trechos. Propaga
+        `DecisaoIndisponivel`."""
+        calculados: dict[tuple[str, ProdutoDoSinal], _SinaisDoPar] = {}
         por_sku: dict[str, list[SinalCorpus]] = {}
         for sugestao, sku in pares:
             if sugestao.fornecedor is None:
@@ -68,18 +67,15 @@ class SinaisCorpus:
             par = (sugestao.fornecedor.fornecedor_nome, _produto(sku))
             if par not in calculados:
                 calculados[par] = self._sinais(*par)
-            por_sku[sugestao.sku_code] = calculados[par][0]
+            por_sku[sugestao.sku_code] = calculados[par].sinais
         trechos: dict[str, TrechoClassificado] = {}
-        for sinais, avaliados in calculados.values():
-            por_id = {t.id: t for t in avaliados}
-            for trecho_id in (i for sinal in sinais for i in sinal.trechos):
+        for do_par in calculados.values():
+            por_id = {t.id: t for t in do_par.avaliados}
+            for trecho_id in (i for sinal in do_par.sinais for i in sinal.trechos):
                 trechos.setdefault(trecho_id, por_id[trecho_id])
-        return SinaisDasSugestoes(por_sku=por_sku, trechos=list(trechos.values()))
+        return SinaisDasSugestoes(por_sku=por_sku, trechos_de_origem=list(trechos.values()))
 
-    def _sinais(
-        self, fornecedor: str, produto: ProdutoDoSinal
-    ) -> tuple[list[SinalCorpus], list[TrechoClassificado]]:
-        """Os sinais e os trechos que foram ao modelo de decisão."""
+    def _sinais(self, fornecedor: str, produto: ProdutoDoSinal) -> _SinaisDoPar:
         consulta = f"{fornecedor} e {produto.nome}: atrasos de entrega, vendas por época do ano e estoque encalhado"
         resultado = self._busca.buscar(consulta, k=K_SINAIS, com_conflitos=False)
         trechos = sorted(
@@ -88,41 +84,32 @@ class SinaisCorpus:
             reverse=True,
         )[:MAX_TRECHOS_SINAIS]
         if not trechos:
-            return [], []
+            return _SinaisDoPar([], [])
         avaliacoes = self._decisao.avaliar_sinais(fornecedor, produto, trechos)
         sinais = [
             sinal
             for tipo in get_args(TipoSinal)
             if (sinal := _sinal(tipo, fornecedor, produto, avaliacoes)) is not None
         ]
-        return sinais, trechos
+        return _SinaisDoPar(sinais, trechos)
 
 
 def _sinal(
     tipo: TipoSinal, fornecedor: str, produto: ProdutoDoSinal, avaliacoes: Sequence[AvaliacaoSinais]
 ) -> SinalCorpus | None:
-    limiar = getattr(LIMIARES_SINAIS, tipo)
     acima = sorted(
-        (a for a in avaliacoes if getattr(a, tipo) > limiar),
-        key=lambda a: getattr(a, tipo),
+        (a for a in avaliacoes if a.probabilidades[tipo] > LIMIARES_SINAIS[tipo]),
+        key=lambda a: a.probabilidades[tipo],
         reverse=True,
     )
     if not acima:
         return None
     return SinalCorpus(
         tipo=tipo,
-        mensagem=_mensagem(tipo, fornecedor, produto),
+        mensagem=_MENSAGENS[tipo].format(fornecedor=fornecedor, produto=produto.nome),
         trechos=[a.trecho_id for a in acima],
-        probabilidade=getattr(acima[0], tipo),
+        probabilidade=acima[0].probabilidades[tipo],
     )
-
-
-def _mensagem(tipo: TipoSinal, fornecedor: str, produto: ProdutoDoSinal) -> str:
-    if tipo == "atraso_do_fornecedor":
-        return f"Os documentos relatam atraso de entrega da {fornecedor}."
-    if tipo == "demanda_sazonal":
-        return f"Os documentos relatam venda forte de {produto.nome} em alguma época do ano."
-    return f"Os documentos relatam encalhe de {produto.nome} ou da categoria dele numa compra anterior."
 
 
 def _produto(sku: SKU) -> ProdutoDoSinal:

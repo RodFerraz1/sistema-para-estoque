@@ -28,8 +28,13 @@ class RedatorIndisponivel(Exception):
 
 
 class Redator(Protocol):
+    """`usa_llm` diz se o texto é redigido por um LLM, e então tem as citações verificadas."""
+
     @property
     def nome(self) -> str: ...
+
+    @property
+    def usa_llm(self) -> bool: ...
 
     def redigir(self, pergunta: str, contexto: str) -> str: ...
 
@@ -39,6 +44,7 @@ class RedatorSemLLM(Redator):
     (padrão) ou o LLM configurado está indisponível."""
 
     nome = "sem_llm"
+    usa_llm = False
 
     def __init__(self, motivo: str = SEM_LLM_CONFIGURADO) -> None:
         self._motivo = motivo

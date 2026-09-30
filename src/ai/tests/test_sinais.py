@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import get_args
 
 import pytest
+from pydantic import ValidationError
 
 from src.ai.busca import BuscaContexto
 from src.ai.decisao import DecisaoIndisponivel
 from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel, Probabilidades
-from src.ai.schemas import AvaliacaoSinais, AvaliacaoTrecho, ProdutoDoSinal, Trecho
+from src.ai.schemas import AvaliacaoSinais, AvaliacaoTrecho, ProdutoDoSinal, TipoSinal, Trecho
 from src.ai.sinais import K_SINAIS, LIMIARES_SINAIS, MAX_TRECHOS_SINAIS, SinaisCorpus
 from src.catalog.schemas import SKU
 from src.purchasing.schemas import MotivoSemCompra, SugestaoPedido
@@ -82,12 +84,27 @@ def test_mensagens_de_venda_por_epoca_e_encalhe_citam_o_produto() -> None:
     ]
 
 
-@pytest.mark.parametrize("tipo", ["atraso_do_fornecedor", "demanda_sazonal", "encalhe"])
-def test_probabilidade_exatamente_no_limiar_nao_vira_sinal(tipo: str) -> None:
-    limiar = getattr(LIMIARES_SINAIS, tipo)
-    decisao = InMemoryDecisionModel(padrao=ACEITO, sinais_padrao={tipo: limiar})  # type: ignore[misc]
+@pytest.mark.parametrize("tipo", get_args(TipoSinal))
+def test_probabilidade_exatamente_no_limiar_nao_vira_sinal(tipo: TipoSinal) -> None:
+    decisao = InMemoryDecisionModel(padrao=ACEITO, sinais_padrao={tipo: LIMIARES_SINAIS[tipo]})
 
     assert sinais_corpus([make_trecho("a.md#s")], decisao).para_sugestao(sugestao(TOALHA), TOALHA) == []
+
+
+@pytest.mark.parametrize("tipo", get_args(TipoSinal))
+def test_todo_tipo_de_sinal_tem_limiar_e_mensagem(tipo: TipoSinal) -> None:
+    decisao = InMemoryDecisionModel(padrao=ACEITO, sinais_padrao={tipo: 1.0})
+
+    [sinal] = sinais_corpus([make_trecho("a.md#s")], decisao).para_sugestao(sugestao(TOALHA), TOALHA)
+
+    assert sinal.tipo == tipo
+
+
+def test_avaliacao_sem_a_probabilidade_de_algum_tipo_e_invalida() -> None:
+    with pytest.raises(ValidationError, match="demanda_sazonal"):
+        AvaliacaoSinais(
+            trecho_id="a.md#s", probabilidades={"atraso_do_fornecedor": 0.9, "encalhe": 0.1}, modelo="jev"
+        )
 
 
 def test_trechos_do_sinal_vem_do_mais_provavel_ao_menos_provavel_e_so_acima_do_limiar() -> None:
@@ -203,7 +220,7 @@ def test_para_sugestoes_calcula_uma_vez_por_par_de_fornecedor_e_produto() -> Non
             (sugestao(rosto), rosto),
             (sugestao(sem_compra, None), sem_compra),
         ]
-    )
+    ).por_sku
 
     assert [(f, p.nome) for f, p, _ in decisao.chamadas_sinais] == [
         ("Katrina Têxtil", "Toalha Banho Conforto"),
@@ -222,7 +239,7 @@ def test_para_sugestoes_calcula_uma_vez_por_par_de_fornecedor_e_produto() -> Non
     assert por_sku["TBC-BRAN-70140-03"] == []
 
 
-def test_para_sugestoes_com_trechos_traz_so_os_trechos_de_origem_sem_repeticao() -> None:
+def test_para_sugestoes_traz_so_os_trechos_de_origem_sem_repeticao() -> None:
     rosto = make_sku("TRC-BEGE-4880-01", produto_nome="Toalha Rosto Conforto", categoria="felpudo")
     trechos = [
         make_trecho("revisao.md#katrina", "Katrina toalha atraso"),
@@ -238,7 +255,7 @@ def test_para_sugestoes_com_trechos_traz_so_os_trechos_de_origem_sem_repeticao()
         },
     )
 
-    resultado = sinais_corpus(trechos, decisao).para_sugestoes_com_trechos(
+    resultado = sinais_corpus(trechos, decisao).para_sugestoes(
         [(sugestao(TOALHA), TOALHA), (sugestao(rosto), rosto)]
     )
 
@@ -247,16 +264,16 @@ def test_para_sugestoes_com_trechos_traz_so_os_trechos_de_origem_sem_repeticao()
         ["revisao.md#katrina"],
         ["veraneio.md#sobra", "revisao.md#katrina"],
     ]
-    assert [t.id for t in resultado.trechos] == ["revisao.md#katrina", "veraneio.md#sobra"]
-    assert resultado.trechos[0].texto == "Katrina toalha atraso"
+    assert [t.id for t in resultado.trechos_de_origem] == ["revisao.md#katrina", "veraneio.md#sobra"]
+    assert resultado.trechos_de_origem[0].texto == "Katrina toalha atraso"
 
 
-def test_para_sugestoes_com_trechos_sem_fornecedor_nao_busca() -> None:
+def test_para_sugestoes_sem_fornecedor_nao_busca() -> None:
     decisao = InMemoryDecisionModel(falhar_trechos=True, falhar_sinais=True)
 
-    resultado = sinais_corpus([make_trecho("a.md#s")], decisao).para_sugestoes_com_trechos(
+    resultado = sinais_corpus([make_trecho("a.md#s")], decisao).para_sugestoes(
         [(sugestao(TOALHA, None), TOALHA)]
     )
 
     assert resultado.por_sku == {"TBC-BEGE-70140-01": []}
-    assert resultado.trechos == []
+    assert resultado.trechos_de_origem == []

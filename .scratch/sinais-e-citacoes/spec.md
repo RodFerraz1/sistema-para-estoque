@@ -21,7 +21,7 @@ A segunda: o redator cita trechos entre colchetes, mas ninguém confere se o tre
 ## Solution
 
 1. **Sinais do corpus**: para cada par (fornecedor sugerido, produto) de uma sugestão, o código faz uma busca focada no corpus e pergunta ao Jev, trecho a trecho, três coisas: se relata atraso desse fornecedor, se relata venda forte do produto numa época do ano e se relata encalhe do produto. O código transforma as respostas acima do limiar em sinais com os trechos de origem. Os sinais acompanham a sugestão e nunca alteram a quantidade.
-2. **Verificação de citações**: depois da redação, o código extrai cada citação `[id]` com a frase que a contém. Id que não estava no contexto é marcado como fonte inexistente, sem chamar o Jev. Os demais vão ao Jev com uma `Choice` (sustenta, contradiz, não trata), e o código marca no texto toda citação que não foi confirmada com confiança.
+2. **Verificação de citações**: depois da redação, o código extrai cada citação `[id]` com a frase que a contém. Id que não estava no contexto é marcado como trecho inexistente, sem chamar o Jev. Os demais vão ao Jev com uma `Choice` (sustenta, contradiz, não trata), e o código marca no texto toda citação que não foi confirmada com confiança.
 3. **Chat**: a intenção `sugestao_compra` passa a trazer os sinais de cada sugestão no contexto do redator e na resposta, e toda resposta redigida por LLM passa pela verificação. O registro de decisão guarda os sinais e as verificações.
 4. **Endpoint** `GET /skus/{sku_code}/sugestao-compra/sinais` devolve os sinais da sugestão de um SKU (o M7 usa a mesma função para priorizar a fila).
 
@@ -54,18 +54,19 @@ A segunda: o redator cita trechos entre colchetes, mas ninguém confere se o tre
 | `demanda_sazonal` | O `trecho` relata que o `produto` ou a categoria dele vende mais numa data comemorativa ou época do ano? | O trecho cita venda maior desse produto ou da categoria dele no Natal, no Dia das Mães, no inverno, no verão ou em outra época. | O trecho não fala de venda por época desse produto nem da categoria dele. |
 | `encalhe` | O `trecho` relata que o `produto` ou a categoria dele encalhou ou sobrou em estoque depois de uma compra? | O trecho conta que uma compra desse produto ou da categoria dele vendeu abaixo do esperado, ficou parada ou precisou de liquidação. | O trecho não fala de sobra de estoque desse produto nem da categoria dele. |
 
-`ProdutoDoSinal`: `nome`, `categoria`. `AvaliacaoSinais`: `trecho_id`, as três probabilidades e `modelo`. `InMemoryDecisionModel` ganha a configuração por trecho, padrão e modo de falha, como nos outros métodos.
+`ProdutoDoSinal`: `nome`, `categoria`. `AvaliacaoSinais`: `trecho_id`, `probabilidades: dict[TipoSinal, Probabilidade]` (uma por tipo, validado) e `modelo`. `InMemoryDecisionModel` ganha a configuração por trecho, padrão e modo de falha, como nos outros métodos.
 
 **Serviço** `SinaisCorpus` (`src/ai/sinais.py`):
 
 - `para_sugestao(sugestao: SugestaoPedido, sku: SKU) -> list[SinalCorpus]`. Sugestão sem fornecedor (quantidade zero por SKU novo, sem giro ou sem fornecedor) não tem sinal. Caso contrário:
   1. Busca focada: `BuscaContexto.buscar(consulta, k=K_SINAIS, com_conflitos=False)` com `consulta = f"{fornecedor} e {produto}: atrasos de entrega, vendas por época do ano e estoque encalhado"` e `K_SINAIS = 15`. `buscar` ganha o parâmetro `com_conflitos` (padrão `True`, o comportamento do M4 não muda).
   2. Os trechos `aceito` e `conflitante` da busca, até `MAX_TRECHOS_SINAIS = 10` por similaridade, vão para `avaliar_sinais`.
-  3. Um sinal por tipo cuja probabilidade passa de `LIMIARES_SINAIS.<tipo>` em pelo menos um trecho, com os ids desses trechos (por probabilidade, maior primeiro) e a maior probabilidade.
-- Cache por chamada: `para_sugestoes(pares: Sequence[tuple[SugestaoPedido, SKU]]) -> dict[str, list[SinalCorpus]]` (chave `sku_code`) calcula uma vez por par (fornecedor, produto) e reaproveita para os SKUs do mesmo par.
+  3. Um sinal por tipo cuja probabilidade passa de `LIMIARES_SINAIS[tipo]` em pelo menos um trecho, com os ids desses trechos (por probabilidade, maior primeiro) e a maior probabilidade.
+- Cache por chamada: `para_sugestoes(pares: Sequence[tuple[SugestaoPedido, SKU]]) -> SinaisDasSugestoes` calcula uma vez por par (fornecedor, produto) e reaproveita para os SKUs do mesmo par. `SinaisDasSugestoes`: `por_sku: dict[str, list[SinalCorpus]]` (uma chave por sugestão, lista vazia sem fornecedor) e `trechos_de_origem: list[TrechoClassificado]` (os trechos de origem de algum sinal, sem repetição, para quem precisa mostrar ou citar esses trechos).
 - `SinalCorpus`: `tipo: Literal["atraso_do_fornecedor", "demanda_sazonal", "encalhe"]`, `mensagem` (feita em código), `trechos: list[str]`, `probabilidade`.
+- Tudo que varia por tipo é indexado por `TipoSinal`: `LIMIARES_SINAIS: dict[TipoSinal, float]`, as mensagens num mapa e as probabilidades da `AvaliacaoSinais`. As perguntas ao Jev (`PERGUNTAS_SINAIS`) ficam declaradas uma a uma, com o nome do tipo como chave. Um tipo novo pede o `Literal`, o limiar, a mensagem e a pergunta.
 - Mensagens: "Os documentos relatam atraso de entrega da <fornecedor>.", "Os documentos relatam venda forte de <produto> em alguma época do ano.", "Os documentos relatam encalhe de <produto> ou da categoria dele numa compra anterior."
-- `SugestaoComSinais` (`sugestao`, `sinais`) em `src/ai/schemas.py`. O `purchasing` não muda e não conhece o corpus.
+- `SugestaoComSinais` (`sugestao`, `sinais: list[SinalCorpus] | None`) em `src/ai/schemas.py`: `sinais` nulo quando não foram calculados (Jev fora do ar), lista vazia quando foram calculados sem sinal ou a sugestão não tem fornecedor. O `purchasing` não muda e não conhece o corpus.
 
 **Avaliação** (mesmo processo do ticket 01 do M5): `evals/sinais.json` com pelo menos 15 casos `(fornecedor, produto, trecho_id, esperado: {atraso_do_fornecedor, demanda_sazonal, encalhe})`, rotulados antes de rodar a partir do corpus, com pelo menos 3 positivos de cada tipo e casos de fornecedor ou produto trocado (ex: trecho de atraso da Katrina perguntado para a Malha Fina). `scripts/avaliar_sinais.py` roda contra o Jev real, grava as respostas cruas em `evals/resultados/sinais-<data>.json`, aceita `--de-arquivo` e varre o limiar de cada tipo de 0,30 a 0,90. **Regra**: por tipo, o limiar com mais acertos; empate, o mais alto. Não é gate.
 
@@ -73,8 +74,8 @@ A segunda: o redator cita trechos entre colchetes, mas ninguém confere se o tre
 
 **Funções puras** (`src/ai/citacoes.py`):
 
-- `extrair_citacoes(texto) -> list[Citacao]`: cada `[<id>]` cujo conteúdo tem o formato de id de trecho (`<caminho>.md#<slug>`), com a `afirmacao` = a frase que contém a citação, sem os colchetes. Frase termina em `.`, `!`, `?` seguido de espaço ou em quebra de linha; item de lista é uma frase. Colchetes com mais de um id separados por `;` ou `,` viram uma citação por id.
-- `marcar_citacoes(texto, verificacoes) -> str`: troca cada citação não confirmada pela marcação do veredito, mantendo o id: `[<id> - não confirmada]` (`sem_suporte` e `incerta`), `[<id> - o trecho diz o contrário]` (`contradita`), `[<id> - fonte inexistente]` (`inventada`). Citação `confirmada` fica como está.
+- `extrair_citacoes(texto) -> list[Citacao]`: cada `[<id>]` cujo conteúdo tem o formato de id de trecho (`<caminho>.md#<slug>`), com a `afirmacao` = a frase que contém a citação, sem os colchetes. Frase termina em `.`, `!`, `?` seguido de espaço ou em quebra de linha; item de lista é uma frase. Colchetes com mais de um id separados por `;` ou `,` viram uma citação por id. Citação logo depois do fim da frase (`dias. [id]`) fica com essa frase. Citação sozinha numa linha herda a última afirmação do texto (`ultima_afirmacao`, a da frase anterior, em outra linha); sozinha no começo do texto fica com afirmação vazia, não vai ao Jev e sai `incerta`.
+- `marcar_citacoes(texto, verificacoes) -> str`: troca cada citação não confirmada pela marcação do veredito, mantendo o id: `[<id> - não confirmada]` (`sem_suporte` e `incerta`), `[<id> - o trecho diz o contrário]` (`contradita`), `[<id> - trecho inexistente]` (`inventada`). Citação `confirmada` fica como está.
 
 **Port**: `DecisionModel.verificar_citacoes(pares: Sequence[tuple[str, Trecho]]) -> list[AvaliacaoCitacao]`, um request por par (afirmação, trecho), até 8 em paralelo, state `{"afirmacao": ..., "trecho": {"titulo", "tipo", "data", "texto"}}` e uma `Choice`:
 
@@ -87,16 +88,18 @@ A segunda: o redator cita trechos entre colchetes, mas ninguém confere se o tre
 
 **Veredito** (código, `VerificacaoCitacao` com `trecho_id`, `afirmacao`, `veredito`, `confianca: float | None`): id fora do contexto -> `inventada` (sem Jev); confiança abaixo de `LIMIAR_CITACAO` -> `incerta`; senão `sustenta` -> `confirmada`, `contradiz` -> `contradita`, `nao_trata` -> `sem_suporte`. `LIMIAR_CITACAO` parte de 0,80 (receita do TypeSafe) e é ajustado pela avaliação.
 
+**Conferência** (`conferir_citacoes(texto, trechos, decisao) -> CitacoesConferidas`): extrai, pergunta ao Jev uma vez por par (afirmação, trecho) só para ids dos `trechos` com afirmação, decide e marca. `CitacoesConferidas`: `texto` (marcado), `verificacoes` e `decisao_indisponivel`. Com o Jev fora do ar não propaga: as citações do contexto ficam `incerta` sem avaliação, as inventadas continuam inventadas e `decisao_indisponivel` vem verdadeiro.
+
 **Avaliação**: `evals/citacoes.json` com pelo menos 15 pares `(afirmacao, trecho_id, esperado)` escritos à mão a partir do corpus, pelo menos 5 de cada relação, incluindo afirmações com número trocado (ex: "a Katrina entrega em 30 dias" contra a cláusula de 45 dias) e afirmações verdadeiras sobre outro fornecedor. `scripts/avaliar_citacoes.py` roda contra o Jev real, grava as respostas cruas em `evals/resultados/citacoes-<data>.json`, aceita `--de-arquivo` e reporta acerto por relação e, para limiares de 0,50 a 0,95, quantas citações ficariam `incerta` e quantos erros sobrariam entre as decididas. **Regra**: o menor limiar sem nenhuma `confirmada` errada (citação que não sustenta marcada como confirmada é o erro que importa); se nenhum zerar, 0,95 e o risco fica registrado.
 
 ### Chat
 
 No `Copilot` do M5:
 
-- `sugestao_compra` com SKUs identificados: depois das sugestões, `SinaisCorpus.para_sugestoes` para as sugestões com fornecedor. A montagem passa a ter `sugestoes: list[SugestaoComSinais]`, e o contexto renderiza os sinais logo abaixo de cada sugestão, com os ids dos trechos de origem. Os trechos que deram origem a sinais entram na seção de trechos do contexto (sem passar de `MAX_TRECHOS_NO_CONTEXTO` somados aos da busca da pergunta; os da pergunta têm prioridade), para o redator poder citá-los.
-- Toda resposta redigida por um LLM (redator diferente de `sem_llm`) passa pela verificação: `extrair_citacoes`, vereditos, `marcar_citacoes`. A `RespostaCopilot` ganha `citacoes: list[VerificacaoCitacao]` e a resposta final é o texto marcado. Resposta do `RedatorSemLLM`, esclarecimento e fora de escopo não passam pela verificação.
-- `DecisaoIndisponivel` durante sinais ou verificação: a resposta sai sem sinais ou sem verificação, com uma observação ("não consegui calcular os sinais do corpus" ou "não consegui verificar as citações"). Não derruba o chat, porque o entendimento já aconteceu e os dois são aumento de valor. As citações não verificadas ficam marcadas como `incerta`.
-- Migration `0005`: `copilot.registros_decisao` ganha `sinais jsonb not null default '[]'` e `citacoes jsonb not null default '[]'`, gravados pelo `Copilot`.
+- `sugestao_compra` com SKUs identificados: depois das sugestões, `SinaisCorpus.para_sugestoes` para as sugestões com fornecedor. A montagem passa a ter `sugestoes: list[SugestaoComSinais]`, e o contexto renderiza os sinais logo abaixo de cada sugestão, com os ids dos trechos de origem. Os trechos que deram origem a sinais entram na seção de trechos do contexto (sem passar de `MAX_TRECHOS_NO_CONTEXTO` somados aos da busca da pergunta; os da pergunta têm prioridade), para o redator poder citá-los. Os que não couberam continuam citáveis: o id deles aparece abaixo da sugestão, então a verificação confere a citação contra o texto deles em vez de dar `inventada` (os `citaveis` são os trechos do contexto mais os de origem dos sinais).
+- Toda resposta redigida por um LLM (`Redator.usa_llm`, falso no `RedatorSemLLM`, inclusive quando ele entra na queda do redator configurado) passa pela verificação, com `conferir_citacoes` sobre a redação, antes da confirmação da faixa média. A `RespostaCopilot` ganha `citacoes: list[VerificacaoCitacao]` e a resposta final é o texto marcado. Resposta do `RedatorSemLLM`, esclarecimento e fora de escopo não passam pela verificação.
+- `DecisaoIndisponivel` durante sinais ou verificação não derruba o chat, porque o entendimento já aconteceu e os dois são aumento de valor. Nos sinais, calculados antes da redação, as sugestões saem com `sinais` nulo e a `Montagem` ganha a observação `OBSERVACAO_SEM_SINAIS` ("Não foi possível calcular os sinais do corpus agora ..."), que o redator vê no contexto. Na verificação, que roda depois da redação, as citações do contexto ficam `incerta` e o código acrescenta ao fim da resposta o aviso `AVISO_SEM_VERIFICACAO` ("Observação: não consegui verificar as citações agora ...").
+- Migration `0005`: `copilot.registros_decisao` ganha `sinais jsonb not null default '[]'` e `citacoes jsonb not null default '[]'`, gravados pelo `Copilot`. `sinais` é uma lista de `SinaisDoSKU` (`sku_code`, `sinais: list[SinalCorpus] | None`), um item por sugestão: lista vazia quando os sinais foram calculados sem nenhum sinal, nulo quando não foram calculados. A mudança cabe no jsonb, sem migration nova; os registros gravados antes dela só têm os SKUs com algum sinal.
 
 ### Endpoint
 
@@ -107,8 +110,8 @@ No `Copilot` do M5:
 - **`SinaisCorpus`**: com `InMemoryDecisionModel`, embedder falso e repositório em memória. Sinal só acima do limiar; ids ordenados por probabilidade; sugestão sem fornecedor não busca; um cálculo por par (fornecedor, produto) em `para_sugestoes`; `com_conflitos=False` não chama `avaliar_conflitos`.
 - **`JevDecisionModel.avaliar_sinais` e `verificar_citacoes`**: com cliente TypeSafe falso (state, perguntas, mapeamento, erro vira `DecisaoIndisponivel`) e um `externo` cada.
 - **`citacoes`**: frase com uma e com duas citações; citação no meio e no fim da frase; item de lista; colchete que não é id de trecho fica fora; `;` e `,` com vários ids; marcação de cada veredito; texto sem citação volta igual.
-- **`Copilot`**: sinais no contexto e na resposta de `sugestao_compra`; verificação só para redator LLM; `inventada` sem chamar o Jev; queda do Jev nos sinais e na verificação vira observação.
-- **Registro**: sinais e citações gravados e lidos (contrato in-memory e Postgres).
+- **`Copilot`**: sinais no contexto e na resposta de `sugestao_compra`; verificação só para redator LLM; `inventada` sem chamar o Jev; queda do Jev nos sinais vira observação no contexto e `sinais` nulo; queda na verificação vira aviso no fim da resposta.
+- **Registro**: sinais (com sinal, vazios e nulos) e citações gravados e lidos (contrato in-memory e Postgres).
 - **HTTP**: `/skus/{sku_code}/sugestao-compra/sinais` feliz, 404, 503, sem fornecedor.
 - **Smoke** (`externo`): sinais de um SKU da Katrina trazem `atraso_do_fornecedor`.
 

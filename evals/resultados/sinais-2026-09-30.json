@@ -33,9 +33,11 @@
       "latencia_s": 0.384,
       "avaliacao": {
         "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
-        "atraso_do_fornecedor": 0.98,
-        "demanda_sazonal": 0.03,
-        "encalhe": 0.02,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.98,
+          "demanda_sazonal": 0.03,
+          "encalhe": 0.02
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -44,9 +46,11 @@
       "latencia_s": 0.246,
       "avaliacao": {
         "trecho_id": "fornecedores/katrina-textil.md#lead-time",
-        "atraso_do_fornecedor": 0.96,
-        "demanda_sazonal": 0.02,
-        "encalhe": 0.02,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.96,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.02
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -55,9 +59,11 @@
       "latencia_s": 0.289,
       "avaliacao": {
         "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento",
-        "atraso_do_fornecedor": 0.94,
-        "demanda_sazonal": 0.02,
-        "encalhe": 0.02,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.94,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.02
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -66,9 +72,11 @@
       "latencia_s": 0.262,
       "avaliacao": {
         "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
-        "atraso_do_fornecedor": 0.09,
-        "demanda_sazonal": 0.02,
-        "encalhe": 0.02,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.09,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.02
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -77,9 +85,11 @@
       "latencia_s": 0.256,
       "avaliacao": {
         "trecho_id": "fornecedores/katrina-textil.md#lead-time",
-        "atraso_do_fornecedor": 0.13,
-        "demanda_sazonal": 0.02,
-        "encalhe": 0.02,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.13,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.02
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -88,9 +98,11 @@
       "latencia_s": 0.268,
       "avaliacao": {
         "trecho_id": "fornecedores/verdela-home.md#lead-time",
-        "atraso_do_fornecedor": 0.02,
-        "demanda_sazonal": 0.02,
-        "encalhe": 0.02,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.02
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -99,9 +111,11 @@
       "latencia_s": 0.259,
       "avaliacao": {
         "trecho_id": "fornecedores/malha-fina-textil.md#lead-time",
-        "atraso_do_fornecedor": 0.67,
-        "demanda_sazonal": 0.02,
-        "encalhe": 0.01,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.67,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.01
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -110,9 +124,11 @@
       "latencia_s": 0.249,
       "avaliacao": {
         "trecho_id": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
-        "atraso_do_fornecedor": 0.07,
-        "demanda_sazonal": 0.57,
-        "encalhe": 0.03,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.07,
+          "demanda_sazonal": 0.57,
+          "encalhe": 0.03
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -121,9 +137,11 @@
       "latencia_s": 0.297,
       "avaliacao": {
         "trecho_id": "reunioes/2024-11-natal-king-size.md#contexto",
-        "atraso_do_fornecedor": 0.02,
-        "demanda_sazonal": 0.98,
-        "encalhe": 0.05,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.98,
+          "encalhe": 0.05
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -132,9 +150,11 @@
       "latencia_s": 0.261,
       "avaliacao": {
         "trecho_id": "reunioes/2024-11-natal-king-size.md#contexto",
-        "atraso_do_fornecedor": 0.02,
-        "demanda_sazonal": 0.94,
-        "encalhe": 0.05,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.94,
+          "encalhe": 0.05
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -143,9 +163,11 @@
       "latencia_s": 0.298,
       "avaliacao": {
         "trecho_id": "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025",
-        "atraso_do_fornecedor": 0.03,
-        "demanda_sazonal": 0.58,
-        "encalhe": 0.07,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.03,
+          "demanda_sazonal": 0.58,
+          "encalhe": 0.07
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -154,9 +176,11 @@
       "latencia_s": 0.255,
       "avaliacao": {
         "trecho_id": "mercado/tendencia-cama-mesa-banho-2026.md#movimento-macro",
-        "atraso_do_fornecedor": 0.01,
-        "demanda_sazonal": 0.82,
-        "encalhe": 0.02,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.01,
+          "demanda_sazonal": 0.82,
+          "encalhe": 0.02
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -165,9 +189,11 @@
       "latencia_s": 0.278,
       "avaliacao": {
         "trecho_id": "reunioes/2024-11-natal-king-size.md#contexto",
-        "atraso_do_fornecedor": 0.02,
-        "demanda_sazonal": 0.43,
-        "encalhe": 0.04,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.43,
+          "encalhe": 0.04
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -176,9 +202,11 @@
       "latencia_s": 0.323,
       "avaliacao": {
         "trecho_id": "fornecedores/katrina-textil.md#sazonalidade-e-capacidade",
-        "atraso_do_fornecedor": 0.1,
-        "demanda_sazonal": 0.69,
-        "encalhe": 0.02,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.1,
+          "demanda_sazonal": 0.69,
+          "encalhe": 0.02
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -187,9 +215,11 @@
       "latencia_s": 0.259,
       "avaliacao": {
         "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
-        "atraso_do_fornecedor": 0.02,
-        "demanda_sazonal": 0.35,
-        "encalhe": 0.98,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.35,
+          "encalhe": 0.98
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -198,9 +228,11 @@
       "latencia_s": 0.274,
       "avaliacao": {
         "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#introducao",
-        "atraso_do_fornecedor": 0.03,
-        "demanda_sazonal": 0.61,
-        "encalhe": 0.79,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.03,
+          "demanda_sazonal": 0.61,
+          "encalhe": 0.79
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -209,9 +241,11 @@
       "latencia_s": 0.269,
       "avaliacao": {
         "trecho_id": "fornecedores/katrina-textil.md#linhas-ativas",
-        "atraso_do_fornecedor": 0.02,
-        "demanda_sazonal": 0.03,
-        "encalhe": 0.65,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.03,
+          "encalhe": 0.65
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -220,9 +254,11 @@
       "latencia_s": 0.299,
       "avaliacao": {
         "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
-        "atraso_do_fornecedor": 0.02,
-        "demanda_sazonal": 0.15,
-        "encalhe": 0.27,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.15,
+          "encalhe": 0.27
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -231,9 +267,11 @@
       "latencia_s": 0.292,
       "avaliacao": {
         "trecho_id": "reunioes/2024-11-natal-king-size.md#riscos-aceitos",
-        "atraso_do_fornecedor": 0.03,
-        "demanda_sazonal": 0.63,
-        "encalhe": 0.48,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.03,
+          "demanda_sazonal": 0.63,
+          "encalhe": 0.48
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -242,9 +280,11 @@
       "latencia_s": 0.255,
       "avaliacao": {
         "trecho_id": "politicas/estoque-e-giro.md#principios",
-        "atraso_do_fornecedor": 0.02,
-        "demanda_sazonal": 0.07,
-        "encalhe": 0.03,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.07,
+          "encalhe": 0.03
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -253,9 +293,11 @@
       "latencia_s": 0.26,
       "avaliacao": {
         "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#causas-identificadas",
-        "atraso_do_fornecedor": 0.02,
-        "demanda_sazonal": 0.04,
-        "encalhe": 0.8,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.04,
+          "encalhe": 0.8
+        },
         "modelo": "jev-1.13.0"
       }
     },
@@ -264,9 +306,11 @@
       "latencia_s": 0.334,
       "avaliacao": {
         "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#prejuizo-estimado",
-        "atraso_do_fornecedor": 0.03,
-        "demanda_sazonal": 0.03,
-        "encalhe": 0.15,
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.03,
+          "demanda_sazonal": 0.03,
+          "encalhe": 0.15
+        },
         "modelo": "jev-1.13.0"
       }
     }
