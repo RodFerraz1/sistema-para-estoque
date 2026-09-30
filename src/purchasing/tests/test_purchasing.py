@@ -106,6 +106,7 @@ def _purchasing(
         inventory,
         sales,
         politicas or InMemoryPoliticaCompraRepositorio(),
+        adapter,
         now=NOW,
     )
 

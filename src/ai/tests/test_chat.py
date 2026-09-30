@@ -135,7 +135,7 @@ def copilot(
         decisao,
         catalog,
         ficha_sku,
-        Purchasing(ficha_sku, inventory, sales, politicas, now=NOW),
+        Purchasing(ficha_sku, inventory, sales, politicas, adapter, now=NOW),
         politicas,
         busca,
         SinaisCorpus(busca, decisao),

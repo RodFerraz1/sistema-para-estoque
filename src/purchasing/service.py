@@ -1,7 +1,10 @@
-"""Módulo `purchasing`: sugere quanto comprar de um SKU e de quem.
+"""Módulo `purchasing`: sugere quanto comprar de um SKU e de quem, calcula a
+faixa de aprovação e submete o pedido aprovado ao ERP.
 
-Mecanismo fixo, parâmetros da política de compra ativa (ADR-0003). Só lê
-dos módulos de domínio; não fala com o `ERPAdapter` diretamente.
+Mecanismo fixo, parâmetros da política de compra ativa (ADR-0003). Lê dos
+módulos de domínio; do `ERPAdapter` só usa os pedidos de compra, que não têm
+módulo de leitura próprio. `submeter_pedido` é a única escrita do Copilot no
+ERP e só a aprovação humana chama (`module-interfaces.md`).
 """
 from __future__ import annotations
 
@@ -9,8 +12,10 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 from src.catalog.schemas import FornecedorParaSKU
+from src.erp_adapter.port import ERPAdapter
 from src.ficha_sku.service import FichaSKU
 from src.inventory.service import Inventory
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
@@ -22,8 +27,11 @@ from src.politica_compra.schemas import (
     PoliticaCompra,
     SazonalidadeModo,
 )
+from src.purchasing.faixa import faixa_aprovacao
 from src.purchasing.schemas import (
     Alerta,
+    FaixaAprovacao,
+    ItemNovoPedido,
     LeadTimeOrigem,
     MemoriaCalculo,
     MotivoSemCompra,
@@ -31,6 +39,33 @@ from src.purchasing.schemas import (
     TipoAlerta,
 )
 from src.sales.service import Sales
+
+
+class SugestaoSemCompra(ValueError):
+    def __init__(self, sku_code: str) -> None:
+        super().__init__(f"A sugestão de '{sku_code}' não tem compra (quantidade 0, sem fornecedor).")
+        self.sku_code = sku_code
+
+
+class QuantidadeInvalida(ValueError):
+    def __init__(self, quantidade: int, moq_unidades: int) -> None:
+        super().__init__(
+            f"A quantidade {quantidade} precisa ser maior que zero e pelo menos o MOQ "
+            f"de {moq_unidades} unidades do fornecedor."
+        )
+        self.quantidade = quantidade
+        self.moq_unidades = moq_unidades
+
+
+def _validar_compra(
+    sugestao: SugestaoPedido, quantidade: int
+) -> tuple[FornecedorParaSKU, MemoriaCalculo]:
+    """Fornecedor e memória de cálculo de uma sugestão com compra, com a quantidade validada."""
+    if sugestao.fornecedor is None or sugestao.calculo is None:
+        raise SugestaoSemCompra(sugestao.sku_code)
+    if quantidade <= 0 or quantidade < sugestao.fornecedor.moq_unidades:
+        raise QuantidadeInvalida(quantidade, sugestao.fornecedor.moq_unidades)
+    return sugestao.fornecedor, sugestao.calculo
 
 
 def _lead_time(
@@ -286,6 +321,7 @@ class Purchasing:
         inventory: Inventory,
         sales: Sales,
         politicas: PoliticaCompraRepositorio,
+        erp: ERPAdapter,
         *,
         now: datetime | None = None,
     ) -> None:
@@ -293,6 +329,7 @@ class Purchasing:
         self._inventory = inventory
         self._sales = sales
         self._politicas = politicas
+        self._erp = erp
         self._now = now
 
     def _agora(self) -> datetime:
@@ -351,4 +388,53 @@ class Purchasing:
             calculo=escolhido.calculo,
             alertas=_alertas(escolhido, politica.parametros, agora),
             politica_versao=politica.versao,
+        )
+
+    def faixa_aprovacao(
+        self, sugestao: SugestaoPedido, quantidade: int | None = None
+    ) -> FaixaAprovacao:
+        """Faixa do pedido com a quantidade sugerida ou a editada, com a política ativa.
+
+        Com a quantidade editada, o valor é recalculado e a violação de teto
+        também: vale o alerta da sugestão ou a cobertura na chegada com a
+        quantidade nova acima do teto. Lança `SugestaoSemCompra` e
+        `QuantidadeInvalida`.
+        """
+        quantidade = sugestao.quantidade if quantidade is None else quantidade
+        fornecedor, calculo = _validar_compra(sugestao, quantidade)
+        parametros = self._politicas.ativa().parametros
+        cobertura_na_chegada = (calculo.estoque_na_chegada + quantidade) / calculo.giro_mensal
+        viola_teto = cobertura_na_chegada > parametros.teto_meses or any(
+            a.tipo == TipoAlerta.VIOLA_TETO for a in sugestao.alertas
+        )
+        # `preco_unitario_reais` já guarda centavos, apesar do nome.
+        return faixa_aprovacao(
+            quantidade * fornecedor.preco_unitario_reais,
+            viola_teto=viola_teto,
+            fornecedor_tem_pedido=self._erp.fornecedor_tem_pedido(fornecedor.fornecedor_id),
+            parametros=parametros,
+        )
+
+    def submeter_pedido(
+        self, sugestao: SugestaoPedido, quantidade: int, aprovado_por: str, referencia: str
+    ) -> UUID:
+        """Cria no ERP o pedido de compra `aprovado` de um item, com a data
+        prevista de hoje mais o lead time da sugestão. Só a aprovação humana
+        chama. Lança `SugestaoSemCompra`, `QuantidadeInvalida` e `ValueError`
+        sem `aprovado_por`."""
+        fornecedor, calculo = _validar_compra(sugestao, quantidade)
+        aprovado_por = aprovado_por.strip()
+        if not aprovado_por:
+            raise ValueError("aprovado_por não pode ser vazio")
+        return self._erp.criar_pedido_compra(
+            fornecedor.fornecedor_id,
+            [
+                ItemNovoPedido(
+                    sku_code=sugestao.sku_code,
+                    quantidade=quantidade,
+                    preco_unitario_centavos=fornecedor.preco_unitario_reais,
+                )
+            ],
+            self._agora().date() + timedelta(days=calculo.lead_time_dias),
+            f"Criado pelo Copilot a partir da sugestão {referencia}, aprovado por {aprovado_por}.",
         )

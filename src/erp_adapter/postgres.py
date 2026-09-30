@@ -5,8 +5,8 @@ produto no `SKU` para evitar N+1 nos consumidores.
 """
 from __future__ import annotations
 
-from datetime import datetime
-from uuid import UUID
+from datetime import date, datetime
+from uuid import UUID, uuid4
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine, Row
@@ -19,6 +19,7 @@ from src.inventory.schemas import (
     ItemEmTransito,
     Movimentacao,
 )
+from src.purchasing.schemas import ItemNovoPedido
 from src.sales.schemas import Venda
 
 
@@ -232,3 +233,84 @@ class PostgresERPAdapter(ERPAdapter):
             )
             for r in rows
         ]
+
+    def fornecedor_tem_pedido(self, fornecedor_id: UUID) -> bool:
+        with self._engine.connect() as conn:
+            return conn.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1 FROM erp.pedidos_compra
+                        WHERE fornecedor_id = :fornecedor_id
+                          AND status NOT IN ('rascunho', 'cancelado')
+                    )
+                    """
+                ),
+                {"fornecedor_id": fornecedor_id},
+            ).scalar_one()
+
+    def criar_pedido_compra(
+        self,
+        fornecedor_id: UUID,
+        itens: list[ItemNovoPedido],
+        data_prevista_entrega: date,
+        observacao: str,
+    ) -> UUID:
+        if not itens:
+            raise ValueError("pedido de compra sem itens")
+        pedido_id = uuid4()
+        with self._engine.begin() as conn:
+            fornecedor_existe = conn.execute(
+                text("SELECT EXISTS (SELECT 1 FROM erp.fornecedores WHERE id = :id)"),
+                {"id": fornecedor_id},
+            ).scalar_one()
+            if not fornecedor_existe:
+                raise ValueError(f"fornecedor {fornecedor_id} não existe")
+            sku_ids = dict(
+                conn.execute(
+                    text("SELECT sku_code, id FROM erp.skus WHERE sku_code = ANY(:codes)"),
+                    {"codes": [i.sku_code for i in itens]},
+                ).all()
+            )
+            if faltando := sorted({i.sku_code for i in itens} - sku_ids.keys()):
+                raise ValueError(f"SKU inexistente: {', '.join(faltando)}")
+
+            # `valor_total_reais` e `preco_unitario_reais` guardam centavos, apesar do nome.
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO erp.pedidos_compra
+                      (id, fornecedor_id, status, aprovado_em, data_prevista_entrega,
+                       valor_total_reais, observacao)
+                    VALUES (:id, :fornecedor_id, 'aprovado', now(), :data_prevista_entrega,
+                            :valor_total, :observacao)
+                    """
+                ),
+                {
+                    "id": pedido_id,
+                    "fornecedor_id": fornecedor_id,
+                    "data_prevista_entrega": data_prevista_entrega,
+                    "valor_total": sum(i.quantidade * i.preco_unitario_centavos for i in itens),
+                    "observacao": observacao,
+                },
+            )
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO erp.pedidos_compra_itens
+                      (id, pedido_id, sku_id, quantidade, preco_unitario_reais)
+                    VALUES (:id, :pedido_id, :sku_id, :quantidade, :preco_unitario)
+                    """
+                ),
+                [
+                    {
+                        "id": uuid4(),
+                        "pedido_id": pedido_id,
+                        "sku_id": sku_ids[i.sku_code],
+                        "quantidade": i.quantidade,
+                        "preco_unitario": i.preco_unitario_centavos,
+                    }
+                    for i in itens
+                ],
+            )
+        return pedido_id

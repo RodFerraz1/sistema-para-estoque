@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.catalog.schemas import FornecedorParaSKU
 
@@ -69,3 +69,27 @@ class SugestaoPedido(BaseModel):
     calculo: MemoriaCalculo | None
     alertas: list[Alerta]
     politica_versao: int
+
+
+class ItemNovoPedido(BaseModel):
+    """Item de um pedido de compra que o Copilot cria no ERP."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    quantidade: int = Field(gt=0)
+    preco_unitario_centavos: int = Field(ge=0)
+
+
+class FaixaAprovacao(BaseModel):
+    """Faixa de `politicas/aprovacao-compras.md` de um pedido de compra.
+
+    `ajustes` traz uma frase por exceção do documento que mudou a faixa.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    faixa: int = Field(ge=1, le=4)
+    aprovadores: str
+    exige_justificativa: bool
+    ajustes: list[str]

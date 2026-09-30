@@ -26,6 +26,9 @@ def _v1(**overrides: Any) -> dict[str, Any]:
         "meses_quentes": [5, 6, 11, 12],
         "extra_sazonal_meses": 2.0,
         "dias_historico_minimo": 60,
+        "faixa_1_ate_reais": 15_000,
+        "faixa_2_ate_reais": 60_000,
+        "faixa_3_ate_reais": 150_000,
     }
     return base | overrides
 
@@ -38,6 +41,11 @@ def test_parametros_v1_validos() -> None:
     assert p.criterio_fornecedor is CriterioFornecedor.MENOR_PRECO
     assert p.sazonalidade_modo is SazonalidadeModo.ALERTAR
     assert p.meses_quentes == (5, 6, 11, 12)
+    assert (p.faixa_1_ate_reais, p.faixa_2_ate_reais, p.faixa_3_ate_reais) == (
+        15_000,
+        60_000,
+        150_000,
+    )
 
 
 def test_parametros_sao_imutaveis() -> None:
@@ -64,6 +72,10 @@ def test_parametros_sao_imutaveis() -> None:
             {"piso_reposicao_dias": 60, "ciclo_compra_meses": 1.5, "teto_meses": 3.0},
         ),
         ("meses_quentes sem repetição", {"meses_quentes": [5, 5, 12]}),
+        ("faixa_1_ate_reais > 0", {"faixa_1_ate_reais": 0}),
+        ("faixa_1 < faixa_2", {"faixa_1_ate_reais": 60_000}),
+        ("faixa_2 < faixa_3", {"faixa_2_ate_reais": 150_000}),
+        ("faixas em ordem", {"faixa_1_ate_reais": 150_000, "faixa_3_ate_reais": 15_000}),
         ("meses_quentes >= 1", {"meses_quentes": [0, 5]}),
         ("meses_quentes <= 12", {"meses_quentes": [5, 13]}),
         ("lead_time_base fechado", {"lead_time_base": "media"}),

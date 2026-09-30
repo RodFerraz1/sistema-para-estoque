@@ -46,6 +46,9 @@ class ParametrosPolitica(BaseModel):
     meses_quentes: tuple[Mes, ...]
     extra_sazonal_meses: float = Field(ge=0)
     dias_historico_minimo: int = Field(ge=0)
+    faixa_1_ate_reais: int = Field(gt=0)
+    faixa_2_ate_reais: int
+    faixa_3_ate_reais: int
 
     @model_validator(mode="after")
     def _regras_entre_campos(self) -> Self:
@@ -58,6 +61,11 @@ class ParametrosPolitica(BaseModel):
             )
         if len(set(self.meses_quentes)) != len(self.meses_quentes):
             raise ValueError("meses_quentes não pode ter mês repetido")
+        if not self.faixa_1_ate_reais < self.faixa_2_ate_reais < self.faixa_3_ate_reais:
+            raise ValueError(
+                "os limites das faixas precisam crescer: "
+                "faixa_1_ate_reais < faixa_2_ate_reais < faixa_3_ate_reais"
+            )
         return self
 
 
@@ -72,6 +80,9 @@ PARAMETROS_V1 = ParametrosPolitica(
     meses_quentes=(5, 6, 11, 12),
     extra_sazonal_meses=2.0,
     dias_historico_minimo=60,
+    faixa_1_ate_reais=15_000,
+    faixa_2_ate_reais=60_000,
+    faixa_3_ate_reais=150_000,
 )
 
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from fastapi import Depends
 
+from src.erp_adapter.dependencies import get_erp_adapter
+from src.erp_adapter.port import ERPAdapter
 from src.ficha_sku.dependencies import get_ficha_sku
 from src.ficha_sku.service import FichaSKU
 from src.inventory.dependencies import get_inventory
@@ -18,5 +20,6 @@ def get_purchasing(
     inventory: Inventory = Depends(get_inventory),
     sales: Sales = Depends(get_sales),
     politicas: PoliticaCompraRepositorio = Depends(get_politica_compra_repositorio),
+    erp: ERPAdapter = Depends(get_erp_adapter),
 ) -> Purchasing:
-    return Purchasing(ficha_sku, inventory, sales, politicas)
+    return Purchasing(ficha_sku, inventory, sales, politicas, erp)
