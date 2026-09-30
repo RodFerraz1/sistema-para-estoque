@@ -55,6 +55,8 @@ A partir do M4 o `ai` segue a ADR-0002: **Jev decide, código executa, LLM redig
 
 **Saída visível**: pesquisa "lead time da Katrina" e vê os trechos relevantes, com o conflito entre lead time contratual e observado sinalizado.
 
+**Concluído em 2026-09-30.** O gate da ADR-0002 reprovou na relevância de trecho, e o dev manteve a ADR aceitando o risco (`.scratch/rag-jev/spike-resultado.md`).
+
 ## M5 - Primeira conversa: Jev roteia, LLM redige
 
 - Endpoint `/chat` recebe pergunta em linguagem natural.

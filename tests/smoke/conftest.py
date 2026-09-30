@@ -1,9 +1,9 @@
 """Fixtures do smoke test end-to-end.
 
 Sobe o app FastAPI contra o Postgres real (do `docker compose up`),
-aplica as migrations (`alembic upgrade head`) e popula o seed
-(`scripts.seed.run`). Se o Postgres não estiver acessível, o suite
-inteiro é `skip`.
+aplica as migrations (`alembic upgrade head`), popula o seed
+(`scripts.seed.run`) e ingere o `corpus/` com o embedding de verdade. Se
+o Postgres não estiver acessível, o suite inteiro é `skip`.
 """
 from __future__ import annotations
 
@@ -17,6 +17,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from scripts.seed import run as run_seed
+from src.ai.dependencies import get_embedder, get_trechos_repositorio
+from src.ai.ingestao import ingerir
+from src.db.config import get_settings
 from src.db.engine import get_engine
 from src.main import app
 
@@ -38,6 +41,7 @@ def _banco_migrado_e_populado() -> None:
         pytest.skip("Postgres precisa estar disponível (docker compose up)")
     command.upgrade(Config(str(ALEMBIC_INI)), "head")
     run_seed()
+    ingerir(get_settings().corpus_dir, get_embedder(), get_trechos_repositorio())
 
 
 @pytest.fixture(scope="session")
