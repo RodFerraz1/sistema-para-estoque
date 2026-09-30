@@ -39,6 +39,7 @@ addopts = "-ra"
 markers = [
     "smoke: end-to-end tests that require Postgres + seed (docker compose up + alembic upgrade head)",
     "externo: chamam um serviço externo pago (o Jev); pulados sem JEV_KEY",
+    "externo_llm: chamam o LLM redator real (a Groq); pulados sem GROQ_API_KEY",
 ]
 
 [tool.uv]

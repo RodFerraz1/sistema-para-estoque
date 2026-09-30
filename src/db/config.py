@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     )
     jev_key: str | None = Field(default=None, alias="JEV_KEY")
     jev_model: str = Field(default="jev-1.13.0", alias="JEV_MODEL")
+    groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
+    groq_model: str = Field(default="openai/gpt-oss-120b", alias="GROQ_MODEL")
+    groq_base_url: str = Field(default="https://api.groq.com/openai/v1", alias="GROQ_BASE_URL")
     embedding_model: str = Field(
         default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         alias="EMBEDDING_MODEL",
