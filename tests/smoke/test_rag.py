@@ -26,7 +26,6 @@ def test_segunda_ingestao_deixa_todo_o_corpus_inalterado() -> None:
 
 
 @pytest.mark.externo
-@pytest.mark.skipif(not get_settings().jev_key, reason="JEV_KEY vazio: não chama o Jev real")
 def test_busca_do_lead_time_da_katrina_aceita_um_trecho_da_katrina(client: TestClient) -> None:
     response = client.get("/rag/busca", params={"q": "lead time da Katrina"})
 

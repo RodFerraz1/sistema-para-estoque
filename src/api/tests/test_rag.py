@@ -1,7 +1,6 @@
 """Testes HTTP de `/rag/busca` com embedder, repositório e Jev em memória."""
 from __future__ import annotations
 
-from collections import defaultdict
 from collections.abc import Iterator
 from datetime import date
 
@@ -10,23 +9,12 @@ from fastapi.testclient import TestClient
 
 from src.ai.decisao import DecisionModel
 from src.ai.dependencies import get_decision_model, get_embedder, get_trechos_repositorio
-from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel, InMemoryTrechosRepositorio
-from src.ai.schemas import Trecho, TrechoIndexado
+from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel
+from src.ai.schemas import Trecho
 from src.main import app
+from tests.fakes import make_trecho, repositorio_com
 
 PERGUNTA = "lead time da Katrina"
-
-
-def trecho(id: str, texto: str = PERGUNTA) -> Trecho:
-    return Trecho(
-        id=id,
-        documento=id.split("#")[0],
-        titulo=f"Katrina Têxtil S.A. > {id}",
-        tipo="fornecedor",
-        data=date(2025, 11, 10),
-        tags=["katrina", "lead-time"],
-        texto=texto,
-    )
 
 
 @pytest.fixture
@@ -39,12 +27,7 @@ def client() -> Iterator[TestClient]:
 def preparar(trechos: list[Trecho], decisao: DecisionModel | None = None) -> None:
     """Indexa `trechos` em memória e, com `decisao`, troca o Jev por ela."""
     embedder = FakeEmbedder()
-    repositorio = InMemoryTrechosRepositorio()
-    por_documento: dict[str, list[TrechoIndexado]] = defaultdict(list)
-    for t, vetor in zip(trechos, embedder.embed([t.texto for t in trechos]), strict=True):
-        por_documento[t.documento].append(TrechoIndexado(**t.model_dump(), embedding=vetor))
-    for documento, indexados in por_documento.items():
-        repositorio.substituir_documento(documento, f"hash de {documento}", indexados)
+    repositorio = repositorio_com(trechos, embedder)
     app.dependency_overrides[get_embedder] = lambda: embedder
     app.dependency_overrides[get_trechos_repositorio] = lambda: repositorio
     if decisao is not None:
@@ -53,7 +36,16 @@ def preparar(trechos: list[Trecho], decisao: DecisionModel | None = None) -> Non
 
 def test_busca_devolve_os_trechos_classificados_com_as_probabilidades(client: TestClient) -> None:
     preparar(
-        [trecho("fornecedores/katrina.md#lead-time")],
+        [
+            make_trecho(
+                "fornecedores/katrina.md#lead-time",
+                PERGUNTA,
+                titulo="Katrina Têxtil S.A. > Lead time",
+                tipo="fornecedor",
+                data=date(2025, 11, 10),
+                tags=["katrina", "lead-time"],
+            )
+        ],
         InMemoryDecisionModel(
             {
                 "fornecedores/katrina.md#lead-time": {
@@ -77,7 +69,7 @@ def test_busca_devolve_os_trechos_classificados_com_as_probabilidades(client: Te
     assert item == {
         "id": "fornecedores/katrina.md#lead-time",
         "documento": "fornecedores/katrina.md",
-        "titulo": "Katrina Têxtil S.A. > fornecedores/katrina.md#lead-time",
+        "titulo": "Katrina Têxtil S.A. > Lead time",
         "tipo": "fornecedor",
         "data": "2025-11-10",
         "tags": ["katrina", "lead-time"],
@@ -106,7 +98,7 @@ def test_busca_devolve_os_trechos_classificados_com_as_probabilidades(client: Te
 def test_parametros_fora_do_intervalo_dao_422(
     client: TestClient, params: dict[str, str | int]
 ) -> None:
-    preparar([trecho("a.md#s")], InMemoryDecisionModel())
+    preparar([make_trecho("a.md#s")], InMemoryDecisionModel())
 
     assert client.get("/rag/busca", params=params).status_code == 422
 
@@ -122,13 +114,13 @@ def test_parametros_fora_do_intervalo_dao_422(
 def test_parametros_nos_limites_sao_aceitos(
     client: TestClient, params: dict[str, str | int]
 ) -> None:
-    preparar([trecho("a.md#s")], InMemoryDecisionModel())
+    preparar([make_trecho("a.md#s")], InMemoryDecisionModel())
 
     assert client.get("/rag/busca", params=params).status_code == 200
 
 
 def test_sem_k_avalia_os_30_mais_parecidos(client: TestClient) -> None:
-    preparar([trecho(f"a.md#s{i}", f"lead time {i}") for i in range(31)], InMemoryDecisionModel())
+    preparar([make_trecho(f"a.md#s{i}", f"lead time {i}") for i in range(31)], InMemoryDecisionModel())
 
     response = client.get("/rag/busca", params={"q": PERGUNTA})
 
@@ -139,8 +131,8 @@ def test_sem_k_avalia_os_30_mais_parecidos(client: TestClient) -> None:
 def test_busca_devolve_os_conflitos_entre_trechos(client: TestClient) -> None:
     preparar(
         [
-            trecho("contratos/katrina.md#prazos", "lead time da Katrina"),
-            trecho("reunioes/q1.md#katrina", "lead time da Katrina em dias"),
+            make_trecho("contratos/katrina.md#prazos", "lead time da Katrina"),
+            make_trecho("reunioes/q1.md#katrina", "lead time da Katrina em dias"),
         ],
         InMemoryDecisionModel(
             padrao={"relevante": 0.9, "tem_evidencia": 0.9},
@@ -173,7 +165,7 @@ def test_busca_devolve_os_conflitos_entre_trechos(client: TestClient) -> None:
     ],
 )
 def test_jev_indisponivel_da_503(client: TestClient, decisao: InMemoryDecisionModel) -> None:
-    preparar([trecho("a.md#s"), trecho("b.md#s", "lead time da Katrina em dias")], decisao)
+    preparar([make_trecho("a.md#s"), make_trecho("b.md#s", "lead time da Katrina em dias")], decisao)
 
     response = client.get("/rag/busca", params={"q": PERGUNTA})
 
@@ -183,7 +175,7 @@ def test_jev_indisponivel_da_503(client: TestClient, decisao: InMemoryDecisionMo
 
 def test_sem_jev_key_da_503(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("JEV_KEY", "")
-    preparar([trecho("a.md#s")])
+    preparar([make_trecho("a.md#s")])
 
     response = client.get("/rag/busca", params={"q": PERGUNTA})
 

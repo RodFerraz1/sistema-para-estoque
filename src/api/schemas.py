@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from src.ai.schemas import Classificacao, ConflitoEntreTrechos, MotivoDescarte
+from src.ai.schemas import Classificacao, ConflitoEntreTrechos, MotivoDescarte, Probabilidade
 from src.inventory.schemas import Cobertura, Estoque
 from src.politica_compra.schemas import ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
@@ -88,10 +88,10 @@ class SugestaoPedidoResponse(BaseModel):
 class AvaliacaoTrechoResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    relevante: float
-    tem_evidencia: float
-    contradiz_premissa: float
-    tenta_instruir: float
+    relevante: Probabilidade
+    tem_evidencia: Probabilidade
+    contradiz_premissa: Probabilidade
+    tenta_instruir: Probabilidade
 
 
 class TrechoClassificadoResponse(BaseModel):

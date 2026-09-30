@@ -90,11 +90,11 @@ class JevDecisionModel(DecisionModel):
         return _em_paralelo(lambda trecho: self._avaliar_trecho(pergunta, trecho), trechos)
 
     def _avaliar_trecho(self, pergunta: str, trecho: Trecho) -> AvaliacaoTrecho:
-        no_state = _no_state(trecho)
+        dados = _trecho_para_o_state(trecho)
         resposta = self._cliente.system_one(
-            {"pergunta": pergunta, "trecho": no_state}, PERGUNTAS_TRECHO
+            {"pergunta": pergunta, "trecho": dados}, PERGUNTAS_TRECHO
         )
-        injecao = self._cliente.system_one({"trecho": no_state}, PERGUNTAS_INJECAO)
+        injecao = self._cliente.system_one({"trecho": dados}, PERGUNTAS_INJECAO)
         return AvaliacaoTrecho(
             trecho_id=trecho.id,
             relevante=resposta.nouls["relevante"].noul,
@@ -112,7 +112,7 @@ class JevDecisionModel(DecisionModel):
     def _avaliar_conflito(self, par: tuple[Trecho, Trecho]) -> AvaliacaoConflito:
         trecho_a, trecho_b = par
         resposta = self._cliente.system_one(
-            {"trecho_a": _no_state(trecho_a), "trecho_b": _no_state(trecho_b)},
+            {"trecho_a": _trecho_para_o_state(trecho_a), "trecho_b": _trecho_para_o_state(trecho_b)},
             PERGUNTAS_CONFLITO,
         )
         return AvaliacaoConflito(
@@ -123,7 +123,7 @@ class JevDecisionModel(DecisionModel):
         )
 
 
-def _no_state(trecho: Trecho) -> dict[str, str]:
+def _trecho_para_o_state(trecho: Trecho) -> dict[str, str]:
     return {
         "titulo": trecho.titulo,
         "tipo": trecho.tipo,

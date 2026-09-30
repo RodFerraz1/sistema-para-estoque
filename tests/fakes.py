@@ -1,4 +1,4 @@
-"""Fábricas de DTOs de domínio para montar `InMemoryERPAdapter` em testes.
+"""Fábricas de DTOs de domínio para montar os adapters em memória nos testes.
 
 Mantém defaults sensatos para que cada teste especifique apenas o que
 importa. UUIDs são derivados por `uuid5` a partir do nome/código para
@@ -7,9 +7,13 @@ serem estáveis entre runs.
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from datetime import UTC, date, datetime
 from uuid import UUID
 
+from src.ai.embeddings import Embedder
+from src.ai.in_memory import InMemoryTrechosRepositorio
+from src.ai.schemas import Trecho, TrechoIndexado
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.in_memory import (
     ItemPedidoCompra,
@@ -171,3 +175,34 @@ def make_item_pedido_compra(
         quantidade=quantidade,
         quantidade_recebida=quantidade_recebida,
     )
+
+
+def make_trecho(
+    id: str,
+    texto: str = "Texto do trecho.",
+    *,
+    titulo: str = "Documento > Seção",
+    tipo: str = "reuniao",
+    data: date = date(2025, 3, 14),
+    tags: list[str] | None = None,
+) -> Trecho:
+    return Trecho(
+        id=id,
+        documento=id.split("#")[0],
+        titulo=titulo,
+        tipo=tipo,
+        data=data,
+        tags=tags or [],
+        texto=texto,
+    )
+
+
+def repositorio_com(trechos: list[Trecho], embedder: Embedder) -> InMemoryTrechosRepositorio:
+    """Grava os `trechos` já com embedding, agrupados por documento como na ingestão."""
+    repositorio = InMemoryTrechosRepositorio()
+    por_documento: dict[str, list[TrechoIndexado]] = defaultdict(list)
+    for trecho, vetor in zip(trechos, embedder.embed([t.texto for t in trechos]), strict=True):
+        por_documento[trecho.documento].append(TrechoIndexado(**trecho.model_dump(), embedding=vetor))
+    for documento, indexados in por_documento.items():
+        repositorio.substituir_documento(documento, f"hash de {documento}", indexados)
+    return repositorio

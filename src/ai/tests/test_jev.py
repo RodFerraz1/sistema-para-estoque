@@ -1,6 +1,6 @@
 """Testes do `JevDecisionModel` com um cliente TypeSafe falso no lugar da API.
 
-O último teste chama o Jev real (marcador `externo`) e é pulado sem `JEV_KEY`.
+Os testes com o marcador `externo` chamam o Jev real e são pulados sem `JEV_KEY`.
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from src.ai.decisao import DecisaoIndisponivel
 from src.ai.jev import JevDecisionModel, criar_cliente
 from src.ai.schemas import Trecho
 from src.db.config import get_settings
+from tests.fakes import make_trecho
 
 RAIZ = Path(__file__).resolve().parents[3]
 EVALS = RAIZ / "evals"
@@ -56,36 +57,30 @@ class ClienteFalso:
         )
 
 
-def trecho(id: str, texto: str) -> Trecho:
-    return Trecho(
-        id=id,
-        documento=id.split("#")[0],
-        titulo=f"Katrina Têxtil S.A. > {id}",
-        tipo="fornecedor",
-        data=date(2025, 11, 10),
-        tags=["katrina"],
-        texto=texto,
-    )
-
-
 def test_cada_trecho_vai_com_a_pergunta_e_depois_sozinho_para_a_injecao() -> None:
     cliente = ClienteFalso()
-    lead_time = trecho("fornecedores/katrina.md#lead-time", "Contratado 45 dias, observado 62.")
+    lead_time = make_trecho(
+        "fornecedores/katrina.md#lead-time",
+        "Contratado 45 dias, observado 62.",
+        titulo="Katrina Têxtil S.A. > Lead time",
+        tipo="fornecedor",
+        data=date(2025, 11, 10),
+    )
 
     JevDecisionModel(cliente).avaliar_trechos("lead time da Katrina", [lead_time])
 
-    no_state = {
-        "titulo": "Katrina Têxtil S.A. > fornecedores/katrina.md#lead-time",
+    dados_do_trecho = {
+        "titulo": "Katrina Têxtil S.A. > Lead time",
         "tipo": "fornecedor",
         "data": "2025-11-10",
         "texto": "Contratado 45 dias, observado 62.",
     }
     assert [(state, sorted(perguntas)) for state, perguntas in cliente.pedidos] == [
         (
-            {"pergunta": "lead time da Katrina", "trecho": no_state},
+            {"pergunta": "lead time da Katrina", "trecho": dados_do_trecho},
             ["contradiz_premissa", "relevante", "tem_evidencia"],
         ),
-        ({"trecho": no_state}, ["tenta_instruir"]),
+        ({"trecho": dados_do_trecho}, ["tenta_instruir"]),
     ]
 
 
@@ -94,8 +89,8 @@ def test_perguntas_sao_as_calibradas_no_spike_em_pt() -> None:
     calibradas = json.loads(SPIKE_R2.read_text(encoding="utf-8"))["perguntas"]
 
     jev = JevDecisionModel(cliente)
-    jev.avaliar_trechos("lead time da Katrina", [trecho("a.md#s", "Texto.")])
-    jev.avaliar_conflitos([(trecho("a.md#s", "Texto."), trecho("b.md#s", "Outro texto."))])
+    jev.avaliar_trechos("lead time da Katrina", [make_trecho("a.md#s", "Texto.")])
+    jev.avaliar_conflitos([(make_trecho("a.md#s", "Texto."), make_trecho("b.md#s", "Outro texto."))])
 
     enviadas = [
         {nome: p.model_dump() for nome, p in perguntas.items() if isinstance(p, Noul)}
@@ -112,7 +107,7 @@ def test_cada_resposta_vira_o_campo_de_mesmo_nome_na_ordem_dos_trechos() -> None
     cliente = ClienteFalso(
         {"relevante": 0.91, "tem_evidencia": 0.82, "contradiz_premissa": 0.13, "tenta_instruir": 0.04}
     )
-    trechos = [trecho(f"a.md#s{i}", f"Texto {i}.") for i in range(12)]
+    trechos = [make_trecho(f"a.md#s{i}", f"Texto {i}.") for i in range(12)]
 
     avaliacoes = JevDecisionModel(cliente).avaliar_trechos("lead time da Katrina", trechos)
 
@@ -125,14 +120,16 @@ def test_cada_resposta_vira_o_campo_de_mesmo_nome_na_ordem_dos_trechos() -> None
 def test_modelo_vem_da_resposta_do_jev() -> None:
     cliente = ClienteFalso(modelo="jev-1.13.1")
 
-    [avaliacao] = JevDecisionModel(cliente).avaliar_trechos("lead time da Katrina", [trecho("a.md#s", "Texto.")])
+    [avaliacao] = JevDecisionModel(cliente).avaliar_trechos(
+        "lead time da Katrina", [make_trecho("a.md#s", "Texto.")]
+    )
 
     assert avaliacao.modelo == "jev-1.13.1"
 
 
 def test_erro_do_sdk_num_trecho_vira_decisao_indisponivel_para_o_lote_todo() -> None:
     cliente = ClienteFalso(falha_no_texto="Texto 3.")
-    trechos = [trecho(f"a.md#s{i}", f"Texto {i}.") for i in range(6)]
+    trechos = [make_trecho(f"a.md#s{i}", f"Texto {i}.") for i in range(6)]
 
     with pytest.raises(DecisaoIndisponivel, match="timed out"):
         JevDecisionModel(cliente).avaliar_trechos("lead time da Katrina", trechos)
@@ -140,8 +137,20 @@ def test_erro_do_sdk_num_trecho_vira_decisao_indisponivel_para_o_lote_todo() -> 
 
 def test_cada_par_vai_num_request_com_os_dois_trechos_no_state() -> None:
     cliente = ClienteFalso()
-    contrato = trecho("contratos/katrina.md#prazos", "Antecedência mínima de 45 dias.")
-    revisao = trecho("reunioes/q1.md#katrina", "Lead time observado de 62 dias.")
+    contrato = make_trecho(
+        "contratos/katrina.md#prazos",
+        "Antecedência mínima de 45 dias.",
+        titulo="Contrato Katrina > Prazos",
+        tipo="contrato",
+        data=date(2025, 1, 20),
+    )
+    revisao = make_trecho(
+        "reunioes/q1.md#katrina",
+        "Lead time observado de 62 dias.",
+        titulo="Revisão Q1/2025 > Katrina Têxtil",
+        tipo="reuniao",
+        data=date(2025, 3, 14),
+    )
 
     JevDecisionModel(cliente).avaliar_conflitos([(contrato, revisao)])
 
@@ -149,15 +158,15 @@ def test_cada_par_vai_num_request_com_os_dois_trechos_no_state() -> None:
         (
             {
                 "trecho_a": {
-                    "titulo": "Katrina Têxtil S.A. > contratos/katrina.md#prazos",
-                    "tipo": "fornecedor",
-                    "data": "2025-11-10",
+                    "titulo": "Contrato Katrina > Prazos",
+                    "tipo": "contrato",
+                    "data": "2025-01-20",
                     "texto": "Antecedência mínima de 45 dias.",
                 },
                 "trecho_b": {
-                    "titulo": "Katrina Têxtil S.A. > reunioes/q1.md#katrina",
-                    "tipo": "fornecedor",
-                    "data": "2025-11-10",
+                    "titulo": "Revisão Q1/2025 > Katrina Têxtil",
+                    "tipo": "reuniao",
+                    "data": "2025-03-14",
                     "texto": "Lead time observado de 62 dias.",
                 },
             },
@@ -168,7 +177,10 @@ def test_cada_par_vai_num_request_com_os_dois_trechos_no_state() -> None:
 
 def test_cada_par_vira_a_probabilidade_de_conflito_na_ordem_dos_pares() -> None:
     cliente = ClienteFalso({"conflitam": 0.62}, modelo="jev-1.13.1")
-    pares = [(trecho(f"a.md#s{i}", f"Texto {i}."), trecho(f"b.md#s{i}", f"Outro {i}.")) for i in range(12)]
+    pares = [
+        (make_trecho(f"a.md#s{i}", f"Texto {i}."), make_trecho(f"b.md#s{i}", f"Outro {i}."))
+        for i in range(12)
+    ]
 
     avaliacoes = JevDecisionModel(cliente).avaliar_conflitos(pares)
 
@@ -178,7 +190,10 @@ def test_cada_par_vira_a_probabilidade_de_conflito_na_ordem_dos_pares() -> None:
 
 def test_erro_do_sdk_num_par_vira_decisao_indisponivel_para_o_lote_todo() -> None:
     cliente = ClienteFalso(falha_no_texto="Outro 3.")
-    pares = [(trecho(f"a.md#s{i}", f"Texto {i}."), trecho(f"b.md#s{i}", f"Outro {i}.")) for i in range(6)]
+    pares = [
+        (make_trecho(f"a.md#s{i}", f"Texto {i}."), make_trecho(f"b.md#s{i}", f"Outro {i}."))
+        for i in range(6)
+    ]
 
     with pytest.raises(DecisaoIndisponivel, match="timed out"):
         JevDecisionModel(cliente).avaliar_conflitos(pares)
@@ -187,8 +202,7 @@ def test_erro_do_sdk_num_par_vira_decisao_indisponivel_para_o_lote_todo() -> Non
 @pytest.fixture
 def jev_real() -> Iterator[JevDecisionModel]:
     settings = get_settings()
-    if not settings.jev_key:
-        pytest.skip("JEV_KEY vazio: não chama o Jev real")
+    assert settings.jev_key, "quem usa jev_real precisa do marcador externo, que pula sem JEV_KEY"
     with criar_cliente(settings.jev_key, settings.jev_model) as cliente:
         yield JevDecisionModel(cliente)
 

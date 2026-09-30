@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 Classificacao = Literal["aceito", "conflitante", "descartado"]
 MotivoDescarte = Literal["injecao", "irrelevante", "sem_evidencia"]
+Probabilidade = Annotated[float, Field(ge=0, le=1)]
 
 
 class Trecho(BaseModel):
@@ -31,26 +32,27 @@ class TrechoRecuperado(Trecho):
 
 
 class AvaliacaoTrecho(BaseModel):
-    """Probabilidades de 0 a 1 que o modelo de decisão deu para um trecho diante da pergunta."""
+    """Probabilidades que o modelo de decisão deu para um trecho diante da pergunta."""
 
     model_config = ConfigDict(frozen=True)
 
     trecho_id: str
-    relevante: float
-    tem_evidencia: float
-    contradiz_premissa: float
-    tenta_instruir: float
+    relevante: Probabilidade
+    tem_evidencia: Probabilidade
+    contradiz_premissa: Probabilidade
+    tenta_instruir: Probabilidade
     modelo: str
 
 
 class AvaliacaoConflito(BaseModel):
-    """Probabilidade de 0 a 1 que o modelo de decisão deu para os dois trechos se contradizerem."""
+    """Probabilidade que o modelo de decisão deu para os dois trechos afirmarem coisas
+    incompatíveis sobre o mesmo fato."""
 
     model_config = ConfigDict(frozen=True)
 
     trecho_a: str
     trecho_b: str
-    conflitam: float
+    conflitam: Probabilidade
     modelo: str
 
 
@@ -65,7 +67,7 @@ class ConflitoEntreTrechos(BaseModel):
 
     trecho_a: str
     trecho_b: str
-    probabilidade: float
+    probabilidade: Probabilidade
 
 
 class ResultadoBusca(BaseModel):

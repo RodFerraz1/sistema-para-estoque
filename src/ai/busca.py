@@ -36,7 +36,7 @@ LIMIARES = Limiares(
     injecao=0.50, contradiz_premissa=0.85, relevante=0.55, evidencia=0.15, conflito=0.10
 )
 
-_ORDEM: dict[Classificacao, int] = {"aceito": 0, "conflitante": 1, "descartado": 2}
+_ORDEM_DAS_CLASSIFICACOES: dict[Classificacao, int] = {"aceito": 0, "conflitante": 1, "descartado": 2}
 
 
 class BuscaContexto:
@@ -55,7 +55,7 @@ class BuscaContexto:
         avaliacoes = {a.trecho_id: a for a in self._decisao.avaliar_trechos(pergunta, recuperados)}
         trechos = sorted(
             (_classificar(trecho, avaliacoes[trecho.id]) for trecho in recuperados),
-            key=lambda t: (_ORDEM[t.classificacao], -t.similaridade),
+            key=lambda t: (_ORDEM_DAS_CLASSIFICACOES[t.classificacao], -t.similaridade),
         )
         return ResultadoBusca(
             pergunta=pergunta,
@@ -85,7 +85,7 @@ class BuscaContexto:
 
 
 def _classificar(trecho: TrechoRecuperado, avaliacao: AvaliacaoTrecho) -> TrechoClassificado:
-    classificacao, motivo = _regras(avaliacao)
+    classificacao, motivo = _classificacao_e_motivo(avaliacao)
     return TrechoClassificado(
         **trecho.model_dump(),
         classificacao=classificacao,
@@ -94,7 +94,7 @@ def _classificar(trecho: TrechoRecuperado, avaliacao: AvaliacaoTrecho) -> Trecho
     )
 
 
-def _regras(avaliacao: AvaliacaoTrecho) -> tuple[Classificacao, MotivoDescarte | None]:
+def _classificacao_e_motivo(avaliacao: AvaliacaoTrecho) -> tuple[Classificacao, MotivoDescarte | None]:
     if avaliacao.tenta_instruir > LIMIARES.injecao:
         return "descartado", "injecao"
     if avaliacao.contradiz_premissa > LIMIARES.contradiz_premissa:

@@ -1,51 +1,26 @@
 """Testes de `BuscaContexto` com `FakeEmbedder`, `InMemoryTrechosRepositorio` e `InMemoryDecisionModel`."""
 from __future__ import annotations
 
-from collections import defaultdict
-from datetime import date
-
 import pytest
 
 from src.ai.busca import LIMIARES, BuscaContexto
 from src.ai.decisao import DecisaoIndisponivel
-from src.ai.in_memory import (
-    FakeEmbedder,
-    InMemoryDecisionModel,
-    InMemoryTrechosRepositorio,
-    Probabilidades,
-)
-from src.ai.schemas import ResultadoBusca, Trecho, TrechoIndexado
+from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel, Probabilidades
+from src.ai.schemas import ResultadoBusca, Trecho
+from tests.fakes import make_trecho, repositorio_com
 
 PERGUNTA = "lead time da Katrina"
 
 
-def trecho(id: str, texto: str = PERGUNTA) -> Trecho:
-    return Trecho(
-        id=id,
-        documento=id.split("#")[0],
-        titulo=f"Título de {id}",
-        tipo="reuniao",
-        data=date(2025, 3, 14),
-        tags=["fornecedores"],
-        texto=texto,
-    )
-
-
 def busca(trechos: list[Trecho], decisao: InMemoryDecisionModel) -> BuscaContexto:
     embedder = FakeEmbedder()
-    repositorio = InMemoryTrechosRepositorio()
-    por_documento: dict[str, list[TrechoIndexado]] = defaultdict(list)
-    for t, vetor in zip(trechos, embedder.embed([t.texto for t in trechos]), strict=True):
-        por_documento[t.documento].append(TrechoIndexado(**t.model_dump(), embedding=vetor))
-    for documento, indexados in por_documento.items():
-        repositorio.substituir_documento(documento, f"hash de {documento}", indexados)
-    return BuscaContexto(embedder, repositorio, decisao)
+    return BuscaContexto(embedder, repositorio_com(trechos, embedder), decisao)
 
 
 def test_trecho_relevante_com_evidencia_e_aceito() -> None:
     decisao = InMemoryDecisionModel({"a.md#lead-time": {"relevante": 0.9, "tem_evidencia": 0.9}})
 
-    [classificado] = busca([trecho("a.md#lead-time")], decisao).buscar(PERGUNTA).trechos
+    [classificado] = busca([make_trecho("a.md#lead-time")], decisao).buscar(PERGUNTA).trechos
 
     assert classificado.id == "a.md#lead-time"
     assert classificado.classificacao == "aceito"
@@ -57,7 +32,7 @@ def test_trecho_que_tenta_instruir_e_descartado_por_injecao() -> None:
         {"a.md#ata": {"relevante": 0.9, "tem_evidencia": 0.9, "tenta_instruir": 0.95}}
     )
 
-    [classificado] = busca([trecho("a.md#ata")], decisao).buscar(PERGUNTA).trechos
+    [classificado] = busca([make_trecho("a.md#ata")], decisao).buscar(PERGUNTA).trechos
 
     assert classificado.classificacao == "descartado"
     assert classificado.motivo_descarte == "injecao"
@@ -68,7 +43,7 @@ def test_trecho_que_contradiz_a_premissa_e_conflitante() -> None:
         {"a.md#revisao": {"relevante": 0.9, "tem_evidencia": 0.1, "contradiz_premissa": 0.95}}
     )
 
-    [classificado] = busca([trecho("a.md#revisao")], decisao).buscar(PERGUNTA).trechos
+    [classificado] = busca([make_trecho("a.md#revisao")], decisao).buscar(PERGUNTA).trechos
 
     assert classificado.classificacao == "conflitante"
     assert classificado.motivo_descarte is None
@@ -77,7 +52,7 @@ def test_trecho_que_contradiz_a_premissa_e_conflitante() -> None:
 def test_trecho_irrelevante_e_descartado_mesmo_com_evidencia() -> None:
     decisao = InMemoryDecisionModel({"a.md#malha-fina": {"relevante": 0.2, "tem_evidencia": 0.9}})
 
-    [classificado] = busca([trecho("a.md#malha-fina")], decisao).buscar(PERGUNTA).trechos
+    [classificado] = busca([make_trecho("a.md#malha-fina")], decisao).buscar(PERGUNTA).trechos
 
     assert classificado.classificacao == "descartado"
     assert classificado.motivo_descarte == "irrelevante"
@@ -86,7 +61,7 @@ def test_trecho_irrelevante_e_descartado_mesmo_com_evidencia() -> None:
 def test_trecho_relevante_sem_evidencia_e_descartado() -> None:
     decisao = InMemoryDecisionModel({"a.md#contexto": {"relevante": 0.9, "tem_evidencia": 0.05}})
 
-    [classificado] = busca([trecho("a.md#contexto")], decisao).buscar(PERGUNTA).trechos
+    [classificado] = busca([make_trecho("a.md#contexto")], decisao).buscar(PERGUNTA).trechos
 
     assert classificado.classificacao == "descartado"
     assert classificado.motivo_descarte == "sem_evidencia"
@@ -94,24 +69,24 @@ def test_trecho_relevante_sem_evidencia_e_descartado() -> None:
 
 def classificar(probabilidades: Probabilidades) -> tuple[str, str | None]:
     decisao = InMemoryDecisionModel({"a.md#s": probabilidades})
-    [classificado] = busca([trecho("a.md#s")], decisao).buscar(PERGUNTA).trechos
+    [classificado] = busca([make_trecho("a.md#s")], decisao).buscar(PERGUNTA).trechos
     return classificado.classificacao, classificado.motivo_descarte
 
 
-def test_injecao_vem_antes_da_contradicao_e_da_evidencia() -> None:
+def test_injecao_vem_antes_da_contradicao_da_premissa_e_da_evidencia() -> None:
     assert classificar(
         {"tenta_instruir": 0.95, "contradiz_premissa": 0.95, "relevante": 0.9, "tem_evidencia": 0.9}
     ) == ("descartado", "injecao")
 
 
-def test_contradicao_vem_antes_da_evidencia() -> None:
+def test_contradicao_da_premissa_vem_antes_da_evidencia() -> None:
     assert classificar({"contradiz_premissa": 0.95, "relevante": 0.9, "tem_evidencia": 0.9}) == (
         "conflitante",
         None,
     )
 
 
-def test_contradicao_vem_antes_da_relevancia() -> None:
+def test_contradicao_da_premissa_vem_antes_da_relevancia() -> None:
     assert classificar({"contradiz_premissa": 0.95, "relevante": 0.1, "tem_evidencia": 0.9}) == (
         "conflitante",
         None,
@@ -129,7 +104,7 @@ def test_contradicao_vem_antes_da_relevancia() -> None:
         pytest.param(
             {"contradiz_premissa": LIMIARES.contradiz_premissa, "relevante": 0.9, "tem_evidencia": 0.9},
             ("aceito", None),
-            id="contradicao-no-limiar-nao-e-conflitante",
+            id="contradicao-da-premissa-no-limiar-nao-e-conflitante",
         ),
         pytest.param(
             {"relevante": LIMIARES.relevante, "tem_evidencia": 0.9},
@@ -151,10 +126,10 @@ def test_valor_exatamente_no_limiar(
 
 def test_resultado_vem_por_classificacao_e_depois_por_similaridade() -> None:
     trechos = [
-        trecho("a.md#1", "lead time da Katrina"),
-        trecho("b.md#2", "lead time da Katrina em dias"),
-        trecho("c.md#3", "lead time da Katrina em dias corridos"),
-        trecho("d.md#4", "lead time da Katrina em dias corridos no contrato"),
+        make_trecho("a.md#1", "lead time da Katrina"),
+        make_trecho("b.md#2", "lead time da Katrina em dias"),
+        make_trecho("c.md#3", "lead time da Katrina em dias corridos"),
+        make_trecho("d.md#4", "lead time da Katrina em dias corridos no contrato"),
     ]
     decisao = InMemoryDecisionModel(
         {
@@ -180,7 +155,7 @@ def test_resultado_vem_por_classificacao_e_depois_por_similaridade() -> None:
 def test_resultado_informa_o_modelo_que_avaliou_os_trechos() -> None:
     decisao = InMemoryDecisionModel(modelo="jev-1.13.0")
 
-    resultado = busca([trecho("a.md#s")], decisao).buscar(PERGUNTA)
+    resultado = busca([make_trecho("a.md#s")], decisao).buscar(PERGUNTA)
 
     assert resultado.modelo == "jev-1.13.0"
     assert resultado.trechos[0].avaliacao.modelo == "jev-1.13.0"
@@ -190,7 +165,7 @@ def test_jev_indisponivel_propaga_sem_resultado_parcial() -> None:
     decisao = InMemoryDecisionModel(falhar_trechos=True)
 
     with pytest.raises(DecisaoIndisponivel):
-        busca([trecho("a.md#s")], decisao).buscar(PERGUNTA)
+        busca([make_trecho("a.md#s")], decisao).buscar(PERGUNTA)
 
 
 def test_corpus_vazio_devolve_listas_vazias_sem_chamar_o_jev() -> None:
@@ -204,9 +179,9 @@ def test_corpus_vazio_devolve_listas_vazias_sem_chamar_o_jev() -> None:
 
 def test_busca_avalia_so_os_k_mais_parecidos() -> None:
     trechos = [
-        trecho("a.md#1", "lead time da Katrina"),
-        trecho("b.md#2", "lead time da Katrina em dias"),
-        trecho("c.md#3", "prazo de pagamento da Verdela"),
+        make_trecho("a.md#1", "lead time da Katrina"),
+        make_trecho("b.md#2", "lead time da Katrina em dias"),
+        make_trecho("c.md#3", "prazo de pagamento da Verdela"),
     ]
 
     resultado = busca(trechos, InMemoryDecisionModel()).buscar(PERGUNTA, k=2)
@@ -223,8 +198,8 @@ def conflitos(resultado: ResultadoBusca) -> list[tuple[str, str, float]]:
 
 def test_par_de_documentos_diferentes_acima_do_limiar_vira_conflito() -> None:
     trechos = [
-        trecho("contrato.md#prazos", "lead time da Katrina"),
-        trecho("revisao.md#katrina", "lead time da Katrina em dias"),
+        make_trecho("contrato.md#prazos", "lead time da Katrina"),
+        make_trecho("revisao.md#katrina", "lead time da Katrina em dias"),
     ]
     decisao = InMemoryDecisionModel(
         padrao=ACEITO, conflitos={("revisao.md#katrina", "contrato.md#prazos"): 0.62}
@@ -237,9 +212,9 @@ def test_par_de_documentos_diferentes_acima_do_limiar_vira_conflito() -> None:
 
 def test_trechos_do_mesmo_documento_nao_formam_par() -> None:
     trechos = [
-        trecho("contrato.md#prazos", "lead time da Katrina"),
-        trecho("contrato.md#notas", "lead time da Katrina em dias"),
-        trecho("revisao.md#katrina", "lead time da Katrina em dias corridos"),
+        make_trecho("contrato.md#prazos", "lead time da Katrina"),
+        make_trecho("contrato.md#notas", "lead time da Katrina em dias"),
+        make_trecho("revisao.md#katrina", "lead time da Katrina em dias corridos"),
     ]
     decisao = InMemoryDecisionModel(padrao=ACEITO, conflito_padrao=0.9)
 
@@ -253,9 +228,9 @@ def test_trechos_do_mesmo_documento_nao_formam_par() -> None:
 
 def test_so_aceitos_e_conflitantes_formam_par() -> None:
     trechos = [
-        trecho("contrato.md#prazos", "lead time da Katrina"),
-        trecho("revisao.md#katrina", "lead time da Katrina em dias"),
-        trecho("ata.md#decisoes", "lead time da Katrina em dias corridos"),
+        make_trecho("contrato.md#prazos", "lead time da Katrina"),
+        make_trecho("revisao.md#katrina", "lead time da Katrina em dias"),
+        make_trecho("ata.md#decisoes", "lead time da Katrina em dias corridos"),
     ]
     decisao = InMemoryDecisionModel(
         {
@@ -273,7 +248,7 @@ def test_so_aceitos_e_conflitantes_formam_par() -> None:
 
 
 def test_so_os_6_trechos_mais_parecidos_formam_pares() -> None:
-    trechos = [trecho(f"doc{i}.md#s", "lead time da Katrina" + " em dias" * i) for i in range(7)]
+    trechos = [make_trecho(f"doc{i}.md#s", "lead time da Katrina" + " em dias" * i) for i in range(7)]
     decisao = InMemoryDecisionModel(padrao=ACEITO, conflito_padrao=0.9)
 
     resultado = busca(trechos, decisao).buscar(PERGUNTA)
@@ -286,8 +261,8 @@ def test_so_os_6_trechos_mais_parecidos_formam_pares() -> None:
 
 def test_par_exatamente_no_limiar_nao_vira_conflito() -> None:
     trechos = [
-        trecho("contrato.md#prazos", "lead time da Katrina"),
-        trecho("revisao.md#katrina", "lead time da Katrina em dias"),
+        make_trecho("contrato.md#prazos", "lead time da Katrina"),
+        make_trecho("revisao.md#katrina", "lead time da Katrina em dias"),
     ]
     decisao = InMemoryDecisionModel(padrao=ACEITO, conflito_padrao=LIMIARES.conflito)
 
@@ -296,9 +271,9 @@ def test_par_exatamente_no_limiar_nao_vira_conflito() -> None:
 
 def test_sem_par_elegivel_nao_pergunta_sobre_conflito() -> None:
     trechos = [
-        trecho("contrato.md#prazos", "lead time da Katrina"),
-        trecho("contrato.md#notas", "lead time da Katrina em dias"),
-        trecho("revisao.md#katrina", "lead time da Katrina em dias corridos"),
+        make_trecho("contrato.md#prazos", "lead time da Katrina"),
+        make_trecho("contrato.md#notas", "lead time da Katrina em dias"),
+        make_trecho("revisao.md#katrina", "lead time da Katrina em dias corridos"),
     ]
     decisao = InMemoryDecisionModel(
         {"contrato.md#prazos": ACEITO, "contrato.md#notas": ACEITO}, falhar_conflitos=True
@@ -309,8 +284,8 @@ def test_sem_par_elegivel_nao_pergunta_sobre_conflito() -> None:
 
 def test_jev_indisponivel_no_conflito_propaga_sem_resultado_parcial() -> None:
     trechos = [
-        trecho("contrato.md#prazos", "lead time da Katrina"),
-        trecho("revisao.md#katrina", "lead time da Katrina em dias"),
+        make_trecho("contrato.md#prazos", "lead time da Katrina"),
+        make_trecho("revisao.md#katrina", "lead time da Katrina em dias"),
     ]
     decisao = InMemoryDecisionModel(padrao=ACEITO, falhar_conflitos=True)
 
