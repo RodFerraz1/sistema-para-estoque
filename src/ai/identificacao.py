@@ -22,6 +22,8 @@ MAX_SKUS_POR_RESPOSTA = 12
 PROBABILIDADE_MINIMA_CANDIDATO = 0.15
 MAX_CANDIDATOS = 3
 
+OrigemIdentificacao = Literal["codigo", "produto", "nenhum"]
+
 
 class Identificacao(BaseModel):
     """`total_skus` conta os SKUs identificados antes do corte em `MAX_SKUS_POR_RESPOSTA`."""
@@ -30,7 +32,7 @@ class Identificacao(BaseModel):
 
     skus: list[str]
     total_skus: int
-    origem: Literal["codigo", "produto", "nenhum"]
+    origem: OrigemIdentificacao
     produto: str | None
     candidatos: list[str]
 
@@ -90,7 +92,7 @@ def identificar_skus(
 
 def _identificacao(
     skus: list[str],
-    origem: Literal["codigo", "produto", "nenhum"],
+    origem: OrigemIdentificacao,
     produto: str | None,
     candidatos: list[str],
 ) -> Identificacao:

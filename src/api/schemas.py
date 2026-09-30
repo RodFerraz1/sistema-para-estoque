@@ -7,8 +7,10 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
+from src.ai.chat import Acao, Faixa
+from src.ai.identificacao import OrigemIdentificacao
 from src.ai.schemas import Classificacao, ConflitoEntreTrechos, MotivoDescarte, Probabilidade
 from src.inventory.schemas import Cobertura, Estoque
 from src.politica_compra.schemas import ParametrosPolitica
@@ -117,3 +119,49 @@ class ResultadoBuscaResponse(BaseModel):
     modelo: str | None
     trechos: list[TrechoClassificadoResponse]
     conflitos: list[ConflitoEntreTrechos]
+
+
+class PerguntaChatRequest(BaseModel):
+    pergunta: str = Field(min_length=1, max_length=1000)
+
+
+class EscolhaResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    escolha: str
+    confianca: Probabilidade
+    probabilidades: dict[str, Probabilidade]
+
+
+class EntendimentoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    intencao: EscolhaResponse
+    produto: EscolhaResponse
+    modelo: str
+
+
+class IdentificacaoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    skus: list[str]
+    total_skus: int
+    origem: OrigemIdentificacao
+    produto: str | None
+    candidatos: list[str]
+
+
+class RespostaChatResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    resposta: str
+    acao: Acao
+    faixa: Faixa
+    entendimento: EntendimentoResponse
+    identificacao: IdentificacaoResponse | None
+    fichas: list[AnaliseSKUResponse]
+    sugestoes: list[SugestaoPedidoResponse]
+    trechos: list[TrechoClassificadoResponse]
+    conflitos: list[ConflitoEntreTrechos]
+    redator: str | None
+    registro_id: UUID | None

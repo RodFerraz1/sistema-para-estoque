@@ -5,6 +5,7 @@ from functools import lru_cache
 from fastapi import Depends
 
 from src.ai.busca import BuscaContexto
+from src.ai.chat import Copilot
 from src.ai.decisao import DecisaoIndisponivel, DecisionModel
 from src.ai.embeddings import Embedder, FastEmbedEmbedder
 from src.ai.groq import GroqRedator
@@ -12,8 +13,16 @@ from src.ai.jev import JevDecisionModel, criar_cliente
 from src.ai.postgres import PostgresTrechosRepositorio
 from src.ai.redator import Redator, RedatorSemLLM
 from src.ai.repositorio import TrechosRepositorio
+from src.catalog.dependencies import get_catalog
+from src.catalog.service import Catalog
 from src.db.config import get_settings
 from src.db.engine import get_engine
+from src.ficha_sku.dependencies import get_ficha_sku
+from src.ficha_sku.service import FichaSKU
+from src.politica_compra.dependencies import get_politica_compra_repositorio
+from src.politica_compra.repositorio import PoliticaCompraRepositorio
+from src.purchasing.dependencies import get_purchasing
+from src.purchasing.service import Purchasing
 
 
 @lru_cache(maxsize=1)
@@ -56,3 +65,15 @@ def get_busca_contexto(
     decisao: DecisionModel = Depends(get_decision_model),
 ) -> BuscaContexto:
     return BuscaContexto(embedder, repositorio, decisao)
+
+
+def get_copilot(
+    decisao: DecisionModel = Depends(get_decision_model),
+    catalog: Catalog = Depends(get_catalog),
+    ficha_sku: FichaSKU = Depends(get_ficha_sku),
+    purchasing: Purchasing = Depends(get_purchasing),
+    politicas: PoliticaCompraRepositorio = Depends(get_politica_compra_repositorio),
+    busca: BuscaContexto = Depends(get_busca_contexto),
+    redator: Redator = Depends(get_redator),
+) -> Copilot:
+    return Copilot(decisao, catalog, ficha_sku, purchasing, politicas, busca, redator)

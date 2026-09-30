@@ -6,12 +6,9 @@ from fastapi.responses import JSONResponse
 
 from src.ai.busca import K_PADRAO, BuscaContexto
 from src.ai.dependencies import get_busca_contexto
-from src.ai.schemas import ResultadoBusca, TrechoClassificado
-from src.api.schemas import (
-    AvaliacaoTrechoResponse,
-    ResultadoBuscaResponse,
-    TrechoClassificadoResponse,
-)
+from src.ai.schemas import ResultadoBusca
+from src.api.conversores import trecho_to_response
+from src.api.schemas import ResultadoBuscaResponse
 
 router = APIRouter(prefix="/rag", tags=["rag"])
 
@@ -23,32 +20,11 @@ def decisao_indisponivel(request: Request, erro: Exception) -> JSONResponse:
     )
 
 
-def _trecho_to_response(trecho: TrechoClassificado) -> TrechoClassificadoResponse:
-    return TrechoClassificadoResponse(
-        id=trecho.id,
-        documento=trecho.documento,
-        titulo=trecho.titulo,
-        tipo=trecho.tipo,
-        data=trecho.data,
-        tags=trecho.tags,
-        texto=trecho.texto,
-        similaridade=trecho.similaridade,
-        classificacao=trecho.classificacao,
-        motivo_descarte=trecho.motivo_descarte,
-        avaliacao=AvaliacaoTrechoResponse(
-            relevante=trecho.avaliacao.relevante,
-            tem_evidencia=trecho.avaliacao.tem_evidencia,
-            contradiz_premissa=trecho.avaliacao.contradiz_premissa,
-            tenta_instruir=trecho.avaliacao.tenta_instruir,
-        ),
-    )
-
-
 def _to_response(resultado: ResultadoBusca) -> ResultadoBuscaResponse:
     return ResultadoBuscaResponse(
         pergunta=resultado.pergunta,
         modelo=resultado.modelo,
-        trechos=[_trecho_to_response(t) for t in resultado.trechos],
+        trechos=[trecho_to_response(t) for t in resultado.trechos],
         conflitos=resultado.conflitos,
     )
 
