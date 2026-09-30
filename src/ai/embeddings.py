@@ -1,10 +1,15 @@
 """Port do modelo de embedding e o adapter local com fastembed (ADR-0004)."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Protocol
 
-from fastembed import TextEmbedding
+# O onnxruntime do fastembed manda telemetria em segundo plano, e um envio em andamento
+# na saída do processo aborta o Python (SIGABRT). Só vale se definida antes do import.
+os.environ.setdefault("ORT_DISABLE_TELEMETRY", "1")
+
+from fastembed import TextEmbedding  # noqa: E402
 
 DIMENSAO = 384
 
