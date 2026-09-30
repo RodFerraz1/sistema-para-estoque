@@ -1,7 +1,9 @@
 """Adapter do `DecisionModel` com o Jev (TypeSafe, System One).
 
-As perguntas são as da rodada 2 do spike, em PT, com que os `LIMIARES` da
-busca foram calibrados. Mudar a redação exige rodar o spike de novo.
+As perguntas de intenção e de trecho são as da rodada 2 do spike, em PT, com
+que as faixas do chat e os `LIMIARES` da busca foram calibrados. A de produto
+foi medida por `scripts/avaliar_entendimento.py`, que calibrou o
+`LIMIAR_PRODUTO`. Mudar a redação exige medir de novo.
 """
 from __future__ import annotations
 
@@ -11,6 +13,8 @@ from typing import Protocol
 
 import httpx2
 from typesafe_sdk import (
+    Choice,
+    ChoiceAnswer,
     JSONContent,
     Noul,
     Question,
@@ -20,9 +24,45 @@ from typesafe_sdk import (
 )
 
 from src.ai.decisao import DecisaoIndisponivel, DecisionModel
-from src.ai.schemas import AvaliacaoConflito, AvaliacaoTrecho, Trecho
+from src.ai.schemas import (
+    NENHUM_PRODUTO,
+    AvaliacaoConflito,
+    AvaliacaoTrecho,
+    Entendimento,
+    Escolha,
+    ProdutoCatalogo,
+    Trecho,
+)
 
 MAX_PARALELO = 8
+
+PERGUNTA_INTENCAO = Choice(
+    instructions="Qual é a intenção do comprador na `pergunta`?",
+    criteria={
+        "situacao_sku": "Quer saber estoque, giro ou cobertura de um SKU",
+        "sugestao_compra": "Quer saber se deve comprar e quanto",
+        "politica_ou_fornecedor": "Pergunta sobre política de compras ou fornecedor",
+        "fora_de_escopo": "Nada a ver com compras",
+    },
+)
+
+
+def pergunta_produto(produtos: Sequence[ProdutoCatalogo]) -> Choice:
+    return Choice(
+        instructions="Qual produto do catálogo a `pergunta` cita?",
+        criteria={
+            **{produto.nome: _descricao(produto) for produto in produtos},
+            NENHUM_PRODUTO: "A pergunta não cita um produto desta lista, ou cita um produto que não está nela.",
+        },
+    )
+
+
+def _descricao(produto: ProdutoCatalogo) -> str:
+    return (
+        f"Categoria {produto.categoria}. Cores: {', '.join(produto.cores)}. "
+        f"Tamanhos: {', '.join(produto.tamanhos)}. Códigos começam com {produto.prefixo}."
+    )
+
 
 PERGUNTAS_TRECHO: dict[str, Question] = {
     "relevante": Noul(
@@ -84,6 +124,22 @@ class JevDecisionModel(DecisionModel):
     def __init__(self, cliente: ClienteSystemOne) -> None:
         self._cliente = cliente
 
+    def entender_pergunta(
+        self, pergunta: str, produtos: Sequence[ProdutoCatalogo]
+    ) -> Entendimento:
+        try:
+            resposta = self._cliente.system_one(
+                {"pergunta": pergunta},
+                {"intencao": PERGUNTA_INTENCAO, "produto": pergunta_produto(produtos)},
+            )
+        except TypeSafeError as erro:
+            raise DecisaoIndisponivel(f"Jev indisponível: {erro}") from erro
+        return Entendimento(
+            intencao=_escolha(resposta.choices["intencao"]),
+            produto=_escolha(resposta.choices["produto"]),
+            modelo=resposta.model,
+        )
+
     def avaliar_trechos(
         self, pergunta: str, trechos: Sequence[Trecho]
     ) -> list[AvaliacaoTrecho]:
@@ -121,6 +177,14 @@ class JevDecisionModel(DecisionModel):
             conflitam=resposta.nouls["conflitam"].noul,
             modelo=resposta.model,
         )
+
+
+def _escolha(resposta: ChoiceAnswer) -> Escolha:
+    return Escolha(
+        escolha=resposta.choice,
+        confianca=resposta.confidence,
+        probabilidades=resposta.probabilities,
+    )
 
 
 def _trecho_para_o_state(trecho: Trecho) -> dict[str, str]:

@@ -13,7 +13,7 @@ from uuid import UUID
 
 from src.ai.embeddings import Embedder
 from src.ai.in_memory import InMemoryTrechosRepositorio
-from src.ai.schemas import Trecho, TrechoIndexado
+from src.ai.schemas import NENHUM_PRODUTO, Entendimento, Escolha, Intencao, Trecho, TrechoIndexado
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.in_memory import (
     ItemPedidoCompra,
@@ -206,3 +206,28 @@ def repositorio_com(trechos: list[Trecho], embedder: Embedder) -> InMemoryTrecho
     for documento, indexados in por_documento.items():
         repositorio.substituir_documento(documento, f"hash de {documento}", indexados)
     return repositorio
+
+
+def make_entendimento(
+    intencao: Intencao = "situacao_sku",
+    confianca: float = 0.95,
+    *,
+    produto: str = NENHUM_PRODUTO,
+    confianca_produto: float = 0.95,
+    probabilidades_intencao: dict[str, float] | None = None,
+    probabilidades_produto: dict[str, float] | None = None,
+    modelo: str = "in-memory",
+) -> Entendimento:
+    return Entendimento(
+        intencao=Escolha(
+            escolha=intencao,
+            confianca=confianca,
+            probabilidades=probabilidades_intencao or {intencao: confianca},
+        ),
+        produto=Escolha(
+            escolha=produto,
+            confianca=confianca_produto,
+            probabilidades=probabilidades_produto or {produto: confianca_produto},
+        ),
+        modelo=modelo,
+    )

@@ -10,15 +10,16 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from typesafe_sdk import JSONContent, Noul, Question, SystemOneResponse, TypeSafeAPITimeoutError
+from typesafe_sdk import Choice, JSONContent, Noul, Question, SystemOneResponse, TypeSafeAPITimeoutError
 
 from src.ai.busca import LIMIARES
 from src.ai.corpus import ler_corpus
 from src.ai.decisao import DecisaoIndisponivel
+from src.ai.identificacao import LIMIAR_PRODUTO, produtos_do_catalogo
 from src.ai.jev import JevDecisionModel, criar_cliente
 from src.ai.schemas import Trecho
 from src.db.config import get_settings
-from tests.fakes import make_trecho
+from tests.fakes import make_sku, make_trecho
 
 RAIZ = Path(__file__).resolve().parents[3]
 EVALS = RAIZ / "evals"
@@ -26,9 +27,11 @@ SPIKE_R2 = EVALS / "resultados" / "spike-2026-09-30-r2.json"
 
 
 class ClienteFalso:
-    """Responde cada `Noul` com o valor de `respostas` para o nome da pergunta, ou 0,5.
+    """Responde cada `Noul` com o valor de `respostas` para o nome da pergunta, ou 0,5,
+    e cada `Choice` com a resposta de `escolhas` para o nome, ou com a primeira opção
+    e confiança 1.
 
-    Com `falha_no_texto`, dá timeout nos pedidos cujo trecho tem esse texto.
+    Com `falha_no_texto`, dá timeout nos pedidos cujo state tem esse texto.
     """
 
     def __init__(
@@ -36,8 +39,10 @@ class ClienteFalso:
         respostas: Mapping[str, float] | None = None,
         modelo: str = "jev-1.13.0",
         falha_no_texto: str | None = None,
+        escolhas: Mapping[str, dict] | None = None,
     ) -> None:
         self.respostas = respostas or {}
+        self.escolhas = escolhas or {}
         self.modelo = modelo
         self.falha_no_texto = falha_no_texto
         self.pedidos: list[tuple[JSONContent, dict[str, Question]]] = []
@@ -50,11 +55,110 @@ class ClienteFalso:
             {
                 "model": self.modelo,
                 "usage": {"input_tokens": 100, "output_tokens": 4},
-                "answers": {
-                    nome: {"type": "noul", "noul": self.respostas.get(nome, 0.5)} for nome in questions
-                },
+                "answers": {nome: self._resposta(nome, pergunta) for nome, pergunta in questions.items()},
             }
         )
+
+    def _resposta(self, nome: str, pergunta: Question) -> dict:
+        if isinstance(pergunta, Choice):
+            primeira = next(iter(pergunta.criteria))
+            return {
+                "type": "choice",
+                **self.escolhas.get(nome, {"choice": primeira, "confidence": 1.0, "probabilities": {primeira: 1.0}}),
+            }
+        return {"type": "noul", "noul": self.respostas.get(nome, 0.5)}
+
+
+PRODUTOS = produtos_do_catalogo(
+    [
+        make_sku("TBC-BEGE-70140-01", produto_nome="Toalha Banho Conforto", cor="bege", tamanho="70x140"),
+        make_sku("TBC-BRAN-70140-03", produto_nome="Toalha Banho Conforto", cor="branco", tamanho="70x140"),
+        make_sku("TRC-BEGE-4880-01", produto_nome="Toalha Rosto Conforto", cor="bege", tamanho="48x80"),
+        make_sku("JDCP-BRAN-CASAL-02", produto_nome="Jogo de Cama Percal 200 fios", categoria="jogo_cama", cor="branco", tamanho="casal"),
+        make_sku("JDCP-BRAN-QUEEN-03", produto_nome="Jogo de Cama Percal 200 fios", categoria="jogo_cama", cor="branco", tamanho="queen"),
+    ]
+)
+
+
+def test_entendimento_vai_num_request_com_a_pergunta_no_state() -> None:
+    cliente = ClienteFalso()
+
+    JevDecisionModel(cliente).entender_pergunta("como tá a toalha conforto?", PRODUTOS)
+
+    assert [(state, sorted(perguntas)) for state, perguntas in cliente.pedidos] == [
+        ({"pergunta": "como tá a toalha conforto?"}, ["intencao", "produto"])
+    ]
+
+
+def test_intencao_e_a_calibrada_no_spike_em_pt() -> None:
+    cliente = ClienteFalso()
+    calibrada = json.loads(SPIKE_R2.read_text(encoding="utf-8"))["perguntas"]["intencao"]["pt"]["intencao"]
+
+    JevDecisionModel(cliente).entender_pergunta("como tá a toalha conforto?", PRODUTOS)
+
+    [(_, perguntas)] = cliente.pedidos
+    assert perguntas["intencao"].model_dump() == calibrada
+
+
+def test_produto_tem_uma_opcao_por_produto_do_catalogo_mais_nenhum() -> None:
+    cliente = ClienteFalso()
+
+    JevDecisionModel(cliente).entender_pergunta("como tá a toalha conforto?", PRODUTOS)
+
+    [(_, perguntas)] = cliente.pedidos
+    produto = perguntas["produto"]
+    assert isinstance(produto, Choice)
+    assert produto.instructions == "Qual produto do catálogo a `pergunta` cita?"
+    assert produto.criteria == {
+        "Jogo de Cama Percal 200 fios": "Categoria jogo_cama. Cores: branco. Tamanhos: casal, queen. Códigos começam com JDCP.",
+        "Toalha Banho Conforto": "Categoria felpudo. Cores: bege, branco. Tamanhos: 70x140. Códigos começam com TBC.",
+        "Toalha Rosto Conforto": "Categoria felpudo. Cores: bege. Tamanhos: 48x80. Códigos começam com TRC.",
+        "nenhum": "A pergunta não cita um produto desta lista, ou cita um produto que não está nela.",
+    }
+
+
+def test_respostas_viram_entendimento_com_as_probabilidades() -> None:
+    cliente = ClienteFalso(
+        modelo="jev-1.13.1",
+        escolhas={
+            "intencao": {
+                "choice": "situacao_sku",
+                "confidence": 0.71,
+                "probabilities": {
+                    "situacao_sku": 0.8,
+                    "sugestao_compra": 0.15,
+                    "politica_ou_fornecedor": 0.04,
+                    "fora_de_escopo": 0.01,
+                },
+            },
+            "produto": {
+                "choice": "Toalha Banho Conforto",
+                "confidence": 0.62,
+                "probabilities": {"Toalha Banho Conforto": 0.75, "Toalha Rosto Conforto": 0.2, "nenhum": 0.05},
+            },
+        },
+    )
+
+    entendimento = JevDecisionModel(cliente).entender_pergunta("como tá a toalha conforto?", PRODUTOS)
+
+    assert entendimento.intencao.escolha == "situacao_sku"
+    assert entendimento.intencao.confianca == 0.71
+    assert entendimento.intencao.probabilidades["sugestao_compra"] == 0.15
+    assert entendimento.produto.escolha == "Toalha Banho Conforto"
+    assert entendimento.produto.confianca == 0.62
+    assert entendimento.produto.probabilidades == {
+        "Toalha Banho Conforto": 0.75,
+        "Toalha Rosto Conforto": 0.2,
+        "nenhum": 0.05,
+    }
+    assert entendimento.modelo == "jev-1.13.1"
+
+
+def test_erro_do_sdk_no_entendimento_vira_decisao_indisponivel() -> None:
+    cliente = ClienteFalso(falha_no_texto="toalha")
+
+    with pytest.raises(DecisaoIndisponivel, match="timed out"):
+        JevDecisionModel(cliente).entender_pergunta("como tá a toalha conforto?", PRODUTOS)
 
 
 def test_cada_trecho_vai_com_a_pergunta_e_depois_sozinho_para_a_injecao() -> None:
@@ -239,3 +343,14 @@ def test_jev_real_sinaliza_o_conflito_do_lead_time_da_katrina(jev_real: JevDecis
 
     assert avaliacao.modelo == "jev-1.13.0"
     assert avaliacao.conflitam > LIMIARES.conflito
+
+
+@pytest.mark.externo
+def test_jev_real_entende_a_situacao_da_toalha_conforto_branca(jev_real: JevDecisionModel) -> None:
+    entendimento = jev_real.entender_pergunta("como tá a toalha banho conforto branca?", PRODUTOS)
+
+    assert entendimento.modelo == "jev-1.13.0"
+    assert entendimento.intencao.escolha == "situacao_sku"
+    assert entendimento.produto.escolha == "Toalha Banho Conforto"
+    assert entendimento.produto.confianca >= LIMIAR_PRODUTO
+    assert set(entendimento.produto.probabilidades) == {p.nome for p in PRODUTOS} | {"nenhum"}

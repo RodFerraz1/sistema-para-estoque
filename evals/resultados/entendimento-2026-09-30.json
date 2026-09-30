@@ -1,0 +1,820 @@
+{
+  "executado_em": "2026-09-30T18:41:10+00:00",
+  "modelo_pedido": "jev-1.13.0",
+  "perguntas": {
+    "intencao": {
+      "type": "choice",
+      "instructions": "Qual é a intenção do comprador na `pergunta`?",
+      "criteria": {
+        "situacao_sku": "Quer saber estoque, giro ou cobertura de um SKU",
+        "sugestao_compra": "Quer saber se deve comprar e quanto",
+        "politica_ou_fornecedor": "Pergunta sobre política de compras ou fornecedor",
+        "fora_de_escopo": "Nada a ver com compras"
+      }
+    },
+    "produto": {
+      "type": "choice",
+      "instructions": "Qual produto do catálogo a `pergunta` cita?",
+      "criteria": {
+        "Colcha Bouti": "Categoria jogo_cama. Cores: azul, bege, off-white. Tamanhos: casal, queen, solteiro. Códigos começam com CB.",
+        "Edredom Duplaface": "Categoria jogo_cama. Cores: bege/marrom, cinza/branco. Tamanhos: casal, queen. Códigos começam com ED.",
+        "Guardanapo Tecido": "Categoria mesa. Cores: bege, branco, verde. Tamanhos: 40x40. Códigos começam com GT.",
+        "Jogo Americano": "Categoria mesa. Cores: azul, bege, cinza. Tamanhos: 35x50. Códigos começam com JA.",
+        "Jogo de Cama Percal 200 fios": "Categoria jogo_cama. Cores: bege, branco, cinza, rosa. Tamanhos: casal, queen, solteiro. Códigos começam com JDCP.",
+        "Jogo de Cama Percal 300 fios": "Categoria jogo_cama. Cores: branco, champagne. Tamanhos: casal, king, queen. Códigos começam com JDCP.",
+        "Luva Térmica": "Categoria cozinha. Cores: azul, preto, vermelho. Tamanhos: único. Códigos começam com LT.",
+        "Pano de Prato Estampado": "Categoria cozinha. Cores: estampa1, estampa2, estampa3. Tamanhos: 45x65. Códigos começam com PDPE.",
+        "Pano Multiuso": "Categoria cozinha. Cores: amarelo, azul, verde. Tamanhos: 30x40. Códigos começam com PM.",
+        "Toalha Banho Conforto": "Categoria felpudo. Cores: azul, bege, branco, cinza. Tamanhos: 70x140. Códigos começam com TBC.",
+        "Toalha Banho Premium": "Categoria felpudo. Cores: azul-marinho, branco, grafite, vinho. Tamanhos: 80x150. Códigos começam com TBP.",
+        "Toalha de Mesa Retangular": "Categoria mesa. Cores: azul, branco, off-white, vermelho. Tamanhos: 140x220, 160x270. Códigos começam com TDMR.",
+        "Toalha de Mesa Redonda": "Categoria mesa. Cores: bege, branco, verde. Tamanhos: d160. Códigos começam com TDMR.",
+        "Toalha Piso Antiderrapante": "Categoria felpudo. Cores: azul, bege, vinho. Tamanhos: 50x70. Códigos começam com TPA.",
+        "Toalha Rosto Conforto": "Categoria felpudo. Cores: bege, branco, cinza, verde. Tamanhos: 48x80. Códigos começam com TRC.",
+        "nenhum": "A pergunta não cita um produto desta lista, ou cita um produto que não está nela."
+      }
+    }
+  },
+  "respostas": [
+    {
+      "caso": "c01",
+      "latencia_s": 0.4,
+      "entendimento": {
+        "intencao": {
+          "escolha": "situacao_sku",
+          "confianca": 1.0,
+          "probabilidades": {
+            "politica_ou_fornecedor": 0.0,
+            "situacao_sku": 1.0,
+            "fora_de_escopo": 0.0,
+            "sugestao_compra": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "Toalha Banho Conforto",
+          "confianca": 1.0,
+          "probabilidades": {
+            "Toalha Piso Antiderrapante": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Colcha Bouti": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Luva Térmica": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Jogo Americano": 0.0,
+            "Pano Multiuso": 0.0,
+            "Toalha Banho Conforto": 1.0,
+            "Edredom Duplaface": 0.0,
+            "nenhum": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Toalha de Mesa Redonda": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c02",
+      "latencia_s": 0.248,
+      "entendimento": {
+        "intencao": {
+          "escolha": "situacao_sku",
+          "confianca": 0.86,
+          "probabilidades": {
+            "politica_ou_fornecedor": 0.08,
+            "fora_de_escopo": 0.02,
+            "situacao_sku": 0.89,
+            "sugestao_compra": 0.01
+          }
+        },
+        "produto": {
+          "escolha": "Jogo de Cama Percal 200 fios",
+          "confianca": 0.97,
+          "probabilidades": {
+            "Toalha de Mesa Retangular": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Pano Multiuso": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.02,
+            "Pano de Prato Estampado": 0.0,
+            "Jogo Americano": 0.0,
+            "nenhum": 0.01,
+            "Guardanapo Tecido": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Luva Térmica": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.97,
+            "Colcha Bouti": 0.0,
+            "Toalha de Mesa Redonda": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c03",
+      "latencia_s": 0.29,
+      "entendimento": {
+        "intencao": {
+          "escolha": "situacao_sku",
+          "confianca": 1.0,
+          "probabilidades": {
+            "politica_ou_fornecedor": 0.0,
+            "situacao_sku": 1.0,
+            "sugestao_compra": 0.0,
+            "fora_de_escopo": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "Pano de Prato Estampado",
+          "confianca": 0.56,
+          "probabilidades": {
+            "Edredom Duplaface": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Luva Térmica": 0.0,
+            "Pano de Prato Estampado": 0.6,
+            "Toalha de Mesa Retangular": 0.0,
+            "Jogo Americano": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Toalha de Mesa Redonda": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Colcha Bouti": 0.0,
+            "nenhum": 0.28,
+            "Jogo de Cama Percal 200 fios": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Pano Multiuso": 0.12,
+            "Toalha Rosto Conforto": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c04",
+      "latencia_s": 0.26,
+      "entendimento": {
+        "intencao": {
+          "escolha": "situacao_sku",
+          "confianca": 0.99,
+          "probabilidades": {
+            "fora_de_escopo": 0.0,
+            "situacao_sku": 0.99,
+            "sugestao_compra": 0.01,
+            "politica_ou_fornecedor": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 0.63,
+          "probabilidades": {
+            "Toalha Piso Antiderrapante": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Jogo Americano": 0.0,
+            "Toalha Rosto Conforto": 0.34,
+            "Toalha de Mesa Redonda": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Luva Térmica": 0.0,
+            "Colcha Bouti": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "nenhum": 0.66,
+            "Pano Multiuso": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.0,
+            "Toalha Banho Conforto": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c05",
+      "latencia_s": 0.264,
+      "entendimento": {
+        "intencao": {
+          "escolha": "situacao_sku",
+          "confianca": 0.99,
+          "probabilidades": {
+            "sugestao_compra": 0.01,
+            "politica_ou_fornecedor": 0.0,
+            "fora_de_escopo": 0.0,
+            "situacao_sku": 0.99
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 0.79,
+          "probabilidades": {
+            "Luva Térmica": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Pano Multiuso": 0.0,
+            "nenhum": 0.81,
+            "Jogo de Cama Percal 300 fios": 0.05,
+            "Edredom Duplaface": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Jogo Americano": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.13,
+            "Guardanapo Tecido": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Toalha de Mesa Redonda": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Colcha Bouti": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c06",
+      "latencia_s": 0.256,
+      "entendimento": {
+        "intencao": {
+          "escolha": "sugestao_compra",
+          "confianca": 0.66,
+          "probabilidades": {
+            "fora_de_escopo": 0.0,
+            "sugestao_compra": 0.74,
+            "situacao_sku": 0.26,
+            "politica_ou_fornecedor": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "Jogo de Cama Percal 300 fios",
+          "confianca": 0.68,
+          "probabilidades": {
+            "Guardanapo Tecido": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Jogo Americano": 0.0,
+            "Pano Multiuso": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.01,
+            "Toalha de Mesa Redonda": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Luva Térmica": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.71,
+            "Colcha Bouti": 0.0,
+            "Edredom Duplaface": 0.0,
+            "nenhum": 0.28
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c07",
+      "latencia_s": 0.253,
+      "entendimento": {
+        "intencao": {
+          "escolha": "sugestao_compra",
+          "confianca": 0.97,
+          "probabilidades": {
+            "politica_ou_fornecedor": 0.02,
+            "sugestao_compra": 0.98,
+            "situacao_sku": 0.0,
+            "fora_de_escopo": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "Toalha Banho Conforto",
+          "confianca": 0.45,
+          "probabilidades": {
+            "Toalha de Mesa Retangular": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Jogo Americano": 0.0,
+            "nenhum": 0.29000000000000004,
+            "Toalha Rosto Conforto": 0.22,
+            "Toalha de Mesa Redonda": 0.0,
+            "Luva Térmica": 0.0,
+            "Colcha Bouti": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Pano Multiuso": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Toalha Banho Conforto": 0.49,
+            "Jogo de Cama Percal 200 fios": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c08",
+      "latencia_s": 0.264,
+      "entendimento": {
+        "intencao": {
+          "escolha": "sugestao_compra",
+          "confianca": 0.92,
+          "probabilidades": {
+            "situacao_sku": 0.01,
+            "fora_de_escopo": 0.0,
+            "politica_ou_fornecedor": 0.05,
+            "sugestao_compra": 0.94
+          }
+        },
+        "produto": {
+          "escolha": "Colcha Bouti",
+          "confianca": 0.57,
+          "probabilidades": {
+            "Toalha Banho Premium": 0.0,
+            "Luva Térmica": 0.0,
+            "Colcha Bouti": 0.6,
+            "Pano de Prato Estampado": 0.0,
+            "Jogo Americano": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.0,
+            "Edredom Duplaface": 0.01,
+            "Pano Multiuso": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "nenhum": 0.39,
+            "Toalha de Mesa Redonda": 0.0,
+            "Toalha Piso Antiderrapante": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c09",
+      "latencia_s": 0.244,
+      "entendimento": {
+        "intencao": {
+          "escolha": "sugestao_compra",
+          "confianca": 0.59,
+          "probabilidades": {
+            "politica_ou_fornecedor": 0.17,
+            "sugestao_compra": 0.7,
+            "fora_de_escopo": 0.0,
+            "situacao_sku": 0.13
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 0.47,
+          "probabilidades": {
+            "Toalha de Mesa Redonda": 0.0,
+            "Colcha Bouti": 0.0,
+            "Jogo Americano": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Edredom Duplaface": 0.01,
+            "Pano Multiuso": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.47,
+            "Luva Térmica": 0.0,
+            "nenhum": 0.51,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.01
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c10",
+      "latencia_s": 0.248,
+      "entendimento": {
+        "intencao": {
+          "escolha": "sugestao_compra",
+          "confianca": 1.0,
+          "probabilidades": {
+            "politica_ou_fornecedor": 0.0,
+            "fora_de_escopo": 0.0,
+            "sugestao_compra": 1.0,
+            "situacao_sku": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "Toalha de Mesa Retangular",
+          "confianca": 0.59,
+          "probabilidades": {
+            "Toalha de Mesa Retangular": 0.62,
+            "Toalha Banho Premium": 0.0,
+            "Pano Multiuso": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Jogo Americano": 0.0,
+            "nenhum": 0.27,
+            "Guardanapo Tecido": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Luva Térmica": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.0,
+            "Toalha de Mesa Redonda": 0.11,
+            "Colcha Bouti": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c11",
+      "latencia_s": 0.463,
+      "entendimento": {
+        "intencao": {
+          "escolha": "situacao_sku",
+          "confianca": 0.31,
+          "probabilidades": {
+            "situacao_sku": 0.48,
+            "sugestao_compra": 0.03,
+            "politica_ou_fornecedor": 0.46,
+            "fora_de_escopo": 0.03
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 0.96,
+          "probabilidades": {
+            "Colcha Bouti": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Jogo Americano": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.01,
+            "Jogo de Cama Percal 300 fios": 0.01,
+            "Luva Térmica": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Pano Multiuso": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Toalha de Mesa Redonda": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "nenhum": 0.98
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c12",
+      "latencia_s": 0.271,
+      "entendimento": {
+        "intencao": {
+          "escolha": "politica_ou_fornecedor",
+          "confianca": 0.99,
+          "probabilidades": {
+            "fora_de_escopo": 0.01,
+            "sugestao_compra": 0.0,
+            "politica_ou_fornecedor": 0.99,
+            "situacao_sku": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 0.99,
+          "probabilidades": {
+            "Toalha Banho Premium": 0.01,
+            "nenhum": 0.99,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Jogo Americano": 0.0,
+            "Luva Térmica": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Pano Multiuso": 0.0,
+            "Toalha de Mesa Redonda": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Colcha Bouti": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Pano de Prato Estampado": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c13",
+      "latencia_s": 0.288,
+      "entendimento": {
+        "intencao": {
+          "escolha": "politica_ou_fornecedor",
+          "confianca": 0.79,
+          "probabilidades": {
+            "fora_de_escopo": 0.0,
+            "sugestao_compra": 0.03,
+            "situacao_sku": 0.13,
+            "politica_ou_fornecedor": 0.84
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 1.0,
+          "probabilidades": {
+            "Toalha Banho Premium": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "nenhum": 1.0,
+            "Jogo Americano": 0.0,
+            "Luva Térmica": 0.0,
+            "Pano Multiuso": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Toalha de Mesa Redonda": 0.0,
+            "Colcha Bouti": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Pano de Prato Estampado": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c14",
+      "latencia_s": 0.241,
+      "entendimento": {
+        "intencao": {
+          "escolha": "politica_ou_fornecedor",
+          "confianca": 0.68,
+          "probabilidades": {
+            "sugestao_compra": 0.06,
+            "politica_ou_fornecedor": 0.76,
+            "fora_de_escopo": 0.08,
+            "situacao_sku": 0.1
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 0.95,
+          "probabilidades": {
+            "Colcha Bouti": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Guardanapo Tecido": 0.01,
+            "Jogo de Cama Percal 200 fios": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Jogo Americano": 0.0,
+            "Pano Multiuso": 0.01,
+            "Luva Térmica": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Toalha de Mesa Redonda": 0.02,
+            "nenhum": 0.96,
+            "Pano de Prato Estampado": 0.0,
+            "Toalha Rosto Conforto": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c15",
+      "latencia_s": 0.284,
+      "entendimento": {
+        "intencao": {
+          "escolha": "politica_ou_fornecedor",
+          "confianca": 1.0,
+          "probabilidades": {
+            "sugestao_compra": 0.0,
+            "fora_de_escopo": 0.0,
+            "politica_ou_fornecedor": 1.0,
+            "situacao_sku": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 0.85,
+          "probabilidades": {
+            "Luva Térmica": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Pano Multiuso": 0.0,
+            "nenhum": 0.86,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Jogo Americano": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Toalha Banho Premium": 0.05,
+            "Toalha Piso Antiderrapante": 0.03,
+            "Toalha Banho Conforto": 0.03,
+            "Toalha de Mesa Redonda": 0.0,
+            "Toalha Rosto Conforto": 0.03,
+            "Colcha Bouti": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c16",
+      "latencia_s": 0.258,
+      "entendimento": {
+        "intencao": {
+          "escolha": "fora_de_escopo",
+          "confianca": 1.0,
+          "probabilidades": {
+            "fora_de_escopo": 1.0,
+            "situacao_sku": 0.0,
+            "politica_ou_fornecedor": 0.0,
+            "sugestao_compra": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 1.0,
+          "probabilidades": {
+            "nenhum": 1.0,
+            "Colcha Bouti": 0.0,
+            "Luva Térmica": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Toalha de Mesa Redonda": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Jogo Americano": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Pano Multiuso": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c17",
+      "latencia_s": 0.277,
+      "entendimento": {
+        "intencao": {
+          "escolha": "fora_de_escopo",
+          "confianca": 1.0,
+          "probabilidades": {
+            "politica_ou_fornecedor": 0.0,
+            "situacao_sku": 0.0,
+            "fora_de_escopo": 1.0,
+            "sugestao_compra": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 1.0,
+          "probabilidades": {
+            "Jogo de Cama Percal 200 fios": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Toalha de Mesa Redonda": 0.0,
+            "Jogo Americano": 0.0,
+            "Luva Térmica": 0.0,
+            "Colcha Bouti": 0.0,
+            "nenhum": 1.0,
+            "Pano Multiuso": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Guardanapo Tecido": 0.0,
+            "Pano de Prato Estampado": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c18",
+      "latencia_s": 0.242,
+      "entendimento": {
+        "intencao": {
+          "escolha": "fora_de_escopo",
+          "confianca": 1.0,
+          "probabilidades": {
+            "fora_de_escopo": 1.0,
+            "situacao_sku": 0.0,
+            "politica_ou_fornecedor": 0.0,
+            "sugestao_compra": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 0.98,
+          "probabilidades": {
+            "Guardanapo Tecido": 0.0,
+            "Colcha Bouti": 0.0,
+            "Luva Térmica": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.01,
+            "Pano Multiuso": 0.0,
+            "Edredom Duplaface": 0.0,
+            "nenhum": 0.98,
+            "Toalha de Mesa Retangular": 0.0,
+            "Toalha de Mesa Redonda": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Jogo Americano": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.01
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c19",
+      "latencia_s": 0.279,
+      "entendimento": {
+        "intencao": {
+          "escolha": "fora_de_escopo",
+          "confianca": 1.0,
+          "probabilidades": {
+            "politica_ou_fornecedor": 0.0,
+            "situacao_sku": 0.0,
+            "sugestao_compra": 0.0,
+            "fora_de_escopo": 1.0
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 1.0,
+          "probabilidades": {
+            "Toalha Piso Antiderrapante": 0.0,
+            "Pano Multiuso": 0.0,
+            "Colcha Bouti": 0.0,
+            "Toalha de Mesa Redonda": 0.0,
+            "nenhum": 1.0,
+            "Guardanapo Tecido": 0.0,
+            "Luva Térmica": 0.0,
+            "Jogo Americano": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Jogo de Cama Percal 200 fios": 0.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Edredom Duplaface": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Toalha Banho Conforto": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c20",
+      "latencia_s": 0.327,
+      "entendimento": {
+        "intencao": {
+          "escolha": "fora_de_escopo",
+          "confianca": 1.0,
+          "probabilidades": {
+            "politica_ou_fornecedor": 0.0,
+            "situacao_sku": 0.0,
+            "fora_de_escopo": 1.0,
+            "sugestao_compra": 0.0
+          }
+        },
+        "produto": {
+          "escolha": "nenhum",
+          "confianca": 1.0,
+          "probabilidades": {
+            "Jogo de Cama Percal 200 fios": 0.0,
+            "Colcha Bouti": 0.0,
+            "Luva Térmica": 0.0,
+            "Jogo de Cama Percal 300 fios": 0.0,
+            "Pano Multiuso": 0.0,
+            "Edredom Duplaface": 0.0,
+            "nenhum": 1.0,
+            "Toalha de Mesa Retangular": 0.0,
+            "Toalha de Mesa Redonda": 0.0,
+            "Toalha Rosto Conforto": 0.0,
+            "Toalha Banho Conforto": 0.0,
+            "Toalha Banho Premium": 0.0,
+            "Jogo Americano": 0.0,
+            "Pano de Prato Estampado": 0.0,
+            "Toalha Piso Antiderrapante": 0.0,
+            "Guardanapo Tecido": 0.0
+          }
+        },
+        "modelo": "jev-1.13.0"
+      }
+    }
+  ]
+}

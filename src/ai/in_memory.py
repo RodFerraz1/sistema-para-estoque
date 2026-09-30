@@ -11,8 +11,12 @@ from src.ai.decisao import DecisaoIndisponivel, DecisionModel
 from src.ai.embeddings import DIMENSAO
 from src.ai.repositorio import TrechosRepositorio
 from src.ai.schemas import (
+    NENHUM_PRODUTO,
     AvaliacaoConflito,
     AvaliacaoTrecho,
+    Entendimento,
+    Escolha,
+    ProdutoCatalogo,
     Trecho,
     TrechoIndexado,
     TrechoRecuperado,
@@ -83,14 +87,23 @@ class Probabilidades(TypedDict, total=False):
     tenta_instruir: float
 
 
-class InMemoryDecisionModel(DecisionModel):
-    """Avaliações configuradas por trecho e por par de trechos, sem rede.
+ENTENDIMENTO_PADRAO = Entendimento(
+    intencao=Escolha(escolha="fora_de_escopo", confianca=1.0, probabilidades={"fora_de_escopo": 1.0}),
+    produto=Escolha(escolha=NENHUM_PRODUTO, confianca=1.0, probabilidades={NENHUM_PRODUTO: 1.0}),
+    modelo="in-memory",
+)
 
+
+class InMemoryDecisionModel(DecisionModel):
+    """Entendimentos configurados por pergunta e avaliações configuradas por trecho
+    e por par de trechos, sem rede.
+
+    Pergunta sem entendimento configurado recebe `entendimento_padrao`.
     Probabilidade que não foi configurada para o trecho vem de `padrao`, e o
     que também não está em `padrao` vale 0. Um par é procurado em `conflitos`
     nas duas ordens e, se não estiver lá, vale `conflito_padrao`. Com
-    `falhar_trechos` ou `falhar_conflitos`, o método correspondente lança
-    `DecisaoIndisponivel` como o Jev fora do ar.
+    `falhar_entendimento`, `falhar_trechos` ou `falhar_conflitos`, o método
+    correspondente lança `DecisaoIndisponivel` como o Jev fora do ar.
     """
 
     def __init__(
@@ -100,10 +113,16 @@ class InMemoryDecisionModel(DecisionModel):
         padrao: Probabilidades | None = None,
         conflitos: Mapping[tuple[str, str], float] | None = None,
         conflito_padrao: float = 0.0,
+        entendimentos: Mapping[str, Entendimento] | None = None,
+        entendimento_padrao: Entendimento = ENTENDIMENTO_PADRAO,
         modelo: str = "in-memory",
+        falhar_entendimento: bool = False,
         falhar_trechos: bool = False,
         falhar_conflitos: bool = False,
     ) -> None:
+        self._entendimentos = dict(entendimentos or {})
+        self._entendimento_padrao = entendimento_padrao
+        self._falhar_entendimento = falhar_entendimento
         self._avaliacoes = dict(avaliacoes or {})
         self._padrao = padrao or {}
         self._conflitos = dict(conflitos or {})
@@ -111,6 +130,13 @@ class InMemoryDecisionModel(DecisionModel):
         self._modelo = modelo
         self._falhar_trechos = falhar_trechos
         self._falhar_conflitos = falhar_conflitos
+
+    def entender_pergunta(
+        self, pergunta: str, produtos: Sequence[ProdutoCatalogo]
+    ) -> Entendimento:
+        if self._falhar_entendimento:
+            raise DecisaoIndisponivel("InMemoryDecisionModel configurado para falhar em entender_pergunta")
+        return self._entendimentos.get(pergunta, self._entendimento_padrao)
 
     def avaliar_trechos(
         self, pergunta: str, trechos: Sequence[Trecho]

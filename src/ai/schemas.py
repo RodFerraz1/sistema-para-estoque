@@ -6,9 +6,13 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.catalog.schemas import SKU
+
 Classificacao = Literal["aceito", "conflitante", "descartado"]
 MotivoDescarte = Literal["injecao", "irrelevante", "sem_evidencia"]
 Probabilidade = Annotated[float, Field(ge=0, le=1)]
+Intencao = Literal["situacao_sku", "sugestao_compra", "politica_ou_fornecedor", "fora_de_escopo"]
+NENHUM_PRODUTO = "nenhum"
 
 
 class Trecho(BaseModel):
@@ -87,3 +91,34 @@ class RelatorioIngestao(BaseModel):
     removidos: list[str]
     inalterados: list[str]
     total_trechos: int
+
+
+class Escolha[T: str](BaseModel):
+    """Resposta de uma `Choice` do modelo de decisão, sem perda."""
+
+    model_config = ConfigDict(frozen=True)
+
+    escolha: T
+    confianca: Probabilidade
+    probabilidades: dict[str, Probabilidade]
+
+
+class Entendimento(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    intencao: Escolha[Intencao]
+    produto: Escolha[str]
+    modelo: str
+
+
+class ProdutoCatalogo(BaseModel):
+    """Produto do catálogo como opção da pergunta de produto. `nome` é único na lista."""
+
+    model_config = ConfigDict(frozen=True)
+
+    nome: str
+    categoria: str
+    cores: list[str]
+    tamanhos: list[str]
+    prefixo: str
+    skus: list[SKU]

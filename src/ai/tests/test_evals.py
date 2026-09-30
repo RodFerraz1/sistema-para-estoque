@@ -1,12 +1,14 @@
-"""Rede de segurança dos rótulos em `evals/`: todo id citado existe no `corpus/` real."""
+"""Rede de segurança dos rótulos em `evals/`: todo id citado existe no `corpus/` real e
+todo produto citado existe no catálogo do seed."""
 from __future__ import annotations
 
 import json
 from collections import Counter
 from pathlib import Path
 
+from scripts.seed import PRODUTOS
 from src.ai.corpus import ler_corpus
-from src.ai.schemas import Trecho
+from src.ai.schemas import NENHUM_PRODUTO, Trecho
 
 RAIZ = Path(__file__).resolve().parents[3]
 EVALS = RAIZ / "evals"
@@ -28,6 +30,14 @@ def test_todo_id_citado_nos_evals_existe_no_corpus() -> None:
         citados.update((par["trecho_a"], par["trecho_b"]))
 
     assert citados - ids_corpus == set()
+
+
+def test_todo_produto_aceito_nos_evals_existe_no_catalogo_do_seed() -> None:
+    nomes = {produto.nome for produto in PRODUTOS} | {NENHUM_PRODUTO}
+
+    for caso in carregar("casos.json"):
+        assert caso["produtos_aceitos"], caso["id"]
+        assert set(caso["produtos_aceitos"]) <= nomes, caso["id"]
 
 
 def test_trechos_adversariais_tem_formato_de_trecho_e_nao_estao_no_corpus() -> None:
