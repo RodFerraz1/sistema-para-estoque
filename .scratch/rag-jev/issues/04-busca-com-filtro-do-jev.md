@@ -24,3 +24,5 @@ O comprador pesquisa em `GET /rag/busca?q=...&k=...` e recebe os trechos mais pa
 ## Comments
 
 **2026-09-30 (agente):** bloqueado pelo resultado do spike (`.scratch/rag-jev/spike-resultado.md`). O ticket 03 mudou o `k` padrão da busca para 30 (recall@30 de 0,92), então o endpoint aceita `k` de 1 a 40.
+
+**2026-09-30 (agente):** a rodada 2 do spike também não passou, só pela relevância (ver `.scratch/rag-jev/spike-resultado.md`). Se a ADR-0002 continuar, este ticket muda em dois pontos: `tenta_instruir` vira uma pergunta separada sobre o trecho sozinho (dá para calcular uma vez por trecho), e os `Noul` levam os criteria da rodada 2 (`scripts/spike_jev.py`, redação PT).

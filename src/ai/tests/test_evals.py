@@ -35,7 +35,7 @@ def test_trechos_adversariais_tem_formato_de_trecho_e_nao_estao_no_corpus() -> N
 
     adversariais = [Trecho.model_validate(item) for item in carregar("trechos_adversariais.json")]
 
-    assert len(adversariais) == 2
+    assert len(adversariais) == 4
     assert {trecho.id for trecho in adversariais} & ids_corpus == set()
 
 

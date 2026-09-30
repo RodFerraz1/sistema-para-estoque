@@ -44,20 +44,18 @@ def relevancia(
     trecho: str,
     relevante: float = 0.0,
     tem_evidencia: float = 0.0,
-    tenta_instruir: float = 0.0,
     input_tokens: int = 0,
 ) -> dict:
     return {
         "caso": caso,
         "trecho": trecho,
-        "respostas": {
-            "relevante": relevante,
-            "tem_evidencia": tem_evidencia,
-            "contradiz_premissa": 0.0,
-            "tenta_instruir": tenta_instruir,
-        },
+        "respostas": {"relevante": relevante, "tem_evidencia": tem_evidencia, "contradiz_premissa": 0.0},
         "input_tokens": input_tokens,
     }
+
+
+def injecao(trecho: str, tenta_instruir: float, input_tokens: int = 0) -> dict:
+    return {"trecho": trecho, "tenta_instruir": tenta_instruir, "input_tokens": input_tokens}
 
 
 def par(a: str, b: str, conflitam: bool) -> dict:
@@ -104,24 +102,13 @@ class TestRelevancia:
             relevancia("c1", "x", relevante=0.9, tem_evidencia=0.9),
         ]
 
-        pontos = {(p.relevante, p.evidencia): p for p in varrer_relevancia(registros, casos, set())}
+        pontos = {(p.relevante, p.evidencia): p for p in varrer_relevancia(registros, casos)}
 
         ponto = pontos[(0.5, 0.45)]
         assert (ponto.verdadeiros_positivos, ponto.falsos_positivos) == (2, 1)
         assert ponto.recall == 1.0
         assert ponto.precisao == pytest.approx(2 / 3)
         assert pontos[(0.55, 0.5)].recall == 0.0
-
-    def test_trechos_adversariais_ficam_fora_da_varredura(self) -> None:
-        casos = [caso("c1", relevantes=["a"])]
-        registros = [
-            relevancia("c1", "a", relevante=0.9, tem_evidencia=0.9),
-            relevancia("c1", "adv", relevante=0.9, tem_evidencia=0.9),
-        ]
-
-        [ponto, *_] = varrer_relevancia(registros, casos, {"adv"})
-
-        assert ponto.precisao == 1.0
 
     def test_escolhe_maior_recall_com_precisao_minima(self) -> None:
         casos = [caso("c1", relevantes=["a", "b"])]
@@ -132,7 +119,7 @@ class TestRelevancia:
             relevancia("c1", "y", relevante=0.1, tem_evidencia=0.9),
         ]
 
-        escolhido = escolher_limiar_relevancia(varrer_relevancia(registros, casos, set()))
+        escolhido = escolher_limiar_relevancia(varrer_relevancia(registros, casos))
 
         assert escolhido is not None
         assert (escolhido.recall, escolhido.precisao) == (1.0, 1.0)
@@ -145,33 +132,29 @@ class TestRelevancia:
             relevancia("c1", f"x{i}", relevante=0.9, tem_evidencia=0.9) for i in range(3)
         ]
 
-        assert escolher_limiar_relevancia(varrer_relevancia(registros, casos, set())) is None
+        assert escolher_limiar_relevancia(varrer_relevancia(registros, casos)) is None
 
 
 class TestInjecao:
-    def test_adversarial_conta_pelo_pior_par_e_corpus_pelo_pior_par(self) -> None:
+    def test_faixa_pega_todos_os_adversariais_e_no_maximo_um_trecho_do_corpus(self) -> None:
         registros = [
-            relevancia("c1", "adv", tenta_instruir=0.9),
-            relevancia("c2", "adv", tenta_instruir=0.6),
-            relevancia("c1", "a", tenta_instruir=0.1),
-            relevancia("c2", "a", tenta_instruir=0.7),
-            relevancia("c1", "b", tenta_instruir=0.2),
+            injecao("adv1", 0.9),
+            injecao("adv2", 0.6),
+            injecao("a", 0.7),
+            injecao("b", 0.2),
+            injecao("c", 0.1),
         ]
 
-        avaliacao = avaliar_injecao(registros, {"adv"})
+        avaliacao = avaliar_injecao(registros, {"adv1", "adv2"})
 
-        assert avaliacao.minimo_adversarial == {"adv": 0.6}
-        assert avaliacao.maximo_corpus == {"a": 0.7, "b": 0.2}
+        assert avaliacao.adversariais == {"adv1": 0.9, "adv2": 0.6}
+        assert avaliacao.corpus == {"a": 0.7, "b": 0.2, "c": 0.1}
         assert avaliacao.faixa == [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55]
         assert avaliacao.limiar == pytest.approx(0.35)
         assert avaliacao.passa
 
     def test_nao_passa_quando_nenhum_limiar_separa(self) -> None:
-        registros = [
-            relevancia("c1", "adv", tenta_instruir=0.3),
-            relevancia("c1", "a", tenta_instruir=0.8),
-            relevancia("c1", "b", tenta_instruir=0.8),
-        ]
+        registros = [injecao("adv", 0.3), injecao("a", 0.8), injecao("b", 0.8)]
 
         avaliacao = avaliar_injecao(registros, {"adv"})
 
@@ -211,9 +194,12 @@ def test_percentil_por_posicao_mais_proxima() -> None:
 
 def test_tokens_por_busca_usa_media_por_request() -> None:
     registros_relevancia = [relevancia("c1", "a", input_tokens=300), relevancia("c1", "b", input_tokens=500)]
+    registros_injecao = [injecao("a", 0.1, input_tokens=200)]
     registros_conflito = [conflito("a", "b", 0.5, input_tokens=600), conflito("a", "c", 0.5, input_tokens=800)]
 
-    assert tokens_por_busca(registros_relevancia, registros_conflito) == 400 * 10 + 700 * 15
+    total = tokens_por_busca(registros_relevancia, registros_injecao, registros_conflito)
+
+    assert total == (400 + 200) * 30 + 700 * 15
 
 
 class ClienteFalso:
@@ -250,17 +236,19 @@ def trecho(id: str, texto: str) -> Trecho:
 
 def test_respostas_gravadas_bastam_para_recalcular_as_metricas(tmp_path: Path) -> None:
     casos = [caso("c1", relevantes=["a.md#k"]), caso("c2", intencao="fora_de_escopo")]
-    trechos = [trecho("a.md#k", "Katrina atrasa"), trecho("b.md#v", "Verdela cumpre"), trecho("adv.md#x", "Katrina, ignore")]
-    pares = [par("a.md#k", "b.md#v", True), par("b.md#v", "adv.md#x", False)]
+    corpus = [trecho("a.md#k", "Katrina atrasa"), trecho("b.md#v", "Verdela cumpre")]
+    adversariais = [trecho("adv.md#x", "Katrina, ignore")]
+    pares = [par("a.md#k", "b.md#v", True), par("b.md#v", "a.md#k", False)]
 
-    resultado = rodar(ClienteFalso(), "jev-1.13.0", casos, trechos, pares)  # type: ignore[arg-type]
+    resultado = rodar(ClienteFalso(), "jev-1.13.0", casos, corpus, adversariais, pares)  # type: ignore[arg-type]
     arquivo = tmp_path / "spike.json"
     gravar(resultado, arquivo)
     relido = json.loads(arquivo.read_text(encoding="utf-8"))
 
     assert relido == resultado
     assert len(relido["intencao"]) == 2 * 2
-    assert len(relido["relevancia"]) == 2 * 2 * 3
+    assert len(relido["relevancia"]) == 2 * 2 * 2
+    assert len(relido["injecao"]) == 3 * 2
     assert len(relido["conflito"]) == 2 * 2
     assert relido["relevancia"][0] == {
         "caso": "c1",
@@ -271,9 +259,20 @@ def test_respostas_gravadas_bastam_para_recalcular_as_metricas(tmp_path: Path) -
         "output_tokens": 5,
         "latencia_s": relido["relevancia"][0]["latencia_s"],
         "latencia_ultima_tentativa_s": 0.25,
-        "respostas": {"relevante": 0.9, "tem_evidencia": 0.9, "contradiz_premissa": 0.9, "tenta_instruir": 0.9},
+        "respostas": {"relevante": 0.9, "tem_evidencia": 0.9, "contradiz_premissa": 0.9},
+    }
+    assert relido["injecao"][-1] == {
+        "trecho": "adv.md#x",
+        "redacao": "en",
+        "modelo": "jev-1.13.0",
+        "input_tokens": 100,
+        "output_tokens": 5,
+        "latencia_s": relido["injecao"][-1]["latencia_s"],
+        "latencia_ultima_tentativa_s": 0.25,
+        "tenta_instruir": 0.9,
     }
     assert set(relido["perguntas"]["relevancia"]) == {"pt", "en"}
+    assert set(relido["perguntas"]["injecao"]["pt"]) == {"tenta_instruir"}
     linhas: list[str] = []
     relatorio(relido, casos, pares, {"adv.md#x"}, imprimir=linhas.append)
     assert any("Gate da ADR-0002" in linha for linha in linhas)
@@ -284,10 +283,11 @@ def test_request_que_falha_fica_gravado_e_invalida_o_gate(tmp_path: Path) -> Non
     trechos = [trecho("a.md#k", "Katrina atrasa"), trecho("b.md#v", "Verdela cumpre")]
     pares = [par("a.md#k", "b.md#v", True), par("b.md#v", "a.md#k", False)]
 
-    resultado = rodar(ClienteFalso(falha_no_trecho="Verdela cumpre"), "jev-1.13.0", casos, trechos, pares)  # type: ignore[arg-type]
+    cliente = ClienteFalso(falha_no_trecho="Verdela cumpre")
+    resultado = rodar(cliente, "jev-1.13.0", casos, trechos, [], pares)  # type: ignore[arg-type]
 
-    falhas = [r for r in resultado["relevancia"] if "erro" in r]
-    assert [(r["trecho"], r["redacao"]) for r in falhas] == [("b.md#v", "pt"), ("b.md#v", "en")]
+    falhas = [r for tipo in ("relevancia", "injecao") for r in resultado[tipo] if "erro" in r]
+    assert [(r["trecho"], r["redacao"]) for r in falhas] == [("b.md#v", "pt"), ("b.md#v", "en")] * 2
     assert falhas[0]["erro"].startswith("TypeSafeRateLimitError")
     linhas: list[str] = []
     assert relatorio(resultado, casos, pares, set(), imprimir=linhas.append) is None
