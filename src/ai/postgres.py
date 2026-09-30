@@ -1,4 +1,5 @@
-"""Implementação Postgres do `TrechosRepositorio` sobre `copilot.trechos_corpus`.
+"""Adapters Postgres do módulo `ai`: `TrechosRepositorio` sobre
+`copilot.trechos_corpus` e `RegistrosDecisao` sobre `copilot.registros_decisao`.
 
 A similaridade é 1 - distância de cosseno (operador `<=>` do pgvector). Sem
 índice vetorial: com poucas centenas de linhas a busca exata é suficiente.
@@ -7,9 +8,11 @@ from __future__ import annotations
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Engine
 
 from src.ai.embeddings import DIMENSAO
+from src.ai.registro import RegistroDecisao, RegistrosDecisao
 from src.ai.repositorio import TrechosRepositorio
 from src.ai.schemas import TrechoIndexado, TrechoRecuperado
 
@@ -62,3 +65,33 @@ class PostgresTrechosRepositorio(TrechosRepositorio):
         with self._engine.connect() as conn:
             rows = conn.execute(_BUSCAR, {"vetor": vetor, "k": k}).all()
         return [TrechoRecuperado.model_validate(row._asdict()) for row in rows]
+
+
+_CAMPOS_REGISTRO = list(RegistroDecisao.model_fields)
+
+_INSERT_REGISTRO = text(
+    f"INSERT INTO copilot.registros_decisao ({', '.join(_CAMPOS_REGISTRO)}) "
+    f"VALUES ({', '.join(f':{c}' for c in _CAMPOS_REGISTRO)})"
+).bindparams(bindparam("entendimento", type_=JSONB))
+
+_LISTAR_REGISTROS = text(
+    f"SELECT {', '.join(_CAMPOS_REGISTRO)} FROM copilot.registros_decisao "
+    "ORDER BY criado_em DESC LIMIT :limite"
+)
+
+
+class PostgresRegistrosDecisao(RegistrosDecisao):
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+
+    def gravar(self, registro: RegistroDecisao) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                _INSERT_REGISTRO,
+                {**registro.model_dump(), "entendimento": registro.entendimento.model_dump(mode="json")},
+            )
+
+    def listar(self, limite: int) -> list[RegistroDecisao]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(_LISTAR_REGISTROS, {"limite": limite}).all()
+        return [RegistroDecisao.model_validate(row._asdict()) for row in rows]

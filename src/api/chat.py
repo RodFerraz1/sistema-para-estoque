@@ -1,11 +1,12 @@
-"""Endpoint HTTP do chat do Copilot."""
+"""Endpoints HTTP do chat do Copilot e dos registros de decisão."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from src.ai.chat import Copilot, RespostaCopilot
-from src.ai.dependencies import get_copilot
+from src.ai.dependencies import get_copilot, get_registros_decisao
 from src.ai.identificacao import Identificacao
+from src.ai.registro import RegistroDecisao, RegistrosDecisao
 from src.ai.schemas import Entendimento, Escolha
 from src.api.conversores import ficha_to_response, sugestao_to_response, trecho_to_response
 from src.api.schemas import (
@@ -13,6 +14,7 @@ from src.api.schemas import (
     EscolhaResponse,
     IdentificacaoResponse,
     PerguntaChatRequest,
+    RegistroDecisaoResponse,
     RespostaChatResponse,
 )
 
@@ -65,9 +67,35 @@ def _to_response(resposta: RespostaCopilot) -> RespostaChatResponse:
     )
 
 
+def _registro_to_response(registro: RegistroDecisao) -> RegistroDecisaoResponse:
+    return RegistroDecisaoResponse(
+        id=registro.id,
+        criado_em=registro.criado_em,
+        pergunta=registro.pergunta,
+        intencao=registro.intencao,
+        confianca=registro.confianca,
+        faixa=registro.faixa,
+        acao=registro.acao,
+        skus=registro.skus,
+        entendimento=_entendimento_to_response(registro.entendimento),
+        trechos=registro.trechos,
+        redator=registro.redator,
+        resposta=registro.resposta,
+        duracao_ms=registro.duracao_ms,
+    )
+
+
 @router.post("", response_model=RespostaChatResponse)
 def chat(
     corpo: PerguntaChatRequest,
     copilot: Copilot = Depends(get_copilot),
 ) -> RespostaChatResponse:
     return _to_response(copilot.responder(corpo.pergunta))
+
+
+@router.get("/registros", response_model=list[RegistroDecisaoResponse])
+def listar_registros(
+    limite: int = Query(20, ge=1, le=100),
+    registros: RegistrosDecisao = Depends(get_registros_decisao),
+) -> list[RegistroDecisaoResponse]:
+    return [_registro_to_response(r) for r in registros.listar(limite)]

@@ -5,10 +5,12 @@ Esclarecimento e fora de escopo são respostas feitas em código, sem redator.
 """
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Literal, get_args
-from uuid import UUID
+from datetime import UTC, datetime
+from typing import get_args
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict
 
@@ -17,17 +19,14 @@ from src.ai.contexto import Montagem, renderizar_contexto
 from src.ai.decisao import DecisionModel
 from src.ai.identificacao import Identificacao, identificar_skus, produtos_do_catalogo
 from src.ai.redator import Redator, RedatorIndisponivel, RedatorSemLLM
-from src.ai.schemas import ConflitoEntreTrechos, Entendimento, Intencao, TrechoClassificado
+from src.ai.registro import RegistroDecisao, RegistrosDecisao
+from src.ai.schemas import Acao, ConflitoEntreTrechos, Entendimento, Faixa, Intencao, TrechoClassificado
 from src.catalog.service import Catalog
 from src.ficha_sku.schemas import Ficha
 from src.ficha_sku.service import FichaSKU, SKUSemEstoque
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.purchasing.schemas import SugestaoPedido
 from src.purchasing.service import Purchasing
-
-Faixa = Literal["alta", "media", "baixa"]
-Acao = Literal["respondeu", "confirmou_e_respondeu", "pediu_esclarecimento", "fora_de_escopo"]
-
 
 @dataclass(frozen=True)
 class FaixasConfianca:
@@ -77,7 +76,7 @@ class RespostaCopilot(BaseModel):
     trechos: list[TrechoClassificado]
     conflitos: list[ConflitoEntreTrechos]
     redator: str | None
-    registro_id: UUID | None = None
+    registro_id: UUID
 
 
 class Copilot:
@@ -90,6 +89,7 @@ class Copilot:
         politicas: PoliticaCompraRepositorio,
         busca: BuscaContexto,
         redator: Redator,
+        registros: RegistrosDecisao,
     ) -> None:
         self._decisao = decisao
         self._catalog = catalog
@@ -98,9 +98,19 @@ class Copilot:
         self._politicas = politicas
         self._busca = busca
         self._redator = redator
+        self._registros = registros
 
     def responder(self, pergunta: str) -> RespostaCopilot:
-        """Propaga `DecisaoIndisponivel`: sem entendimento não há roteamento."""
+        """Grava um registro de decisão por resposta. Propaga `DecisaoIndisponivel`
+        (sem entendimento não há roteamento nem registro) e a falha ao gravar
+        (o registro é requisito de auditoria)."""
+        inicio = time.perf_counter()
+        resposta = self._decidir(pergunta, uuid4())
+        duracao_ms = round((time.perf_counter() - inicio) * 1000)
+        self._registros.gravar(_registro(pergunta, resposta, duracao_ms))
+        return resposta
+
+    def _decidir(self, pergunta: str, registro_id: UUID) -> RespostaCopilot:
         produtos = produtos_do_catalogo(self._catalog.listar_skus())
         entendimento = self._decisao.entender_pergunta(pergunta, produtos)
         faixa = _faixa(entendimento.intencao.confianca)
@@ -120,6 +130,7 @@ class Copilot:
                 trechos=[],
                 conflitos=[],
                 redator=None,
+                registro_id=registro_id,
             )
 
         if faixa == "baixa":
@@ -152,6 +163,7 @@ class Copilot:
             trechos=montagem.trechos,
             conflitos=montagem.conflitos,
             redator=redator,
+            registro_id=registro_id,
         )
 
     def _montar(
@@ -203,6 +215,24 @@ class Copilot:
             observacao = f"O redator {self._redator.nome} falhou; a resposta vai sem redação."
             montagem = montagem.model_copy(update={"observacoes": [*montagem.observacoes, observacao]})
             return sem_llm.redigir(pergunta, renderizar_contexto(montagem)), sem_llm.nome
+
+
+def _registro(pergunta: str, resposta: RespostaCopilot, duracao_ms: int) -> RegistroDecisao:
+    return RegistroDecisao(
+        id=resposta.registro_id,
+        criado_em=datetime.now(UTC),
+        pergunta=pergunta,
+        intencao=resposta.entendimento.intencao.escolha,
+        confianca=resposta.entendimento.intencao.confianca,
+        faixa=resposta.faixa,
+        acao=resposta.acao,
+        skus=resposta.identificacao.skus if resposta.identificacao else [],
+        entendimento=resposta.entendimento,
+        trechos=[t.id for t in resposta.trechos],
+        redator=resposta.redator,
+        resposta=resposta.resposta,
+        duracao_ms=duracao_ms,
+    )
 
 
 def _por_sku[T](skus: Sequence[str], ler: Callable[[str], T | None], observacoes: list[str]) -> list[T]:

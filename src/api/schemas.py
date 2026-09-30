@@ -9,9 +9,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.ai.chat import Acao, Faixa
 from src.ai.identificacao import OrigemIdentificacao
-from src.ai.schemas import Classificacao, ConflitoEntreTrechos, MotivoDescarte, Probabilidade
+from src.ai.schemas import Acao, Classificacao, ConflitoEntreTrechos, Faixa, Intencao, MotivoDescarte, Probabilidade
 from src.inventory.schemas import Cobertura, Estoque
 from src.politica_compra.schemas import ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
@@ -164,4 +163,22 @@ class RespostaChatResponse(BaseModel):
     trechos: list[TrechoClassificadoResponse]
     conflitos: list[ConflitoEntreTrechos]
     redator: str | None
-    registro_id: UUID | None
+    registro_id: UUID
+
+
+class RegistroDecisaoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    criado_em: datetime
+    pergunta: str
+    intencao: Intencao
+    confianca: Probabilidade
+    faixa: Faixa
+    acao: Acao
+    skus: list[str]
+    entendimento: EntendimentoResponse
+    trechos: list[str]
+    redator: str | None
+    resposta: str
+    duracao_ms: int

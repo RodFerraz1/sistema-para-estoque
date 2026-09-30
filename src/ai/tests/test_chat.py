@@ -17,6 +17,7 @@ from src.ai.decisao import DecisaoIndisponivel
 from src.ai.identificacao import MAX_SKUS_POR_RESPOSTA
 from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel, Probabilidades
 from src.ai.redator import Redator
+from src.ai.registro import InMemoryRegistrosDecisao, RegistroDecisao
 from src.ai.schemas import Entendimento, Trecho
 from src.catalog.schemas import SKU
 from src.catalog.service import Catalog
@@ -76,6 +77,7 @@ def copilot(
     falhar_entendimento: bool = False,
     falhar_busca: bool = False,
     adapter: InMemoryERPAdapter | None = None,
+    registros: InMemoryRegistrosDecisao | None = None,
 ) -> Copilot:
     """Com `falhar_busca`, o Jev falha se a busca no corpus for chamada."""
     adapter = adapter or erp()
@@ -102,6 +104,7 @@ def copilot(
         politicas,
         busca,
         redator or RedatorGravador(),
+        registros if registros is not None else InMemoryRegistrosDecisao(),
     )
 
 
@@ -131,7 +134,6 @@ def test_situacao_do_sku_pelo_codigo_redige_com_a_ficha_e_a_politica() -> None:
     assert resposta.identificacao.origem == "codigo"
     assert [f.sku.sku_code for f in resposta.fichas] == ["TBC-BEGE-70140-01"]
     assert resposta.sugestoes == resposta.trechos == resposta.conflitos == []
-    assert resposta.registro_id is None
     [(pergunta_redigida, contexto)] = redator.chamadas
     assert pergunta_redigida == pergunta
     assert "## Fichas de SKU (dados do ERP)" in contexto
@@ -362,12 +364,16 @@ def test_queda_do_redator_cai_no_sem_llm_com_a_observacao() -> None:
     assert resposta.resposta.endswith("- O redator groq:modelo falhou; a resposta vai sem redação.")
 
 
-def test_jev_fora_do_ar_propaga_decisao_indisponivel() -> None:
+def test_jev_fora_do_ar_propaga_decisao_indisponivel_sem_registro() -> None:
     redator = RedatorGravador()
+    registros = InMemoryRegistrosDecisao()
 
     with pytest.raises(DecisaoIndisponivel):
-        copilot(make_entendimento(), redator=redator, falhar_entendimento=True).responder(PERGUNTA)
+        copilot(
+            make_entendimento(), redator=redator, falhar_entendimento=True, registros=registros
+        ).responder(PERGUNTA)
     assert redator.chamadas == []
+    assert registros.listar(10) == []
 
 
 def test_so_trechos_aceitos_e_conflitantes_chegam_ao_contexto_ate_o_maximo() -> None:
@@ -410,3 +416,101 @@ def test_so_conflitos_entre_trechos_que_foram_ao_contexto() -> None:
     [conflito] = resposta.conflitos
     assert {conflito.trecho_a, conflito.trecho_b} == {"contratos/katrina.md#prazos", "reunioes/q1.md#katrina"}
     assert "## Conflitos entre trechos" in contexto_de(redator)
+
+
+def test_resposta_redigida_grava_o_registro_e_devolve_o_id() -> None:
+    registros = InMemoryRegistrosDecisao()
+    entendimento = make_entendimento("situacao_sku", 0.95, produto=TOALHA, confianca_produto=0.9)
+    pergunta = "Como tá a toalha banho conforto bege?"
+
+    resposta = copilot(
+        entendimento, redator=RedatorGravador("A toalha bege tem 40 unidades."), registros=registros
+    ).responder(pergunta)
+
+    [registro] = registros.listar(10)
+    assert registro.id == resposta.registro_id
+    assert registro.model_dump(exclude={"id", "criado_em", "duracao_ms"}) == {
+        "pergunta": pergunta,
+        "intencao": "situacao_sku",
+        "confianca": 0.95,
+        "faixa": "alta",
+        "acao": "respondeu",
+        "skus": ["TBC-BEGE-70140-01"],
+        "entendimento": entendimento.model_dump(),
+        "trechos": [],
+        "redator": "gravador",
+        "resposta": "A toalha bege tem 40 unidades.",
+    }
+    assert registro.criado_em.tzinfo is not None
+    assert registro.duracao_ms >= 0
+
+
+def test_registro_guarda_os_ids_dos_trechos_que_foram_ao_redator() -> None:
+    registros = InMemoryRegistrosDecisao()
+
+    resposta = copilot(
+        make_entendimento("politica_ou_fornecedor", 0.95),
+        trechos=[make_trecho("contratos/katrina.md#prazos"), make_trecho("descartados.md#d")],
+        avaliacoes={"contratos/katrina.md#prazos": ACEITO, "descartados.md#d": DESCARTADO},
+        registros=registros,
+    ).responder(PERGUNTA)
+
+    [registro] = registros.listar(10)
+    assert registro.trechos == [t.id for t in resposta.trechos] == ["contratos/katrina.md#prazos"]
+
+
+def test_confirmacao_e_queda_do_redator_ficam_no_registro() -> None:
+    registros = InMemoryRegistrosDecisao()
+
+    resposta = copilot(
+        make_entendimento("situacao_sku", 0.6),
+        redator=RedatorGravador(nome="groq:modelo", falhar=True),
+        registros=registros,
+    ).responder("Situação do TBC-BEGE-70140-01")
+
+    [registro] = registros.listar(10)
+    assert (registro.faixa, registro.acao, registro.redator) == ("media", "confirmou_e_respondeu", "sem_llm")
+    assert registro.resposta == resposta.resposta
+
+
+@pytest.mark.parametrize(
+    ("entendimento", "pergunta", "acao"),
+    [
+        pytest.param(make_entendimento("situacao_sku", 0.31), PERGUNTA, "pediu_esclarecimento", id="intencao"),
+        pytest.param(make_entendimento("situacao_sku", 0.95), "Como tá o estoque?", "pediu_esclarecimento", id="sku"),
+        pytest.param(make_entendimento("fora_de_escopo", 0.95), "Quem ganhou o jogo?", "fora_de_escopo", id="fora-de-escopo"),
+    ],
+)
+def test_resposta_em_codigo_tambem_grava_o_registro(entendimento: Entendimento, pergunta: str, acao: str) -> None:
+    registros = InMemoryRegistrosDecisao()
+
+    resposta = copilot(entendimento, registros=registros, falhar_busca=True).responder(pergunta)
+
+    [registro] = registros.listar(10)
+    assert registro.id == resposta.registro_id
+    assert registro.acao == acao
+    assert registro.skus == []
+    assert registro.trechos == []
+    assert registro.redator is None
+    assert registro.resposta == resposta.resposta
+
+
+def test_cada_pergunta_grava_um_registro_proprio() -> None:
+    registros = InMemoryRegistrosDecisao()
+    instancia = copilot(make_entendimento("fora_de_escopo", 0.95), registros=registros)
+
+    primeira = instancia.responder("Quem ganhou o jogo?")
+    segunda = instancia.responder("Vai chover amanhã?")
+
+    assert primeira.registro_id != segunda.registro_id
+    assert [r.pergunta for r in registros.listar(10)] == ["Vai chover amanhã?", "Quem ganhou o jogo?"]
+
+
+class RegistrosForaDoAr(InMemoryRegistrosDecisao):
+    def gravar(self, registro: RegistroDecisao) -> None:
+        raise ConnectionError("banco fora do ar")
+
+
+def test_falha_ao_gravar_o_registro_derruba_a_resposta() -> None:
+    with pytest.raises(ConnectionError):
+        copilot(make_entendimento("fora_de_escopo", 0.95), registros=RegistrosForaDoAr()).responder(PERGUNTA)

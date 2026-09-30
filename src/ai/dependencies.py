@@ -10,8 +10,9 @@ from src.ai.decisao import DecisaoIndisponivel, DecisionModel
 from src.ai.embeddings import Embedder, FastEmbedEmbedder
 from src.ai.groq import GroqRedator
 from src.ai.jev import JevDecisionModel, criar_cliente
-from src.ai.postgres import PostgresTrechosRepositorio
+from src.ai.postgres import PostgresRegistrosDecisao, PostgresTrechosRepositorio
 from src.ai.redator import Redator, RedatorSemLLM
+from src.ai.registro import RegistrosDecisao
 from src.ai.repositorio import TrechosRepositorio
 from src.catalog.dependencies import get_catalog
 from src.catalog.service import Catalog
@@ -33,6 +34,10 @@ def get_embedder() -> Embedder:
 
 def get_trechos_repositorio() -> TrechosRepositorio:
     return PostgresTrechosRepositorio(get_engine())
+
+
+def get_registros_decisao() -> RegistrosDecisao:
+    return PostgresRegistrosDecisao(get_engine())
 
 
 def get_decision_model() -> DecisionModel:
@@ -75,5 +80,6 @@ def get_copilot(
     politicas: PoliticaCompraRepositorio = Depends(get_politica_compra_repositorio),
     busca: BuscaContexto = Depends(get_busca_contexto),
     redator: Redator = Depends(get_redator),
+    registros: RegistrosDecisao = Depends(get_registros_decisao),
 ) -> Copilot:
-    return Copilot(decisao, catalog, ficha_sku, purchasing, politicas, busca, redator)
+    return Copilot(decisao, catalog, ficha_sku, purchasing, politicas, busca, redator, registros)

@@ -12,6 +12,8 @@ Classificacao = Literal["aceito", "conflitante", "descartado"]
 MotivoDescarte = Literal["injecao", "irrelevante", "sem_evidencia"]
 Probabilidade = Annotated[float, Field(ge=0, le=1)]
 Intencao = Literal["situacao_sku", "sugestao_compra", "politica_ou_fornecedor", "fora_de_escopo"]
+Faixa = Literal["alta", "media", "baixa"]
+Acao = Literal["respondeu", "confirmou_e_respondeu", "pediu_esclarecimento", "fora_de_escopo"]
 NENHUM_PRODUTO = "nenhum"
 
 
