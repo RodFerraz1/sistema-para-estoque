@@ -18,10 +18,10 @@
     "motivo": "Lead time contratado (45 dias) contra observado (62 dias, operar com 65-70 dias de antecedência)."
   },
   {
-    "trecho_a": "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
-    "trecho_b": "reunioes/2024-11-natal-king-size.md#decisao",
+    "trecho_a": "fornecedores/katrina-textil.md#linhas-ativas",
+    "trecho_b": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
     "conflitam": true,
-    "motivo": "A política limita a 3 meses de giro; a decisão comprou 5 meses de giro do king size."
+    "motivo": "A ficha da Katrina diz que o percal king tem histórico de estoque parado; a reunião diz que o king tem menos risco de encalhe que o queen, com giro estável."
   },
   {
     "trecho_a": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
