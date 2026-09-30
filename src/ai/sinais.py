@@ -10,7 +10,14 @@ from typing import get_args
 
 from src.ai.busca import BuscaContexto
 from src.ai.decisao import DecisionModel
-from src.ai.schemas import AvaliacaoSinais, ProdutoDoSinal, SinalCorpus, TipoSinal
+from src.ai.schemas import (
+    AvaliacaoSinais,
+    ProdutoDoSinal,
+    SinaisDasSugestoes,
+    SinalCorpus,
+    TipoSinal,
+    TrechoClassificado,
+)
 from src.catalog.schemas import SKU
 from src.purchasing.schemas import SugestaoPedido
 
@@ -40,13 +47,19 @@ class SinaisCorpus:
         """Sugestão sem fornecedor não tem sinal. Propaga `DecisaoIndisponivel`."""
         if sugestao.fornecedor is None:
             return []
-        return self._sinais(sugestao.fornecedor.fornecedor_nome, _produto(sku))
+        sinais, _ = self._sinais(sugestao.fornecedor.fornecedor_nome, _produto(sku))
+        return sinais
 
     def para_sugestoes(
         self, pares: Sequence[tuple[SugestaoPedido, SKU]]
     ) -> dict[str, list[SinalCorpus]]:
         """Sinais por `sku_code`, calculados uma vez por par (fornecedor, produto)."""
-        calculados: dict[tuple[str, ProdutoDoSinal], list[SinalCorpus]] = {}
+        return self.para_sugestoes_com_trechos(pares).por_sku
+
+    def para_sugestoes_com_trechos(self, pares: Sequence[tuple[SugestaoPedido, SKU]]) -> SinaisDasSugestoes:
+        """Como `para_sugestoes`, com os trechos de origem dos sinais, para quem precisa
+        mostrar ou citar esses trechos."""
+        calculados: dict[tuple[str, ProdutoDoSinal], tuple[list[SinalCorpus], list[TrechoClassificado]]] = {}
         por_sku: dict[str, list[SinalCorpus]] = {}
         for sugestao, sku in pares:
             if sugestao.fornecedor is None:
@@ -55,10 +68,18 @@ class SinaisCorpus:
             par = (sugestao.fornecedor.fornecedor_nome, _produto(sku))
             if par not in calculados:
                 calculados[par] = self._sinais(*par)
-            por_sku[sugestao.sku_code] = calculados[par]
-        return por_sku
+            por_sku[sugestao.sku_code] = calculados[par][0]
+        trechos: dict[str, TrechoClassificado] = {}
+        for sinais, avaliados in calculados.values():
+            por_id = {t.id: t for t in avaliados}
+            for trecho_id in (i for sinal in sinais for i in sinal.trechos):
+                trechos.setdefault(trecho_id, por_id[trecho_id])
+        return SinaisDasSugestoes(por_sku=por_sku, trechos=list(trechos.values()))
 
-    def _sinais(self, fornecedor: str, produto: ProdutoDoSinal) -> list[SinalCorpus]:
+    def _sinais(
+        self, fornecedor: str, produto: ProdutoDoSinal
+    ) -> tuple[list[SinalCorpus], list[TrechoClassificado]]:
+        """Os sinais e os trechos que foram ao modelo de decisão."""
         consulta = f"{fornecedor} e {produto.nome}: atrasos de entrega, vendas por época do ano e estoque encalhado"
         resultado = self._busca.buscar(consulta, k=K_SINAIS, com_conflitos=False)
         trechos = sorted(
@@ -67,13 +88,14 @@ class SinaisCorpus:
             reverse=True,
         )[:MAX_TRECHOS_SINAIS]
         if not trechos:
-            return []
+            return [], []
         avaliacoes = self._decisao.avaliar_sinais(fornecedor, produto, trechos)
-        return [
+        sinais = [
             sinal
             for tipo in get_args(TipoSinal)
             if (sinal := _sinal(tipo, fornecedor, produto, avaliacoes)) is not None
         ]
+        return sinais, trechos
 
 
 def _sinal(

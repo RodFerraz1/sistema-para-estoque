@@ -1,13 +1,15 @@
 """Testes do `Copilot` com ERP, política, busca, Jev e redator em memória."""
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping, Sequence
 from datetime import UTC, datetime
 
 import pytest
 
 from src.ai.busca import BuscaContexto
 from src.ai.chat import (
+    AVISO_SEM_SINAIS,
+    AVISO_SEM_VERIFICACAO,
     FAIXAS,
     MAX_TRECHOS_NO_CONTEXTO,
     RESPOSTA_FORA_DE_ESCOPO,
@@ -15,9 +17,16 @@ from src.ai.chat import (
 )
 from src.ai.decisao import DecisaoIndisponivel
 from src.ai.identificacao import MAX_SKUS_POR_RESPOSTA
-from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel, InMemoryRegistrosDecisao, Probabilidades
-from src.ai.redator import Redator
-from src.ai.schemas import Entendimento, RegistroDecisao, Trecho
+from src.ai.in_memory import (
+    FakeEmbedder,
+    InMemoryDecisionModel,
+    InMemoryRegistrosDecisao,
+    Probabilidades,
+    ProbabilidadesSinais,
+)
+from src.ai.redator import Redator, RedatorSemLLM
+from src.ai.schemas import AvaliacaoTrecho, Entendimento, Escolha, RegistroDecisao, Relacao, Trecho
+from src.ai.sinais import SinaisCorpus
 from src.catalog.schemas import SKU
 from src.catalog.service import Catalog
 from src.erp_adapter.in_memory import InMemoryERPAdapter
@@ -32,6 +41,7 @@ from tests.fakes import (
     make_estoque,
     make_fornecedor,
     make_fornecedor_sku,
+    make_relacao,
     make_sku,
     make_trecho,
     make_venda,
@@ -66,6 +76,22 @@ def erp(skus: list[SKU] | None = None, *, sem_estoque: set[str] = frozenset()) -
     )
 
 
+class DecisaoComTrechosSoNosSinais(InMemoryDecisionModel):
+    """Descarta os trechos de `so_nos_sinais` em toda busca que não é a focada dos sinais."""
+
+    def __init__(self, *args, so_nos_sinais: Collection[str], **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._so_nos_sinais = set(so_nos_sinais)
+
+    def avaliar_trechos(self, pergunta: str, trechos: Sequence[Trecho]) -> list[AvaliacaoTrecho]:
+        avaliacoes = super().avaliar_trechos(pergunta, trechos)
+        if "atrasos de entrega, vendas por época do ano e estoque encalhado" in pergunta:
+            return avaliacoes
+        return [
+            a.model_copy(update={"relevante": 0.0}) if a.trecho_id in self._so_nos_sinais else a for a in avaliacoes
+        ]
+
+
 def copilot(
     entendimento: Entendimento,
     *,
@@ -73,25 +99,36 @@ def copilot(
     trechos: list[Trecho] | None = None,
     avaliacoes: Mapping[str, Probabilidades] | None = None,
     conflitos: Mapping[tuple[str, str], float] | None = None,
+    sinais: Mapping[str, ProbabilidadesSinais] | None = None,
+    citacoes: Mapping[str, Escolha[Relacao]] | None = None,
     falhar_entendimento: bool = False,
     falhar_busca: bool = False,
+    falhar_sinais: bool = False,
+    falhar_citacoes: bool = False,
+    so_nos_sinais: Collection[str] = (),
     adapter: InMemoryERPAdapter | None = None,
     registros: InMemoryRegistrosDecisao | None = None,
 ) -> Copilot:
-    """Com `falhar_busca`, o Jev falha se a busca no corpus for chamada."""
+    """Com `falhar_busca`, o Jev falha se a busca no corpus for chamada. Os trechos de
+    `so_nos_sinais` só são aceitos na busca focada dos sinais."""
     adapter = adapter or erp()
     catalog = Catalog(adapter)
     sales = Sales(adapter, now=NOW)
     inventory = Inventory(adapter, sales)
     ficha_sku = FichaSKU(catalog, inventory, sales)
     politicas = InMemoryPoliticaCompraRepositorio(now=NOW)
-    decisao = InMemoryDecisionModel(
+    decisao = DecisaoComTrechosSoNosSinais(
         avaliacoes,
+        so_nos_sinais=so_nos_sinais,
         conflitos=conflitos,
         entendimento_padrao=entendimento,
         falhar_entendimento=falhar_entendimento,
         falhar_trechos=falhar_busca,
         falhar_conflitos=falhar_busca,
+        sinais=sinais,
+        citacoes=citacoes,
+        falhar_sinais=falhar_sinais,
+        falhar_citacoes=falhar_citacoes,
     )
     embedder = FakeEmbedder()
     busca = BuscaContexto(embedder, repositorio_com(trechos or [], embedder), decisao)
@@ -102,6 +139,7 @@ def copilot(
         Purchasing(ficha_sku, inventory, sales, politicas, now=NOW),
         politicas,
         busca,
+        SinaisCorpus(busca, decisao),
         redator or RedatorGravador(),
         registros if registros is not None else InMemoryRegistrosDecisao(),
     )
@@ -223,8 +261,8 @@ def test_sugestao_de_compra_redige_com_as_sugestoes_a_politica_e_os_trechos() ->
     ).responder(pergunta)
 
     assert resposta.acao == "respondeu"
-    assert [s.sku_code for s in resposta.sugestoes] == ["TBC-BEGE-70140-01"]
-    assert resposta.sugestoes[0].quantidade > 0
+    assert [s.sugestao.sku_code for s in resposta.sugestoes] == ["TBC-BEGE-70140-01"]
+    assert resposta.sugestoes[0].sugestao.quantidade > 0
     assert resposta.fichas == []
     assert [t.id for t in resposta.trechos] == ["politicas/compra.md#teto"]
     contexto = contexto_de(redator)
@@ -439,6 +477,8 @@ def test_resposta_redigida_grava_o_registro_e_devolve_o_id() -> None:
         "trechos": [],
         "redator": "gravador",
         "resposta": "A toalha bege tem 40 unidades.",
+        "sinais": [],
+        "citacoes": [],
     }
     assert registro.criado_em.tzinfo is not None
     assert registro.duracao_ms >= 0
@@ -513,3 +553,237 @@ class RegistrosForaDoAr(InMemoryRegistrosDecisao):
 def test_falha_ao_gravar_o_registro_derruba_a_resposta() -> None:
     with pytest.raises(ConnectionError):
         copilot(make_entendimento("fora_de_escopo", 0.95), registros=RegistrosForaDoAr()).responder(PERGUNTA)
+
+
+SUGESTAO = "Quanto comprar do TBC-BEGE-70140-01?"
+LEAD_TIME = "fornecedores/katrina.md#lead-time"
+POLITICA_TETO = "politicas/compra.md#teto"
+
+
+def test_sugestao_de_compra_traz_os_sinais_no_contexto_e_na_resposta() -> None:
+    redator = RedatorGravador()
+
+    resposta = copilot(
+        make_entendimento("sugestao_compra", 0.95),
+        redator=redator,
+        trechos=[make_trecho(LEAD_TIME, "Katrina Têxtil atrasou as entregas da toalha")],
+        avaliacoes={LEAD_TIME: ACEITO},
+        sinais={LEAD_TIME: {"atraso_do_fornecedor": 0.97}},
+    ).responder(SUGESTAO)
+
+    [com_sinais] = resposta.sugestoes
+    [sinal] = com_sinais.sinais
+    assert (sinal.tipo, sinal.trechos) == ("atraso_do_fornecedor", [LEAD_TIME])
+    assert com_sinais.sugestao.quantidade > 0
+    contexto = contexto_de(redator)
+    assert (
+        "- Sinais do corpus (não alteram a quantidade):\n"
+        "  - Os documentos relatam atraso de entrega da Katrina Têxtil. "
+        f"Trechos de origem: [{LEAD_TIME}]"
+    ) in contexto
+    assert f'<trecho id="{LEAD_TIME}"' in contexto
+
+
+def test_sinais_nao_mudam_a_quantidade_da_sugestao() -> None:
+    def quantidade(sinais: Mapping[str, ProbabilidadesSinais]) -> int:
+        resposta = copilot(
+            make_entendimento("sugestao_compra", 0.95),
+            trechos=[make_trecho(LEAD_TIME)],
+            avaliacoes={LEAD_TIME: ACEITO},
+            sinais=sinais,
+        ).responder(SUGESTAO)
+        return resposta.sugestoes[0].sugestao.quantidade
+
+    assert quantidade({LEAD_TIME: {"atraso_do_fornecedor": 0.99, "encalhe": 0.99}}) == quantidade({})
+
+
+def test_trechos_de_origem_dos_sinais_entram_depois_dos_da_pergunta_ate_o_maximo() -> None:
+    da_pergunta = [f"pergunta.md#p{i}" for i in range(MAX_TRECHOS_NO_CONTEXTO - 1)]
+    de_sinais = ["sinais.md#s0", "sinais.md#s1"]
+    redator = RedatorGravador()
+
+    resposta = copilot(
+        make_entendimento("sugestao_compra", 0.95),
+        redator=redator,
+        trechos=[make_trecho(i) for i in da_pergunta]
+        + [make_trecho(i, "Katrina Têxtil e Toalha Banho Conforto: estoque encalhado") for i in de_sinais],
+        avaliacoes={i: ACEITO for i in da_pergunta + de_sinais},
+        sinais={"sinais.md#s0": {"encalhe": 0.99}, "sinais.md#s1": {"encalhe": 0.9}},
+        so_nos_sinais=de_sinais,
+    ).responder(SUGESTAO)
+
+    ids = [t.id for t in resposta.trechos]
+    assert len(ids) == MAX_TRECHOS_NO_CONTEXTO
+    assert set(ids[:-1]) == set(da_pergunta)
+    assert ids[-1] == "sinais.md#s0"
+    assert resposta.sugestoes[0].sinais[0].trechos == ["sinais.md#s0", "sinais.md#s1"]
+    assert "sinais.md#s1" not in contexto_de(redator).split("## Trechos do corpus")[1]
+
+
+def test_trecho_de_origem_que_nao_coube_no_contexto_ainda_e_verificado_e_nao_inventado() -> None:
+    da_pergunta = [f"pergunta.md#p{i}" for i in range(MAX_TRECHOS_NO_CONTEXTO)]
+    fora = "sinais.md#fora"
+    redator = RedatorGravador(f"A Katrina atrasa [{fora}].")
+
+    resposta = copilot(
+        make_entendimento("sugestao_compra", 0.95),
+        redator=redator,
+        trechos=[make_trecho(i, "toalha") for i in da_pergunta] + [make_trecho(fora, "Katrina Têxtil atraso")],
+        avaliacoes={**{i: ACEITO for i in da_pergunta}, fora: ACEITO},
+        sinais={fora: {"atraso_do_fornecedor": 0.99}},
+        citacoes={fora: make_relacao("sustenta")},
+        so_nos_sinais=[fora],
+    ).responder(SUGESTAO)
+
+    assert fora not in [t.id for t in resposta.trechos]
+    assert resposta.sugestoes[0].sinais[0].trechos == [fora]
+    [citacao] = resposta.citacoes
+    assert (citacao.trecho_id, citacao.veredito) == (fora, "confirmada")
+    assert resposta.resposta == f"A Katrina atrasa [{fora}]."
+
+
+def test_jev_fora_do_ar_nos_sinais_responde_sem_sinais_e_com_aviso() -> None:
+    redator = RedatorGravador("Compre 120 unidades.")
+
+    resposta = copilot(
+        make_entendimento("sugestao_compra", 0.95),
+        redator=redator,
+        trechos=[make_trecho(POLITICA_TETO)],
+        avaliacoes={POLITICA_TETO: ACEITO},
+        falhar_sinais=True,
+    ).responder(SUGESTAO)
+
+    assert [s.sinais for s in resposta.sugestoes] == [[]]
+    assert resposta.resposta == f"Compre 120 unidades.\n\n{AVISO_SEM_SINAIS}"
+    assert AVISO_SEM_SINAIS == (
+        "Observação: não consegui calcular os sinais do corpus agora, então a sugestão vem sem eles."
+    )
+    assert "Sinais do corpus" not in contexto_de(redator)
+
+
+def test_resposta_redigida_por_llm_tem_as_citacoes_verificadas_e_marcadas() -> None:
+    redacao = f"O teto é de 3 meses [{POLITICA_TETO}]. A Katrina entrega em 30 dias [{LEAD_TIME}]."
+
+    resposta = copilot(
+        make_entendimento("politica_ou_fornecedor", 0.95),
+        redator=RedatorGravador(redacao),
+        trechos=[make_trecho(POLITICA_TETO), make_trecho(LEAD_TIME)],
+        avaliacoes={POLITICA_TETO: ACEITO, LEAD_TIME: ACEITO},
+        citacoes={POLITICA_TETO: make_relacao("sustenta"), LEAD_TIME: make_relacao("contradiz", 0.97)},
+    ).responder(PERGUNTA)
+
+    assert resposta.resposta == (
+        f"O teto é de 3 meses [{POLITICA_TETO}]. A Katrina entrega em 30 dias [{LEAD_TIME} - o trecho diz o contrário]."
+    )
+    assert [(c.trecho_id, c.afirmacao, c.veredito, c.confianca) for c in resposta.citacoes] == [
+        (POLITICA_TETO, "O teto é de 3 meses.", "confirmada", 0.95),
+        (LEAD_TIME, "A Katrina entrega em 30 dias.", "contradita", 0.97),
+    ]
+
+
+def test_citacao_de_id_fora_do_contexto_e_inventada_sem_chamar_o_jev() -> None:
+    inventado = "contratos/inexistente.md#prazos"
+
+    resposta = copilot(
+        make_entendimento("politica_ou_fornecedor", 0.95),
+        redator=RedatorGravador(f"O prazo é de 45 dias [{inventado}]."),
+        falhar_citacoes=True,
+    ).responder(PERGUNTA)
+
+    [citacao] = resposta.citacoes
+    assert (citacao.veredito, citacao.confianca) == ("inventada", None)
+    assert resposta.resposta == f"O prazo é de 45 dias [{inventado} - fonte inexistente]."
+
+
+def test_jev_fora_do_ar_na_verificacao_marca_as_citacoes_como_incertas_e_avisa() -> None:
+    resposta = copilot(
+        make_entendimento("politica_ou_fornecedor", 0.95),
+        redator=RedatorGravador(f"O teto é de 3 meses [{POLITICA_TETO}]."),
+        trechos=[make_trecho(POLITICA_TETO)],
+        avaliacoes={POLITICA_TETO: ACEITO},
+        falhar_citacoes=True,
+    ).responder(PERGUNTA)
+
+    [citacao] = resposta.citacoes
+    assert (citacao.veredito, citacao.confianca) == ("incerta", None)
+    assert resposta.resposta == (
+        f"O teto é de 3 meses [{POLITICA_TETO} - não confirmada].\n\n{AVISO_SEM_VERIFICACAO}"
+    )
+    assert AVISO_SEM_VERIFICACAO == (
+        "Observação: não consegui verificar as citações agora, então elas vêm marcadas como não confirmadas."
+    )
+
+
+def test_resposta_sem_llm_nao_passa_pela_verificacao() -> None:
+    resposta = copilot(
+        make_entendimento("politica_ou_fornecedor", 0.95),
+        redator=RedatorSemLLM(),
+        trechos=[make_trecho(POLITICA_TETO)],
+        avaliacoes={POLITICA_TETO: ACEITO},
+        falhar_citacoes=True,
+    ).responder(PERGUNTA)
+
+    assert resposta.redator == "sem_llm"
+    assert resposta.citacoes == []
+    assert "não confirmada" not in resposta.resposta
+    assert AVISO_SEM_VERIFICACAO not in resposta.resposta
+
+
+def test_queda_do_redator_nao_passa_pela_verificacao() -> None:
+    resposta = copilot(
+        make_entendimento("politica_ou_fornecedor", 0.95),
+        redator=RedatorGravador(nome="groq:modelo", falhar=True),
+        trechos=[make_trecho(POLITICA_TETO)],
+        avaliacoes={POLITICA_TETO: ACEITO},
+        falhar_citacoes=True,
+    ).responder(PERGUNTA)
+
+    assert resposta.redator == "sem_llm"
+    assert resposta.citacoes == []
+
+
+def test_faixa_media_verifica_so_a_redacao_depois_da_confirmacao() -> None:
+    resposta = copilot(
+        make_entendimento("politica_ou_fornecedor", 0.6),
+        redator=RedatorGravador(f"O teto é de 3 meses [{POLITICA_TETO}]."),
+        trechos=[make_trecho(POLITICA_TETO)],
+        avaliacoes={POLITICA_TETO: ACEITO},
+    ).responder(PERGUNTA)
+
+    assert resposta.resposta == (
+        "Entendi que você quer saber da política de compra e dos fornecedores. "
+        f"Se não for isso, reformule a pergunta.\n\nO teto é de 3 meses [{POLITICA_TETO} - não confirmada]."
+    )
+    [citacao] = resposta.citacoes
+    assert citacao.afirmacao == "O teto é de 3 meses."
+
+
+def test_registro_guarda_os_sinais_e_as_citacoes() -> None:
+    registros = InMemoryRegistrosDecisao()
+
+    resposta = copilot(
+        make_entendimento("sugestao_compra", 0.95),
+        redator=RedatorGravador(f"A Katrina atrasa [{LEAD_TIME}]."),
+        trechos=[make_trecho(LEAD_TIME, "Katrina Têxtil atrasou")],
+        avaliacoes={LEAD_TIME: ACEITO},
+        sinais={LEAD_TIME: {"atraso_do_fornecedor": 0.97}},
+        citacoes={LEAD_TIME: make_relacao("sustenta")},
+        registros=registros,
+    ).responder(SUGESTAO)
+
+    [registro] = registros.listar(10)
+    [sinais_do_sku] = registro.sinais
+    assert sinais_do_sku.sku_code == "TBC-BEGE-70140-01"
+    assert sinais_do_sku.sinais == resposta.sugestoes[0].sinais
+    assert registro.citacoes == resposta.citacoes
+    assert [c.veredito for c in registro.citacoes] == ["confirmada"]
+
+
+def test_registro_sem_sinal_nao_guarda_o_sku() -> None:
+    registros = InMemoryRegistrosDecisao()
+
+    copilot(make_entendimento("sugestao_compra", 0.95), registros=registros).responder(SUGESTAO)
+
+    [registro] = registros.listar(10)
+    assert registro.skus == ["TBC-BEGE-70140-01"]
+    assert registro.sinais == []

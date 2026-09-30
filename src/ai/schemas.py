@@ -187,6 +187,23 @@ class SugestaoComSinais(BaseModel):
     sinais: list[SinalCorpus]
 
 
+class SinaisDasSugestoes(BaseModel):
+    """Sinais por `sku_code` e os trechos que deram origem a algum deles, sem
+    repetição, na ordem em que aparecem nos sinais."""
+
+    model_config = ConfigDict(frozen=True)
+
+    por_sku: dict[str, list[SinalCorpus]]
+    trechos: list[TrechoClassificado]
+
+
+class SinaisDoSKU(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    sinais: list[SinalCorpus]
+
+
 class Citacao(BaseModel):
     """Um id de trecho citado entre colchetes num texto redigido, com a frase que o cita
     (`afirmacao`, sem as citações)."""
@@ -228,7 +245,7 @@ class Montagem(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     fichas: list[Ficha] = []
-    sugestoes: list[SugestaoPedido] = []
+    sugestoes: list[SugestaoComSinais] = []
     politica: PoliticaCompra | None = None
     trechos: list[TrechoClassificado] = []
     conflitos: list[ConflitoEntreTrechos] = []
@@ -237,7 +254,8 @@ class Montagem(BaseModel):
 
 class RespostaCopilot(BaseModel):
     """`trechos` são os que foram ao redator. `redator` é nulo quando a resposta é
-    feita em código (esclarecimento ou fora de escopo)."""
+    feita em código (esclarecimento ou fora de escopo). `citacoes` só vêm de
+    resposta redigida por LLM."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -247,9 +265,10 @@ class RespostaCopilot(BaseModel):
     entendimento: Entendimento
     identificacao: Identificacao | None
     fichas: list[Ficha]
-    sugestoes: list[SugestaoPedido]
+    sugestoes: list[SugestaoComSinais]
     trechos: list[TrechoClassificado]
     conflitos: list[ConflitoEntreTrechos]
+    citacoes: list[VerificacaoCitacao]
     redator: str | None
     registro_id: UUID
 
@@ -257,7 +276,8 @@ class RespostaCopilot(BaseModel):
 class RegistroDecisao(BaseModel):
     """O que fica gravado de cada pergunta respondida pelo chat. `intencao` e
     `confianca` repetem o `entendimento` para o M8 filtrar sem abrir o jsonb.
-    `trechos` são os ids que foram ao redator."""
+    `trechos` são os ids que foram ao redator. `sinais` só traz os SKUs com algum
+    sinal."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -274,3 +294,5 @@ class RegistroDecisao(BaseModel):
     redator: str | None
     resposta: str
     duracao_ms: int
+    sinais: list[SinaisDoSKU]
+    citacoes: list[VerificacaoCitacao]

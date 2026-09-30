@@ -5,7 +5,8 @@ configurado no `.env`, ERP, política e corpus do Postgres) e responde as
 perguntas dos casos. Cada
 resposta grava um registro de decisão em `copilot.registros_decisao`, como no
 chat. Imprime por caso a intenção esperada e a escolhida, a confiança, a faixa,
-a ação, os SKUs, o redator e a duração, e no fim o total por faixa e por ação.
+a ação, os SKUs, os sinais do corpus, os vereditos das citações, o redator e a
+duração, e no fim o total por faixa, por ação e por veredito.
 
     uv run python -m scripts.rodar_casos_chat               # precisa de JEV_KEY, do seed e do corpus ingerido
     uv run python -m scripts.rodar_casos_chat --respostas   # imprime também o texto de cada resposta
@@ -36,11 +37,17 @@ def linha(caso: dict, resposta: RespostaCopilot, segundos: float) -> str:
     skus = ", ".join(resposta.identificacao.skus) if resposta.identificacao else "-"
     if resposta.identificacao and resposta.identificacao.candidatos:
         skus += f" (candidatos: {', '.join(resposta.identificacao.candidatos)})"
+    sinais = "; ".join(
+        f"{s.sugestao.sku_code}: {', '.join(sinal.tipo for sinal in s.sinais)}" for s in resposta.sugestoes if s.sinais
+    )
+    vereditos = Counter(c.veredito for c in resposta.citacoes)
     return (
         f"{marca} {caso['id']} esperada {caso['intencao']}, escolhida {intencao.escolha} "
         f"({intencao.confianca:.2f}), faixa {resposta.faixa}, {resposta.acao}, "
         f"redator {resposta.redator or '-'}, {segundos:.1f} s\n"
         f"     SKUs: {skus}\n"
+        f"     Sinais: {sinais or '-'}\n"
+        f"     Citações: {', '.join(f'{v} {n}' for v, n in vereditos.most_common()) or '-'}\n"
         f"     {caso['pergunta']}"
     )
 
@@ -59,6 +66,7 @@ def main() -> None:
 
     faixas: Counter[str] = Counter()
     acoes: Counter[str] = Counter()
+    vereditos: Counter[str] = Counter()
     acertos = 0
     for i, caso in enumerate(casos):
         if i and args.pausa:
@@ -71,11 +79,13 @@ def main() -> None:
         print()
         faixas[resposta.faixa] += 1
         acoes[resposta.acao] += 1
+        vereditos.update(c.veredito for c in resposta.citacoes)
         acertos += resposta.entendimento.intencao.escolha == caso["intencao"]
 
     print(f"Intenção: {acertos}/{len(casos)}")
     print("Faixas: " + ", ".join(f"{f} {faixas[f]}" for f in ("alta", "media", "baixa")))
     print("Ações: " + ", ".join(f"{a} {n}" for a, n in acoes.most_common()))
+    print("Citações: " + (", ".join(f"{v} {n}" for v, n in vereditos.most_common()) or "nenhuma"))
 
 
 if __name__ == "__main__":

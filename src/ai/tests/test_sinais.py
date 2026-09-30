@@ -220,3 +220,43 @@ def test_para_sugestoes_calcula_uma_vez_por_par_de_fornecedor_e_produto() -> Non
     assert por_sku["TBC-BEGE-70140-01"] == por_sku["TBC-BEGE-70140-02"]
     assert por_sku["TBC-CINZ-70140-05"][0].mensagem == "Os documentos relatam atraso de entrega da Aurora Home Center."
     assert por_sku["TBC-BRAN-70140-03"] == []
+
+
+def test_para_sugestoes_com_trechos_traz_so_os_trechos_de_origem_sem_repeticao() -> None:
+    rosto = make_sku("TRC-BEGE-4880-01", produto_nome="Toalha Rosto Conforto", categoria="felpudo")
+    trechos = [
+        make_trecho("revisao.md#katrina", "Katrina toalha atraso"),
+        make_trecho("veraneio.md#sobra", "toalha encalhe"),
+        make_trecho("contrato.md#prazos", "Katrina toalha prazo"),
+    ]
+    decisao = InMemoryDecisionModel(
+        padrao=ACEITO,
+        sinais={
+            "revisao.md#katrina": {"atraso_do_fornecedor": 0.97, "encalhe": 0.7},
+            "veraneio.md#sobra": {"encalhe": 0.99},
+            "contrato.md#prazos": {"atraso_do_fornecedor": 0.3},
+        },
+    )
+
+    resultado = sinais_corpus(trechos, decisao).para_sugestoes_com_trechos(
+        [(sugestao(TOALHA), TOALHA), (sugestao(rosto), rosto)]
+    )
+
+    assert [s.tipo for s in resultado.por_sku["TBC-BEGE-70140-01"]] == ["atraso_do_fornecedor", "encalhe"]
+    assert [s.trechos for s in resultado.por_sku["TRC-BEGE-4880-01"]] == [
+        ["revisao.md#katrina"],
+        ["veraneio.md#sobra", "revisao.md#katrina"],
+    ]
+    assert [t.id for t in resultado.trechos] == ["revisao.md#katrina", "veraneio.md#sobra"]
+    assert resultado.trechos[0].texto == "Katrina toalha atraso"
+
+
+def test_para_sugestoes_com_trechos_sem_fornecedor_nao_busca() -> None:
+    decisao = InMemoryDecisionModel(falhar_trechos=True, falhar_sinais=True)
+
+    resultado = sinais_corpus([make_trecho("a.md#s")], decisao).para_sugestoes_com_trechos(
+        [(sugestao(TOALHA, None), TOALHA)]
+    )
+
+    assert resultado.por_sku == {"TBC-BEGE-70140-01": []}
+    assert resultado.trechos == []

@@ -1,6 +1,6 @@
 # 03: Chat com sinais e citações verificadas, README e smoke
 
-**Status:** ready-for-agent
+**Status:** done
 **Blocked by:** 01, 02
 **Spec:** `.scratch/sinais-e-citacoes/spec.md` (seção "Chat")
 
@@ -10,12 +10,37 @@ O chat passa a usar os dois: a intenção `sugestao_compra` traz os sinais de ca
 
 ## Acceptance criteria
 
-- [ ] `Copilot`: sinais por par (fornecedor, produto) nas sugestões; trechos de origem dos sinais no contexto (respeitando `MAX_TRECHOS_NO_CONTEXTO`, prioridade para os da pergunta); verificação só para redator LLM; queda do Jev nos sinais ou na verificação vira observação.
-- [ ] `renderizar_contexto` mostra os sinais abaixo de cada sugestão, com os ids de origem.
-- [ ] `RespostaCopilot` e o DTO HTTP de `POST /chat` com `sugestoes` com sinais e `citacoes`.
-- [ ] Migration `0005` (`sinais` e `citacoes` jsonb em `copilot.registros_decisao`) e o registro gravando os dois.
-- [ ] Smoke `externo`: sinais de um SKU da Katrina trazem `atraso_do_fornecedor`; `POST /chat` pedindo sugestão desse SKU traz os sinais.
-- [ ] README (aviso do topo M0-M6, seção de sinais e citações com exemplo real) e roadmap (M6 concluído, com a data).
-- [ ] `uv run pytest -q` verde (com `JEV_KEY`).
+- [x] `Copilot`: sinais por par (fornecedor, produto) nas sugestões; trechos de origem dos sinais no contexto (respeitando `MAX_TRECHOS_NO_CONTEXTO`, prioridade para os da pergunta); verificação só para redator LLM; queda do Jev nos sinais ou na verificação vira observação.
+- [x] `renderizar_contexto` mostra os sinais abaixo de cada sugestão, com os ids de origem.
+- [x] `RespostaCopilot` e o DTO HTTP de `POST /chat` com `sugestoes` com sinais e `citacoes`.
+- [x] Migration `0005` (`sinais` e `citacoes` jsonb em `copilot.registros_decisao`) e o registro gravando os dois.
+- [x] Smoke `externo`: sinais de um SKU da Katrina trazem `atraso_do_fornecedor`; `POST /chat` pedindo sugestão desse SKU traz os sinais.
+- [x] README (aviso do topo M0-M6, seção de sinais e citações com exemplo real) e roadmap (M6 concluído, com a data).
+- [x] `uv run pytest -q` verde (com `JEV_KEY`).
 
 ## Comments
+
+**2026-09-30 (agente):** pronto, e o M6 fechado no roadmap. Decisões e desvios:
+
+- **Trechos de origem dos sinais**: `SinaisCorpus.para_sugestoes_com_trechos(pares) -> SinaisDasSugestoes` (`por_sku` e `trechos`, os `TrechoClassificado` de origem de algum sinal, sem repetição, na ordem dos sinais). `para_sugestoes` continua com a assinatura da spec e delega a ele. O `Copilot` precisa do texto dos trechos para pô-los no contexto e para verificar as citações, e os sinais só guardam ids. O `SKU` de cada sugestão sai da lista do catálogo que o entendimento já leu (sem nova leitura do ERP).
+- **Contexto**: os trechos da pergunta primeiro, depois os de origem dos sinais que ainda não estão, cortados em `MAX_TRECHOS_NO_CONTEXTO` no total. Um trecho de sinal entra com a classificação da busca focada. Abaixo de cada sugestão com sinal: "- Sinais do corpus (não alteram a quantidade):" e uma linha por sinal com a mensagem e "Trechos de origem: [id], [id]" (sem a probabilidade). Sugestão sem sinal não tem a linha.
+- **Citação de trecho de sinal que não coube no contexto** (acontece: no c06 a busca da pergunta já trouxe 10 trechos): o id aparece no contexto, abaixo da sugestão, então não é `inventada`. Os trechos que o redator pode citar são os do contexto mais os de origem dos sinais, e o Jev verifica contra o texto deles.
+- **Verificação** só quando o redator efetivo não é `sem_llm` (sem chave, ou na queda do redator, não há verificação). Verifica só a redação, antes da confirmação da faixa média e dos avisos, como o ticket 02 recomendou.
+- **Queda do Jev nos sinais e na verificação vira aviso no fim da resposta, feito em código**, e não observação no contexto: "Observação: não consegui calcular os sinais do corpus agora, então a sugestão vem sem eles." e "Observação: não consegui verificar as citações agora, então elas vêm marcadas como não confirmadas." A verificação acontece depois da redação, então o aviso dela tem de ser acrescentado pelo código; usei o mesmo caminho para os sinais para o comprador sempre ver o aviso, qualquer que seja o redator. A queda na busca focada dos sinais também conta como queda nos sinais; a da busca da pergunta continua 503, como no M5. Na queda da verificação, `decidir_vereditos(..., [])`: `incerta` com `confianca` nula, e as inventadas continuam inventadas.
+- **DTOs**: `Montagem.sugestoes` e `RespostaCopilot.sugestoes` viraram `list[SugestaoComSinais]`; `RespostaCopilot.citacoes: list[VerificacaoCitacao]` (vazia sem verificação). Novos em `src/ai/schemas.py`: `SinaisDasSugestoes` e `SinaisDoSKU` (`sku_code`, `sinais`), este para o registro. HTTP: `SugestaoComSinaisResponse` (`sugestao`, com o mesmo `SugestaoPedidoResponse` do `/sugestao-compra`, e `sinais`), `VerificacaoCitacaoResponse` e `SinaisDoSKUResponse`; `RespostaChatResponse` e `RegistroDecisaoResponse` ganharam os campos. Mudança incompatível no `POST /chat`: `sugestoes[i]` agora é `{"sugestao": ..., "sinais": [...]}`.
+- **Registro**: migration `0005_sinais_e_citacoes` (duas colunas jsonb `not null default '[]'`), aplicada no Postgres local (upgrade, downgrade e upgrade); os 53 registros do M5 são lidos com listas vazias. `sinais` guarda só os SKUs com algum sinal; `citacoes`, todas as verificações. Os dois são obrigatórios no `RegistroDecisao`.
+- **Termos**: a definição de **Registro de decisão** no `CONTEXT.md` passou a citar os sinais e as citações.
+- **`scripts/rodar_casos_chat.py`** imprime por caso os sinais (SKU e tipos) e os vereditos das citações, e o total de vereditos no fim.
+- **Citações sem formato de id de trecho** (`[SKU/...]`, `[ TBC-AZUL-70140-07 ]`, `[JDCP-BRAN-QUEEN-02]`, `[Política de compra ativa (v1)]`): a spec só trata `<caminho>.md#<slug>`, então continuam sem marca. Risco registrado: na rodada apareceram em c01 (8 vezes), c06, c07 e num extra. Tratar é ajuste do prompt (M8) ou uma regra nova de extração.
+- **Frase com duas citações vira `incerta`**: mantido, sem mexer no `LIMIAR_CITACAO`. Apareceu de novo (c07 e o exemplo do README).
+- **Testes**: `uv run pytest -q -m "not externo"` com 555 passando (eram 535); `-m externo` com 10 e `-m externo_llm` com 2; `uv run pytest -q` com 565. Novos: `Copilot` (sinais no contexto e na resposta, quantidade igual com e sem sinal, prioridade dos trechos da pergunta, trecho de sinal fora do contexto verificado e não inventado, queda nos sinais, verificação e marcação, `inventada` sem Jev, queda na verificação, sem verificação para `sem_llm` e na queda do redator, faixa média, registro); contexto; `para_sugestoes_com_trechos`; contrato do registro (in-memory e Postgres); HTTP; smoke `test_chat_pedindo_sugestao_do_sku_da_katrina_traz_os_sinais` (Jev real, `RedatorSemLLM`), que confere que um trecho de origem do atraso foi ao contexto e que o registro guarda os sinais.
+
+**Rodada real** (`uv run python -m scripts.rodar_casos_chat --respostas --pausa 30`, Jev `jev-1.13.0`, Groq `openai/gpt-oss-120b`, banco do seed), mais três perguntas de sugestão por código pelo `POST /chat`, com 60 s entre elas:
+
+- **Casos**: intenção 19/20 (o c11 de sempre, `situacao_sku` 0,44, esclarecimento); faixas alta 16, média 3, baixa 1; as 11 redações pela Groq, nenhuma queda por 429. Redações de 1,6 a 10,8 s; as de sugestão com SKU ficaram em 8,1 s (c06) e 10,8 s (c10, 8 SKUs e três pares).
+- **Sinais**: dos casos, só c06 e c10 têm sugestão com SKU (c07 a c09 pedem sugestão sem SKU identificado). c06: `JDCP-BRAN-KING-03` (Katrina, Percal 300) com encalhe pela sequência dos fatos do Veraneio (0,98); `JDCP-CHAM-KING-06` sem compra, sem sinal. c10 (toalhas de mesa, Aurora e Malha Fina): nenhum sinal. Extras: `TBC-BEGE-70140-01` com atraso da Katrina (lead time e riscos consolidados da revisão Q1, 0,96), `JDCP-BRAN-QUEEN-02` e `CB-OFF--QUEEN-09` (Verdela) com encalhe pelo Veraneio (0,98 e 0,94), os mesmos do ticket 01.
+- **Efeito dos sinais**: a quantidade não muda (é a do `/sugestao-compra`). A redação usou o sinal só no `TBC-BEGE-70140-01` (lead time e dependência da Katrina). Nos três de encalhe, o sinal estava no contexto e a redação não falou dele; no c06 os trechos da pergunta encheram os 10 lugares, o trecho do Veraneio ficou fora da seção de trechos, e a redação afirmou "não há registro de encalhe do king size da Katrina no Natal 2024" (verdade para o king size, mas o sinal de encalhe da categoria ficou calado). As instruções do redator não falam de sinais: fica para o M8, e o M7 pode mostrar `sugestoes[].sinais` na tela sem depender do texto.
+- **Citações dos casos**: 20 citações de trecho em 9 redações; 17 `confirmada`, 2 `incerta` e 1 `sem_suporte`, nenhuma `inventada` nem `contradita`. As incertas: c07 (duas citações coladas numa frase; a primeira confirmada com 0,61, a segunda `incerta` com 0,41) e c08 (a retrospectiva do Veraneio "reforça o mesmo critério", conclusão do redator, 0,35). A `sem_suporte`: c06, "a recomendação do cálculo da política seria 3 meses, mas a decisão aprovada foi de 5 meses" contra os riscos aceitos do Natal (0,60). Das confirmadas, uma passou com 0,51 (c10, Malha Fina para o Dia das Mães), perto do limiar. Nos extras: as duas citações do `TBC-BEGE-70140-01` ficaram `incerta` (0,42 e 0,27, uma frase só com lead time e dependência); o `CB-OFF--QUEEN-09` teve uma `confirmada` (0,75) numa frase que compara cobertura com o teto, o que mostra que a verificação confere o que o trecho diz, não a conta do redator.
+- **Redação** (M8, sem mexer no prompt): continua comparando cobertura com o teto, opinando ("Sim, a antecipação faz sentido", "Sim, a compra da colcha ... está dentro dos limites") e com hífen não separável (U+2011) nos códigos de SKU.
+
+**Para o M7 (aprovação humana)**, as assinaturas do chat: `Copilot(decisao, catalog, ficha_sku, purchasing, politicas, busca, sinais, redator, registros)`, montado por `get_copilot`; `RespostaCopilot.sugestoes: list[SugestaoComSinais]` (`sugestao: SugestaoPedido`, `sinais: list[SinalCorpus]`) e `citacoes: list[VerificacaoCitacao]`; no HTTP, `sugestoes[i].sugestao` é o mesmo `SugestaoPedidoResponse` do `/sugestao-compra`. Para priorizar a fila, `SinaisCorpus.para_sugestoes(pares)` (ou `para_sugestao`) dá os sinais por SKU com um cálculo por par (fornecedor, produto), propaga `DecisaoIndisponivel` e custa uma busca focada e até 10 requests de sinais por par (uns 3 s). Os sinais nunca mudam a quantidade, e o registro de decisão guarda `sinais` e `citacoes`, mas não a sugestão.

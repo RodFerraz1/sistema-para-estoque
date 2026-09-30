@@ -85,6 +85,8 @@ Spec: `.scratch/rag-jev/spec.md`. Decisões base: ADR-0002 (Jev decide) e ADR-00
 
 **Saída visível**: pergunta livre gera resposta que combina dados, sugestão e contexto do RAG, com citações verificadas.
 
+**Concluído em 2026-09-30.** Os sinais saem como sinais do corpus ao lado da sugestão (atraso do fornecedor, venda por época e encalhe, cada um um `Noul` trecho a trecho), não como alertas da `SugestaoPedido`, e a citação sem suporte é marcada no texto, não removida (`.scratch/sinais-e-citacoes/spec.md`). O redator ainda ignora a maioria dos sinais e cita dados do ERP e da política com colchetes que não são id de trecho, que a verificação não marca (`.scratch/sinais-e-citacoes/issues/03-chat-com-sinais-e-citacoes.md`).
+
 ## M7 - Aprovação humana (workflow completo)
 
 - UI mínima (HTML puro ou React simples) com: lista de sugestões pendentes, botão aprovar/rejeitar/editar.

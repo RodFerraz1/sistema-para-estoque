@@ -7,7 +7,13 @@ from src.ai.chat import Copilot
 from src.ai.dependencies import get_copilot, get_registros_decisao
 from src.ai.registro import RegistrosDecisao
 from src.ai.schemas import Entendimento, Escolha, Identificacao, RegistroDecisao, RespostaCopilot
-from src.api.conversores import ficha_to_response, sugestao_to_response, trecho_to_response
+from src.api.conversores import (
+    ficha_to_response,
+    sinais_do_sku_to_response,
+    sugestao_com_sinais_to_response,
+    trecho_to_response,
+    verificacao_to_response,
+)
 from src.api.schemas import (
     EntendimentoResponse,
     EscolhaResponse,
@@ -58,9 +64,10 @@ def _to_response(resposta: RespostaCopilot) -> RespostaChatResponse:
             else None
         ),
         fichas=[ficha_to_response(f) for f in resposta.fichas],
-        sugestoes=[sugestao_to_response(s) for s in resposta.sugestoes],
+        sugestoes=[sugestao_com_sinais_to_response(s) for s in resposta.sugestoes],
         trechos=[trecho_to_response(t) for t in resposta.trechos],
         conflitos=resposta.conflitos,
+        citacoes=[verificacao_to_response(c) for c in resposta.citacoes],
         redator=resposta.redator,
         registro_id=resposta.registro_id,
     )
@@ -81,6 +88,8 @@ def _registro_to_response(registro: RegistroDecisao) -> RegistroDecisaoResponse:
         redator=registro.redator,
         resposta=registro.resposta,
         duracao_ms=registro.duracao_ms,
+        sinais=[sinais_do_sku_to_response(s) for s in registro.sinais],
+        citacoes=[verificacao_to_response(c) for c in registro.citacoes],
     )
 
 

@@ -17,7 +17,7 @@ from sqlalchemy import text
 from src.ai.postgres import PostgresRegistrosDecisao
 from src.ai.in_memory import InMemoryRegistrosDecisao
 from src.ai.registro import RegistrosDecisao
-from src.ai.schemas import RegistroDecisao
+from src.ai.schemas import RegistroDecisao, SinaisDoSKU, SinalCorpus, VerificacaoCitacao
 from src.db.engine import get_engine
 from tests.fakes import make_entendimento
 
@@ -89,6 +89,8 @@ def registro(minutos: int = 0, **campos: object) -> RegistroDecisao:
             "redator": "groq:openai/gpt-oss-120b",
             "resposta": "A toalha bege tem 40 unidades.",
             "duracao_ms": 3412,
+            "sinais": [],
+            "citacoes": [],
             **campos,
         }
     )
@@ -140,3 +142,37 @@ def test_listar_respeita_o_limite(registros: RegistrosDecisao) -> None:
 
 def test_listar_sem_registros_devolve_lista_vazia(registros: RegistrosDecisao) -> None:
     assert registros.listar(10) == []
+
+
+def test_sinais_e_citacoes_voltam_inteiros(registros: RegistrosDecisao) -> None:
+    sinais = [
+        SinaisDoSKU(
+            sku_code="TBC-BEGE-70140-01",
+            sinais=[
+                SinalCorpus(
+                    tipo="atraso_do_fornecedor",
+                    mensagem="Os documentos relatam atraso de entrega da Katrina Têxtil.",
+                    trechos=["fornecedores/katrina-textil.md#lead-time", "reunioes/q1.md#riscos"],
+                    probabilidade=0.96,
+                )
+            ],
+        )
+    ]
+    citacoes = [
+        VerificacaoCitacao(
+            trecho_id="contratos/katrina.md#prazos",
+            afirmacao="O lead time contratado é de 45 dias.",
+            veredito="confirmada",
+            confianca=0.98,
+        ),
+        VerificacaoCitacao(
+            trecho_id="contratos/inexistente.md#x", afirmacao="Frase.", veredito="inventada", confianca=None
+        ),
+    ]
+    gravado = registro(sinais=sinais, citacoes=citacoes)
+
+    registros.gravar(gravado)
+
+    [lido] = registros.listar(1)
+    assert lido.sinais == sinais
+    assert lido.citacoes == citacoes

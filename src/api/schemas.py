@@ -21,6 +21,7 @@ from src.ai.schemas import (
     OrigemIdentificacao,
     Probabilidade,
     TipoSinal,
+    Veredito,
 )
 from src.inventory.schemas import Cobertura, Estoque
 from src.politica_compra.schemas import ParametrosPolitica
@@ -106,6 +107,29 @@ class SinalCorpusResponse(BaseModel):
     probabilidade: Probabilidade
 
 
+class SugestaoComSinaisResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    sugestao: SugestaoPedidoResponse
+    sinais: list[SinalCorpusResponse]
+
+
+class SinaisDoSKUResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    sinais: list[SinalCorpusResponse]
+
+
+class VerificacaoCitacaoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    trecho_id: str
+    afirmacao: str
+    veredito: Veredito
+    confianca: Probabilidade | None
+
+
 class AvaliacaoTrechoResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -179,9 +203,10 @@ class RespostaChatResponse(BaseModel):
     entendimento: EntendimentoResponse
     identificacao: IdentificacaoResponse | None
     fichas: list[AnaliseSKUResponse]
-    sugestoes: list[SugestaoPedidoResponse]
+    sugestoes: list[SugestaoComSinaisResponse]
     trechos: list[TrechoClassificadoResponse]
     conflitos: list[ConflitoEntreTrechos]
+    citacoes: list[VerificacaoCitacaoResponse]
     redator: str | None
     registro_id: UUID
 
@@ -202,3 +227,5 @@ class RegistroDecisaoResponse(BaseModel):
     redator: str | None
     resposta: str
     duracao_ms: int
+    sinais: list[SinaisDoSKUResponse]
+    citacoes: list[VerificacaoCitacaoResponse]

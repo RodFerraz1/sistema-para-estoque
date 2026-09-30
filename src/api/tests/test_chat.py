@@ -3,7 +3,7 @@ Jev, redator e registros em memória."""
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
@@ -27,7 +27,11 @@ from tests.fakes import (
     RedatorGravador,
     make_entendimento,
     make_estoque,
+    make_fornecedor,
+    make_fornecedor_sku,
+    make_relacao,
     make_sku,
+    make_venda,
     make_trecho,
     repositorio_com,
 )
@@ -66,7 +70,14 @@ def preparar(
         ],
         embedder,
     )
-    adapter = InMemoryERPAdapter(skus=[SKU], estoques={SKU.sku_code: make_estoque(disponivel=120)})
+    katrina = make_fornecedor("Katrina Têxtil")
+    adapter = InMemoryERPAdapter(
+        skus=[SKU],
+        fornecedores=[katrina],
+        fornecedores_por_sku={SKU.sku_code: [make_fornecedor_sku(katrina)]},
+        estoques={SKU.sku_code: make_estoque(disponivel=120)},
+        vendas=[make_venda(SKU, datetime(2026, mes, 5, tzinfo=UTC), 100) for mes in range(3, 9)],
+    )
     politicas = InMemoryPoliticaCompraRepositorio()
     redator = redator or RedatorGravador()
     registros = InMemoryRegistrosDecisao()
@@ -129,6 +140,7 @@ def test_chat_responde_a_situacao_do_sku(client: TestClient) -> None:
         "sugestoes": [],
         "trechos": [],
         "conflitos": [],
+        "citacoes": [],
         "redator": "gravador",
     }
     [registro] = registros.listar(10)
@@ -245,6 +257,8 @@ def test_registros_mostram_as_perguntas_respondidas_da_mais_recente(client: Test
         "trechos": [],
         "redator": "gravador",
         "resposta": "A TBC-BEGE-70140-01 tem 120 unidades.",
+        "sinais": [],
+        "citacoes": [],
     }
 
 
@@ -280,3 +294,46 @@ def test_jev_indisponivel_nao_grava_registro(client: TestClient) -> None:
 
     assert client.post("/chat", json={"pergunta": PERGUNTA}).status_code == 503
     assert registros.listar(10) == []
+
+
+def test_chat_de_sugestao_devolve_os_sinais_e_as_citacoes_e_grava_os_dois(client: TestClient) -> None:
+    lead_time = "reunioes/q1.md#katrina"
+    registros = preparar(
+        jev(
+            make_entendimento("sugestao_compra", 0.95),
+            padrao={"relevante": 0.9, "tem_evidencia": 0.9},
+            sinais={lead_time: {"atraso_do_fornecedor": 0.97}},
+            citacoes={lead_time: make_relacao("sustenta", 0.96)},
+        ),
+        RedatorGravador(f"A Katrina atrasa [{lead_time}]. O contrato diz 30 dias [contratos/katrina.md#prazos]."),
+    )
+
+    response = client.post("/chat", json={"pergunta": "Quanto comprar do TBC-BEGE-70140-01?"})
+
+    assert response.status_code == 200
+    body = response.json()
+    [sugestao] = body["sugestoes"]
+    assert sugestao["sugestao"]["sku_code"] == "TBC-BEGE-70140-01"
+    assert sugestao["sinais"] == [
+        {
+            "tipo": "atraso_do_fornecedor",
+            "mensagem": "Os documentos relatam atraso de entrega da Katrina Têxtil.",
+            "trechos": [lead_time],
+            "probabilidade": 0.97,
+        }
+    ]
+    assert body["citacoes"] == [
+        {"trecho_id": lead_time, "afirmacao": "A Katrina atrasa.", "veredito": "confirmada", "confianca": 0.96},
+        {
+            "trecho_id": "contratos/katrina.md#prazos",
+            "afirmacao": "O contrato diz 30 dias.",
+            "veredito": "sem_suporte",
+            "confianca": 1.0,
+        },
+    ]
+    assert body["resposta"].endswith("[contratos/katrina.md#prazos - não confirmada].")
+
+    [registro] = client.get("/chat/registros").json()
+    assert registro["sinais"] == [{"sku_code": "TBC-BEGE-70140-01", "sinais": sugestao["sinais"]}]
+    assert registro["citacoes"] == body["citacoes"]
+    assert registros.listar(1)[0].citacoes[0].veredito == "confirmada"

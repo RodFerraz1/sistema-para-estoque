@@ -6,7 +6,15 @@ from datetime import UTC, date, datetime
 import pytest
 
 from src.ai.contexto import AVISO_TRECHOS, renderizar_contexto
-from src.ai.schemas import AvaliacaoTrecho, Classificacao, ConflitoEntreTrechos, Montagem, TrechoClassificado
+from src.ai.schemas import (
+    AvaliacaoTrecho,
+    Classificacao,
+    ConflitoEntreTrechos,
+    Montagem,
+    SinalCorpus,
+    SugestaoComSinais,
+    TrechoClassificado,
+)
 from src.ficha_sku.schemas import Ficha
 from src.inventory.schemas import Cobertura
 from src.politica_compra.schemas import PARAMETROS_V1, PoliticaCompra
@@ -49,7 +57,7 @@ def ficha(*, giro: float = 45.333, cobertura: float | None = 2.72, fornecedores=
     )
 
 
-def sugestao(**campos) -> SugestaoPedido:
+def sugestao(sinais: list[SinalCorpus] | None = None, **campos) -> SugestaoComSinais:
     padrao = dict(
         sku_code=SKU.sku_code,
         quantidade=240,
@@ -60,7 +68,7 @@ def sugestao(**campos) -> SugestaoPedido:
         alertas=[],
         politica_versao=3,
     )
-    return SugestaoPedido(**(padrao | campos))
+    return SugestaoComSinais(sugestao=SugestaoPedido(**(padrao | campos)), sinais=sinais or [])
 
 
 def trecho(id: str, texto: str = "Lead time de 45 dias.", classificacao: Classificacao = "aceito") -> TrechoClassificado:
@@ -173,6 +181,38 @@ def test_sugestao_traz_quantidade_fornecedor_valor_em_reais_calculo_e_versao() -
     assert "  - Cobertura na chegada, com a compra: 25,1 meses" in contexto
     assert "- Alertas:\n  - Nenhum fornecedor cabe no teto." in contexto
     assert "Motivo" not in contexto
+
+
+def test_sinais_saem_abaixo_da_sugestao_com_os_ids_de_origem() -> None:
+    sinais = [
+        SinalCorpus(
+            tipo="atraso_do_fornecedor",
+            mensagem="Os documentos relatam atraso de entrega da Katrina Têxtil.",
+            trechos=["fornecedores/katrina-textil.md#lead-time", "reunioes/q1.md#riscos"],
+            probabilidade=0.96,
+        ),
+        SinalCorpus(
+            tipo="encalhe",
+            mensagem="Os documentos relatam encalhe de Toalha Banho Conforto ou da categoria dele numa compra anterior.",
+            trechos=["reunioes/veraneio.md#sobra"],
+            probabilidade=0.7,
+        ),
+    ]
+
+    contexto = renderizar_contexto(Montagem(sugestoes=[sugestao(sinais)]))
+
+    assert contexto.endswith(
+        "- Sinais do corpus (não alteram a quantidade):\n"
+        "  - Os documentos relatam atraso de entrega da Katrina Têxtil. Trechos de origem: "
+        "[fornecedores/katrina-textil.md#lead-time], [reunioes/q1.md#riscos]\n"
+        "  - Os documentos relatam encalhe de Toalha Banho Conforto ou da categoria dele numa compra anterior. "
+        "Trechos de origem: [reunioes/veraneio.md#sobra]"
+    )
+    assert "0,96" not in contexto
+
+
+def test_sugestao_sem_sinais_nao_tem_a_linha_de_sinais() -> None:
+    assert "Sinais do corpus" not in renderizar_contexto(Montagem(sugestoes=[sugestao()]))
 
 
 def test_sugestao_sem_compra_traz_o_motivo_e_nao_traz_fornecedor() -> None:

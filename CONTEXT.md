@@ -147,7 +147,7 @@ Resposta feita em código, sem redator, que devolve a pergunta ao comprador quan
 _Avoid_: erro, fallback.
 
 **Registro de decisão**:
-O que fica gravado de cada pergunta respondida pelo chat: a pergunta, o entendimento com as probabilidades, a faixa, a ação, os SKUs, os trechos que foram ao redator, o redator e a resposta. Serve para auditoria e para recalibrar as faixas.
+O que fica gravado de cada pergunta respondida pelo chat: a pergunta, o entendimento com as probabilidades, a faixa, a ação, os SKUs, os trechos que foram ao redator, o redator, a resposta, os sinais do corpus das sugestões e o veredito de cada citação. Serve para auditoria e para recalibrar as faixas.
 _Avoid_: log (genérico demais), histórico de conversa (não há sessão).
 
 **Citação**:

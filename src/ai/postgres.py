@@ -68,11 +68,12 @@ class PostgresTrechosRepositorio(TrechosRepositorio):
 
 
 _CAMPOS_REGISTRO = list(RegistroDecisao.model_fields)
+_CAMPOS_JSONB = ("entendimento", "sinais", "citacoes")
 
 _INSERT_REGISTRO = text(
     f"INSERT INTO copilot.registros_decisao ({', '.join(_CAMPOS_REGISTRO)}) "
     f"VALUES ({', '.join(f':{c}' for c in _CAMPOS_REGISTRO)})"
-).bindparams(bindparam("entendimento", type_=JSONB))
+).bindparams(*(bindparam(campo, type_=JSONB) for campo in _CAMPOS_JSONB))
 
 _LISTAR_REGISTROS = text(
     f"SELECT {', '.join(_CAMPOS_REGISTRO)} FROM copilot.registros_decisao "
@@ -88,7 +89,7 @@ class PostgresRegistrosDecisao(RegistrosDecisao):
         with self._engine.begin() as conn:
             conn.execute(
                 _INSERT_REGISTRO,
-                {**registro.model_dump(), "entendimento": registro.entendimento.model_dump(mode="json")},
+                {**registro.model_dump(), **registro.model_dump(mode="json", include=set(_CAMPOS_JSONB))},
             )
 
     def listar(self, limite: int) -> list[RegistroDecisao]:

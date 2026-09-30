@@ -1,15 +1,18 @@
 """Conversores de DTOs de domínio para DTOs HTTP, usados por mais de um router."""
 from __future__ import annotations
 
-from src.ai.schemas import SinalCorpus, TrechoClassificado
+from src.ai.schemas import SinaisDoSKU, SinalCorpus, SugestaoComSinais, TrechoClassificado, VerificacaoCitacao
 from src.api.schemas import (
     AnaliseSKUResponse,
     AvaliacaoTrechoResponse,
     FornecedorResponse,
     GiroResponse,
+    SinaisDoSKUResponse,
     SinalCorpusResponse,
+    SugestaoComSinaisResponse,
     SugestaoPedidoResponse,
     TrechoClassificadoResponse,
+    VerificacaoCitacaoResponse,
 )
 from src.catalog.schemas import FornecedorParaSKU
 from src.ficha_sku.schemas import Ficha
@@ -67,6 +70,26 @@ def sinal_to_response(sinal: SinalCorpus) -> SinalCorpusResponse:
         mensagem=sinal.mensagem,
         trechos=sinal.trechos,
         probabilidade=sinal.probabilidade,
+    )
+
+
+def sugestao_com_sinais_to_response(com_sinais: SugestaoComSinais) -> SugestaoComSinaisResponse:
+    return SugestaoComSinaisResponse(
+        sugestao=sugestao_to_response(com_sinais.sugestao),
+        sinais=[sinal_to_response(s) for s in com_sinais.sinais],
+    )
+
+
+def sinais_do_sku_to_response(sinais: SinaisDoSKU) -> SinaisDoSKUResponse:
+    return SinaisDoSKUResponse(sku_code=sinais.sku_code, sinais=[sinal_to_response(s) for s in sinais.sinais])
+
+
+def verificacao_to_response(verificacao: VerificacaoCitacao) -> VerificacaoCitacaoResponse:
+    return VerificacaoCitacaoResponse(
+        trecho_id=verificacao.trecho_id,
+        afirmacao=verificacao.afirmacao,
+        veredito=verificacao.veredito,
+        confianca=verificacao.confianca,
     )
 
 

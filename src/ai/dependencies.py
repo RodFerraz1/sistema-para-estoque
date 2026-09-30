@@ -87,7 +87,8 @@ def get_copilot(
     purchasing: Purchasing = Depends(get_purchasing),
     politicas: PoliticaCompraRepositorio = Depends(get_politica_compra_repositorio),
     busca: BuscaContexto = Depends(get_busca_contexto),
+    sinais: SinaisCorpus = Depends(get_sinais_corpus),
     redator: Redator = Depends(get_redator),
     registros: RegistrosDecisao = Depends(get_registros_decisao),
 ) -> Copilot:
-    return Copilot(decisao, catalog, ficha_sku, purchasing, politicas, busca, redator, registros)
+    return Copilot(decisao, catalog, ficha_sku, purchasing, politicas, busca, sinais, redator, registros)
