@@ -123,3 +123,25 @@ _Avoid_: agente, chatbot, LLM com tools.
 **Confiança**:
 Número de 0 a 1 que o Jev devolve junto de cada resposta, derivado da distribuição de probabilidades. O código usa faixas de confiança pra decidir entre executar, pedir confirmação ou pedir esclarecimento. Nunca substitui a aprovação humana de um pedido de compra.
 _Avoid_: certeza, probabilidade (é outra coisa), score.
+
+### Chat
+
+**Intenção**:
+O que o comprador chefe quer com uma pergunta do chat, uma de quatro: situação do SKU, sugestão de compra, política ou fornecedor, fora de escopo. Quem escolhe é o Jev, com uma `Choice`; quem decide o que fazer com ela é o código.
+_Avoid_: tipo de pergunta, categoria, comando.
+
+**Entendimento (da pergunta)**:
+As respostas do Jev sobre uma pergunta do chat: a intenção e o produto do catálogo citado, cada uma com probabilidades e confiança.
+_Avoid_: interpretação, parse, classificação (é o nome do rótulo de trecho).
+
+**Faixa de confiança**:
+Alta, média ou baixa, conforme a confiança da intenção. Alta executa; média executa e a resposta começa confirmando o que foi entendido; baixa pede esclarecimento. Os limites são constantes nomeadas no código.
+_Avoid_: nível de certeza, score.
+
+**Esclarecimento**:
+Resposta feita em código, sem redator, que devolve a pergunta ao comprador quando a intenção tem confiança baixa ou quando o SKU não foi identificado.
+_Avoid_: erro, fallback.
+
+**Registro de decisão**:
+O que fica gravado de cada pergunta respondida pelo chat: a pergunta, o entendimento com as probabilidades, a faixa, a ação, os SKUs, os trechos que foram ao redator, o redator e a resposta. Serve para auditoria e para recalibrar as faixas.
+_Avoid_: log (genérico demais), histórico de conversa (não há sessão).
