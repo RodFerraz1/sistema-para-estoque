@@ -20,6 +20,8 @@ Faixa = Literal["alta", "media", "baixa"]
 Acao = Literal["respondeu", "confirmou_e_respondeu", "pediu_esclarecimento", "fora_de_escopo"]
 OrigemIdentificacao = Literal["codigo", "produto", "nenhum"]
 TipoSinal = Literal["atraso_do_fornecedor", "demanda_sazonal", "encalhe"]
+Relacao = Literal["sustenta", "contradiz", "nao_trata"]
+Veredito = Literal["confirmada", "sem_suporte", "contradita", "inventada", "incerta"]
 NENHUM_PRODUTO = "nenhum"
 
 
@@ -183,6 +185,41 @@ class SugestaoComSinais(BaseModel):
 
     sugestao: SugestaoPedido
     sinais: list[SinalCorpus]
+
+
+class Citacao(BaseModel):
+    """Um id de trecho citado entre colchetes num texto redigido, com a frase que o cita
+    (`afirmacao`, sem as citações)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    trecho_id: str
+    afirmacao: str
+
+
+class AvaliacaoCitacao(BaseModel):
+    """Resposta do modelo de decisão sobre como o trecho se relaciona com a afirmação."""
+
+    model_config = ConfigDict(frozen=True)
+
+    afirmacao: str
+    trecho_id: str
+    escolha: Relacao
+    confianca: Probabilidade
+    probabilidades: dict[str, Probabilidade]
+    modelo: str
+
+
+class VerificacaoCitacao(BaseModel):
+    """Veredito do código sobre uma citação. `confianca` é a do modelo de decisão e fica
+    nula quando ele não foi consultado (`inventada`, ou `incerta` sem avaliação)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    trecho_id: str
+    afirmacao: str
+    veredito: Veredito
+    confianca: Probabilidade | None
 
 
 class Montagem(BaseModel):

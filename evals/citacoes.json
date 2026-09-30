@@ -1,0 +1,198 @@
+[
+  {
+    "id": "v01",
+    "afirmacao": "O contrato com a Katrina exige que os pedidos sejam colocados com antecedência mínima de 45 dias.",
+    "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+    "esperado": "sustenta",
+    "motivo": "A cláusula 3 diz exatamente isso."
+  },
+  {
+    "id": "v02",
+    "afirmacao": "O lead time observado da Katrina fica entre 55 e 65 dias, acima dos 45 dias prometidos.",
+    "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+    "esperado": "sustenta",
+    "motivo": "Prometido 45 dias, observado 55-65."
+  },
+  {
+    "id": "v03",
+    "afirmacao": "A Verdela cumpre o prazo prometido e não tem histórico de atraso.",
+    "trecho_id": "fornecedores/verdela-home.md#lead-time",
+    "esperado": "sustenta",
+    "motivo": "O trecho diz que ela cumpre o prometido, sem histórico de atraso."
+  },
+  {
+    "id": "v04",
+    "afirmacao": "Para um pedido de R$ 80 mil, a aprovação deve ser feita pelo comprador chefe, pelo gerente comercial e pelo sócio financeiro, todos em unanimidade.",
+    "trecho_id": "politicas/aprovacao-compras.md#faixas-de-valor/faixa-3-r-60-000-ate-r-150-000",
+    "esperado": "sustenta",
+    "motivo": "Frase real do redator no M5. R$ 80 mil cai na faixa 3 (R$ 60 mil a R$ 150 mil, no título do trecho), que pede os três por unanimidade."
+  },
+  {
+    "id": "v05",
+    "afirmacao": "Não há cláusula de exclusividade no contrato com a Katrina, e o atacadista pode comprar felpudo e jogos de cama de outros fornecedores.",
+    "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/6-exclusividade",
+    "esperado": "sustenta",
+    "motivo": "Frase real do redator no M5, dita pela cláusula 6."
+  },
+  {
+    "id": "v06",
+    "afirmacao": "A regra sazonal permite, em datas quentes como o Natal, estoque adicional de até 2 meses, totalizando 5 meses, desde que a exceção seja registrada em ata.",
+    "trecho_id": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+    "esperado": "sustenta",
+    "motivo": "Frase real do redator no M5, dita pela R2."
+  },
+  {
+    "id": "v07",
+    "afirmacao": "Na revisão do Q1/2025, o lead time real da Katrina ficou em 62 dias, o terceiro trimestre seguido acima do contratado.",
+    "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+    "esperado": "sustenta",
+    "motivo": "62 dias contra 45 contratados, terceiro trimestre seguido."
+  },
+  {
+    "id": "v08",
+    "afirmacao": "A venda de dezembro do king size no Natal de 2024 cumpriu 108% do previsto.",
+    "trecho_id": "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025",
+    "esperado": "sustenta",
+    "motivo": "O resultado registrado diz 108% do previsto em dezembro."
+  },
+  {
+    "id": "v09",
+    "afirmacao": "Não. O contrato exige antecedência mínima de 45 dias entre o pedido e a data desejada de recebimento, mas o lead-time real observado costuma ficar entre 55 e 65 dias.",
+    "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+    "esperado": "sustenta",
+    "motivo": "Frase real do redator no M5 com duas citações; esta é a da primeira metade. O rótulo é o comportamento desejado (a citação está certa), mas o trecho só trata de metade da frase: mede o alarme falso da frase inteira como afirmação."
+  },
+  {
+    "id": "v10",
+    "afirmacao": "Não. O contrato exige antecedência mínima de 45 dias entre o pedido e a data desejada de recebimento, mas o lead-time real observado costuma ficar entre 55 e 65 dias.",
+    "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+    "esperado": "sustenta",
+    "motivo": "A mesma frase do v09, com a citação da segunda metade. O trecho também fala dos 45 dias prometidos."
+  },
+  {
+    "id": "c01",
+    "afirmacao": "A Katrina entrega em 30 dias.",
+    "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+    "esperado": "contradiz",
+    "motivo": "Número trocado: prometido 45, observado 55-65."
+  },
+  {
+    "id": "c02",
+    "afirmacao": "O contrato da Katrina exige antecedência mínima de 30 dias para os pedidos.",
+    "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+    "esperado": "contradiz",
+    "motivo": "Número trocado: a cláusula 3 exige 45 dias."
+  },
+  {
+    "id": "c03",
+    "afirmacao": "A Verdela vive atrasando as entregas.",
+    "trecho_id": "fornecedores/verdela-home.md#lead-time",
+    "esperado": "contradiz",
+    "motivo": "O trecho diz que ela cumpre o prometido, sem histórico de atraso."
+  },
+  {
+    "id": "c04",
+    "afirmacao": "O contrato com a Katrina tem cláusula de exclusividade para felpudo.",
+    "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/6-exclusividade",
+    "esperado": "contradiz",
+    "motivo": "A cláusula 6 diz que não há exclusividade."
+  },
+  {
+    "id": "c05",
+    "afirmacao": "A política permite comprar até 5 meses de giro médio de qualquer SKU.",
+    "trecho_id": "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
+    "esperado": "contradiz",
+    "motivo": "Número trocado: a R1 limita a 3 meses de giro (os 5 meses são só da exceção sazonal, noutro trecho)."
+  },
+  {
+    "id": "c06",
+    "afirmacao": "No Natal de 2024 o king size da Katrina encalhou.",
+    "trecho_id": "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025",
+    "esperado": "contradiz",
+    "motivo": "Premissa falsa do caso c09 do chat: vendeu 108% do previsto, estoque confortável, exceção acertada."
+  },
+  {
+    "id": "c07",
+    "afirmacao": "Um pedido de R$ 80 mil pode ser aprovado só pelo comprador chefe.",
+    "trecho_id": "politicas/aprovacao-compras.md#faixas-de-valor/faixa-3-r-60-000-ate-r-150-000",
+    "esperado": "contradiz",
+    "motivo": "A faixa 3 exige comprador chefe, gerente comercial e sócio financeiro."
+  },
+  {
+    "id": "c08",
+    "afirmacao": "A Malha Fina costuma atrasar e não é confiável no prazo.",
+    "trecho_id": "fornecedores/malha-fina-textil.md#lead-time",
+    "esperado": "contradiz",
+    "motivo": "Observado 20-25 dias para 20 prometidos, descrita como confiável."
+  },
+  {
+    "id": "c09",
+    "afirmacao": "O reajuste da Katrina em fevereiro de 2025 veio acima do teto de 8%.",
+    "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+    "esperado": "contradiz",
+    "motivo": "Número trocado: veio em +5,8%, dentro do teto de 8%."
+  },
+  {
+    "id": "n01",
+    "afirmacao": "A Verdela cumpre o prazo prometido, sem histórico de atraso.",
+    "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+    "esperado": "nao_trata",
+    "motivo": "Verdade sobre outro fornecedor: o trecho é o lead time da Katrina e não fala da Verdela."
+  },
+  {
+    "id": "n02",
+    "afirmacao": "A Malha Fina entrega em 20 a 25 dias.",
+    "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+    "esperado": "nao_trata",
+    "motivo": "Verdade sobre outro fornecedor, citando o lead time da Katrina."
+  },
+  {
+    "id": "n03",
+    "afirmacao": "O pedido mínimo da Verdela é de R$ 25.000.",
+    "trecho_id": "fornecedores/katrina-textil.md#condicoes-comerciais-padrao",
+    "esperado": "nao_trata",
+    "motivo": "Verdade sobre outro fornecedor. O trecho tem o pedido mínimo da Katrina (R$ 12.000), mas não fala da Verdela."
+  },
+  {
+    "id": "n04",
+    "afirmacao": "Para um pedido de R$ 80 mil, a aprovação deve ser feita pelo comprador chefe, pelo gerente comercial e pelo sócio financeiro, todos em unanimidade.",
+    "trecho_id": "politicas/aprovacao-compras.md#faixas-de-valor/faixa-2-r-15-000-ate-r-60-000",
+    "esperado": "nao_trata",
+    "motivo": "A frase do v04 citando a faixa errada: a faixa 2 vai até R$ 60 mil e não trata de um pedido de R$ 80 mil."
+  },
+  {
+    "id": "n05",
+    "afirmacao": "A Katrina dá prioridade a pedidos feitos até julho para entrega em outubro.",
+    "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+    "esperado": "nao_trata",
+    "motivo": "Fato verdadeiro (está em sazonalidade e capacidade) citando a cláusula de prazos, que não fala de prioridade por mês."
+  },
+  {
+    "id": "n06",
+    "afirmacao": "A categoria malha está em queda de participação.",
+    "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#malha-fina",
+    "esperado": "nao_trata",
+    "motivo": "Mesma palavra, outro assunto: o trecho é do fornecedor Malha Fina, não da categoria jogo cama malha."
+  },
+  {
+    "id": "n07",
+    "afirmacao": "O prejuízo com a linha Veraneio foi de cerca de R$ 22.000.",
+    "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
+    "esperado": "nao_trata",
+    "motivo": "O valor está em prejuízo estimado; a sequência dos fatos não fala de prejuízo em reais."
+  },
+  {
+    "id": "n08",
+    "afirmacao": "A exceção sazonal ainda não foi ratificada em reunião formal.",
+    "trecho_id": "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
+    "esperado": "nao_trata",
+    "motivo": "Fato da R2 citando a R1, que só fala do teto."
+  },
+  {
+    "id": "n09",
+    "afirmacao": "A Katrina responde por mais de 35% do faturamento da categoria de felpudo.",
+    "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/6-exclusividade",
+    "esperado": "nao_trata",
+    "motivo": "Fato dos riscos consolidados citando a cláusula de exclusividade, que não fala de participação no faturamento."
+  }
+]

@@ -149,3 +149,7 @@ _Avoid_: erro, fallback.
 **Registro de decisão**:
 O que fica gravado de cada pergunta respondida pelo chat: a pergunta, o entendimento com as probabilidades, a faixa, a ação, os SKUs, os trechos que foram ao redator, o redator e a resposta. Serve para auditoria e para recalibrar as faixas.
 _Avoid_: log (genérico demais), histórico de conversa (não há sessão).
+
+**Citação**:
+Referência `[<id do trecho>]` que o redator escreve junto de uma frase da resposta. O código extrai cada citação com a frase que a contém e dá um veredito: `confirmada` (o trecho sustenta a frase), `sem_suporte` (o trecho não trata dela), `contradita` (o trecho diz o contrário), `inventada` (o id não estava no contexto do redator, sem consultar o Jev) ou `incerta` (confiança do Jev abaixo do limiar, ou Jev não consultado). Toda citação que não é `confirmada` fica marcada no texto da resposta.
+_Avoid_: referência, fonte (é o trecho, não a citação), link.

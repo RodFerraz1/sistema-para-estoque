@@ -29,6 +29,7 @@ def test_todo_id_citado_nos_evals_existe_no_corpus() -> None:
     for par in carregar("pares_conflito.json"):
         citados.update((par["trecho_a"], par["trecho_b"]))
     citados.update(caso["trecho_id"] for caso in carregar("sinais.json"))
+    citados.update(caso["trecho_id"] for caso in carregar("citacoes.json"))
 
     assert citados - ids_corpus == set()
 
@@ -87,3 +88,14 @@ def test_casos_de_sinais_citam_produto_e_fornecedor_do_seed_com_os_tres_rotulos(
         assert set(caso["esperado"]) == {"atraso_do_fornecedor", "demanda_sazonal", "encalhe"}, caso["id"]
     for tipo in ("atraso_do_fornecedor", "demanda_sazonal", "encalhe"):
         assert sum(caso["esperado"][tipo] for caso in casos) >= 3, tipo
+
+
+def test_pares_de_citacao_tem_ao_menos_5_de_cada_relacao() -> None:
+    casos = carregar("citacoes.json")
+
+    assert len(casos) >= 15
+    assert len({caso["id"] for caso in casos}) == len(casos)
+    assert all(caso["afirmacao"] and caso["motivo"] for caso in casos)
+    por_relacao = Counter(caso["esperado"] for caso in casos)
+    assert set(por_relacao) == {"sustenta", "contradiz", "nao_trata"}
+    assert min(por_relacao.values()) >= 5

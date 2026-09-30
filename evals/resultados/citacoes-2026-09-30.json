@@ -1,0 +1,465 @@
+{
+  "executado_em": "2026-09-30T19:51:01+00:00",
+  "modelo_pedido": "jev-1.13.0",
+  "perguntas": {
+    "relacao": {
+      "type": "choice",
+      "instructions": "Como o `trecho` se relaciona com a `afirmacao`?",
+      "criteria": {
+        "sustenta": "O trecho afirma o que a afirmação diz, ou deixa claro que é verdade.",
+        "contradiz": "O trecho afirma o contrário da afirmação, ou deixa claro que ela é falsa.",
+        "nao_trata": "O trecho não fala do que a afirmação diz, nem a favor nem contra."
+      }
+    }
+  },
+  "respostas": [
+    {
+      "caso": "v01",
+      "latencia_s": 0.36,
+      "avaliacao": {
+        "afirmacao": "O contrato com a Katrina exige que os pedidos sejam colocados com antecedência mínima de 45 dias.",
+        "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+        "escolha": "sustenta",
+        "confianca": 1.0,
+        "probabilidades": {
+          "contradiz": 0.0,
+          "sustenta": 1.0,
+          "nao_trata": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "v02",
+      "latencia_s": 0.268,
+      "avaliacao": {
+        "afirmacao": "O lead time observado da Katrina fica entre 55 e 65 dias, acima dos 45 dias prometidos.",
+        "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+        "escolha": "sustenta",
+        "confianca": 1.0,
+        "probabilidades": {
+          "sustenta": 1.0,
+          "contradiz": 0.0,
+          "nao_trata": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "v03",
+      "latencia_s": 0.258,
+      "avaliacao": {
+        "afirmacao": "A Verdela cumpre o prazo prometido e não tem histórico de atraso.",
+        "trecho_id": "fornecedores/verdela-home.md#lead-time",
+        "escolha": "sustenta",
+        "confianca": 1.0,
+        "probabilidades": {
+          "nao_trata": 0.0,
+          "sustenta": 1.0,
+          "contradiz": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "v04",
+      "latencia_s": 0.269,
+      "avaliacao": {
+        "afirmacao": "Para um pedido de R$ 80 mil, a aprovação deve ser feita pelo comprador chefe, pelo gerente comercial e pelo sócio financeiro, todos em unanimidade.",
+        "trecho_id": "politicas/aprovacao-compras.md#faixas-de-valor/faixa-3-r-60-000-ate-r-150-000",
+        "escolha": "sustenta",
+        "confianca": 1.0,
+        "probabilidades": {
+          "contradiz": 0.0,
+          "nao_trata": 0.0,
+          "sustenta": 1.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "v05",
+      "latencia_s": 0.329,
+      "avaliacao": {
+        "afirmacao": "Não há cláusula de exclusividade no contrato com a Katrina, e o atacadista pode comprar felpudo e jogos de cama de outros fornecedores.",
+        "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/6-exclusividade",
+        "escolha": "sustenta",
+        "confianca": 1.0,
+        "probabilidades": {
+          "contradiz": 0.0,
+          "nao_trata": 0.0,
+          "sustenta": 1.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "v06",
+      "latencia_s": 0.251,
+      "avaliacao": {
+        "afirmacao": "A regra sazonal permite, em datas quentes como o Natal, estoque adicional de até 2 meses, totalizando 5 meses, desde que a exceção seja registrada em ata.",
+        "trecho_id": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+        "escolha": "sustenta",
+        "confianca": 0.98,
+        "probabilidades": {
+          "contradiz": 0.01,
+          "nao_trata": 0.0,
+          "sustenta": 0.99
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "v07",
+      "latencia_s": 0.304,
+      "avaliacao": {
+        "afirmacao": "Na revisão do Q1/2025, o lead time real da Katrina ficou em 62 dias, o terceiro trimestre seguido acima do contratado.",
+        "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+        "escolha": "sustenta",
+        "confianca": 0.98,
+        "probabilidades": {
+          "nao_trata": 0.0,
+          "contradiz": 0.01,
+          "sustenta": 0.99
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "v08",
+      "latencia_s": 0.264,
+      "avaliacao": {
+        "afirmacao": "A venda de dezembro do king size no Natal de 2024 cumpriu 108% do previsto.",
+        "trecho_id": "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025",
+        "escolha": "sustenta",
+        "confianca": 1.0,
+        "probabilidades": {
+          "nao_trata": 0.0,
+          "sustenta": 1.0,
+          "contradiz": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "v09",
+      "latencia_s": 0.259,
+      "avaliacao": {
+        "afirmacao": "Não. O contrato exige antecedência mínima de 45 dias entre o pedido e a data desejada de recebimento, mas o lead-time real observado costuma ficar entre 55 e 65 dias.",
+        "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+        "escolha": "sustenta",
+        "confianca": 0.41,
+        "probabilidades": {
+          "contradiz": 0.03,
+          "nao_trata": 0.36,
+          "sustenta": 0.61
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "v10",
+      "latencia_s": 0.29,
+      "avaliacao": {
+        "afirmacao": "Não. O contrato exige antecedência mínima de 45 dias entre o pedido e a data desejada de recebimento, mas o lead-time real observado costuma ficar entre 55 e 65 dias.",
+        "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+        "escolha": "sustenta",
+        "confianca": 0.87,
+        "probabilidades": {
+          "contradiz": 0.08,
+          "nao_trata": 0.01,
+          "sustenta": 0.91
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c01",
+      "latencia_s": 0.262,
+      "avaliacao": {
+        "afirmacao": "A Katrina entrega em 30 dias.",
+        "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+        "escolha": "contradiz",
+        "confianca": 1.0,
+        "probabilidades": {
+          "nao_trata": 0.0,
+          "contradiz": 1.0,
+          "sustenta": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c02",
+      "latencia_s": 0.253,
+      "avaliacao": {
+        "afirmacao": "O contrato da Katrina exige antecedência mínima de 30 dias para os pedidos.",
+        "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+        "escolha": "contradiz",
+        "confianca": 0.97,
+        "probabilidades": {
+          "contradiz": 0.98,
+          "sustenta": 0.02,
+          "nao_trata": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c03",
+      "latencia_s": 0.272,
+      "avaliacao": {
+        "afirmacao": "A Verdela vive atrasando as entregas.",
+        "trecho_id": "fornecedores/verdela-home.md#lead-time",
+        "escolha": "contradiz",
+        "confianca": 1.0,
+        "probabilidades": {
+          "nao_trata": 0.0,
+          "sustenta": 0.0,
+          "contradiz": 1.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c04",
+      "latencia_s": 0.26,
+      "avaliacao": {
+        "afirmacao": "O contrato com a Katrina tem cláusula de exclusividade para felpudo.",
+        "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/6-exclusividade",
+        "escolha": "contradiz",
+        "confianca": 1.0,
+        "probabilidades": {
+          "sustenta": 0.0,
+          "contradiz": 1.0,
+          "nao_trata": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c05",
+      "latencia_s": 0.292,
+      "avaliacao": {
+        "afirmacao": "A política permite comprar até 5 meses de giro médio de qualquer SKU.",
+        "trecho_id": "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
+        "escolha": "contradiz",
+        "confianca": 1.0,
+        "probabilidades": {
+          "contradiz": 1.0,
+          "nao_trata": 0.0,
+          "sustenta": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c06",
+      "latencia_s": 0.346,
+      "avaliacao": {
+        "afirmacao": "No Natal de 2024 o king size da Katrina encalhou.",
+        "trecho_id": "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025",
+        "escolha": "contradiz",
+        "confianca": 0.86,
+        "probabilidades": {
+          "nao_trata": 0.08,
+          "contradiz": 0.9,
+          "sustenta": 0.02
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c07",
+      "latencia_s": 0.325,
+      "avaliacao": {
+        "afirmacao": "Um pedido de R$ 80 mil pode ser aprovado só pelo comprador chefe.",
+        "trecho_id": "politicas/aprovacao-compras.md#faixas-de-valor/faixa-3-r-60-000-ate-r-150-000",
+        "escolha": "contradiz",
+        "confianca": 1.0,
+        "probabilidades": {
+          "nao_trata": 0.0,
+          "sustenta": 0.0,
+          "contradiz": 1.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c08",
+      "latencia_s": 0.254,
+      "avaliacao": {
+        "afirmacao": "A Malha Fina costuma atrasar e não é confiável no prazo.",
+        "trecho_id": "fornecedores/malha-fina-textil.md#lead-time",
+        "escolha": "contradiz",
+        "confianca": 1.0,
+        "probabilidades": {
+          "contradiz": 1.0,
+          "nao_trata": 0.0,
+          "sustenta": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "c09",
+      "latencia_s": 0.361,
+      "avaliacao": {
+        "afirmacao": "O reajuste da Katrina em fevereiro de 2025 veio acima do teto de 8%.",
+        "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+        "escolha": "contradiz",
+        "confianca": 1.0,
+        "probabilidades": {
+          "contradiz": 1.0,
+          "sustenta": 0.0,
+          "nao_trata": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "n01",
+      "latencia_s": 0.258,
+      "avaliacao": {
+        "afirmacao": "A Verdela cumpre o prazo prometido, sem histórico de atraso.",
+        "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+        "escolha": "contradiz",
+        "confianca": 0.76,
+        "probabilidades": {
+          "sustenta": 0.0,
+          "nao_trata": 0.16,
+          "contradiz": 0.84
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "n02",
+      "latencia_s": 0.247,
+      "avaliacao": {
+        "afirmacao": "A Malha Fina entrega em 20 a 25 dias.",
+        "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+        "escolha": "contradiz",
+        "confianca": 0.6,
+        "probabilidades": {
+          "nao_trata": 0.26,
+          "contradiz": 0.74,
+          "sustenta": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "n03",
+      "latencia_s": 0.254,
+      "avaliacao": {
+        "afirmacao": "O pedido mínimo da Verdela é de R$ 25.000.",
+        "trecho_id": "fornecedores/katrina-textil.md#condicoes-comerciais-padrao",
+        "escolha": "contradiz",
+        "confianca": 0.68,
+        "probabilidades": {
+          "nao_trata": 0.21,
+          "contradiz": 0.79,
+          "sustenta": 0.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "n04",
+      "latencia_s": 0.266,
+      "avaliacao": {
+        "afirmacao": "Para um pedido de R$ 80 mil, a aprovação deve ser feita pelo comprador chefe, pelo gerente comercial e pelo sócio financeiro, todos em unanimidade.",
+        "trecho_id": "politicas/aprovacao-compras.md#faixas-de-valor/faixa-2-r-15-000-ate-r-60-000",
+        "escolha": "nao_trata",
+        "confianca": 0.5,
+        "probabilidades": {
+          "contradiz": 0.33,
+          "sustenta": 0.0,
+          "nao_trata": 0.67
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "n05",
+      "latencia_s": 0.306,
+      "avaliacao": {
+        "afirmacao": "A Katrina dá prioridade a pedidos feitos até julho para entrega em outubro.",
+        "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+        "escolha": "nao_trata",
+        "confianca": 0.3,
+        "probabilidades": {
+          "contradiz": 0.43,
+          "sustenta": 0.04,
+          "nao_trata": 0.53
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "n06",
+      "latencia_s": 0.27,
+      "avaliacao": {
+        "afirmacao": "A categoria malha está em queda de participação.",
+        "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#malha-fina",
+        "escolha": "nao_trata",
+        "confianca": 0.96,
+        "probabilidades": {
+          "nao_trata": 0.97,
+          "sustenta": 0.01,
+          "contradiz": 0.02
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "n07",
+      "latencia_s": 0.285,
+      "avaliacao": {
+        "afirmacao": "O prejuízo com a linha Veraneio foi de cerca de R$ 22.000.",
+        "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
+        "escolha": "nao_trata",
+        "confianca": 0.94,
+        "probabilidades": {
+          "nao_trata": 0.96,
+          "contradiz": 0.02,
+          "sustenta": 0.02
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "n08",
+      "latencia_s": 0.246,
+      "avaliacao": {
+        "afirmacao": "A exceção sazonal ainda não foi ratificada em reunião formal.",
+        "trecho_id": "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
+        "escolha": "nao_trata",
+        "confianca": 0.99,
+        "probabilidades": {
+          "contradiz": 0.0,
+          "sustenta": 0.0,
+          "nao_trata": 1.0
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "n09",
+      "latencia_s": 0.327,
+      "avaliacao": {
+        "afirmacao": "A Katrina responde por mais de 35% do faturamento da categoria de felpudo.",
+        "trecho_id": "contratos/contrato-katrina-2025.md#clausulas-comerciais/6-exclusividade",
+        "escolha": "nao_trata",
+        "confianca": 0.98,
+        "probabilidades": {
+          "contradiz": 0.01,
+          "sustenta": 0.0,
+          "nao_trata": 0.99
+        },
+        "modelo": "jev-1.13.0"
+      }
+    }
+  ]
+}

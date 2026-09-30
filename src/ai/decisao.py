@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from src.ai.schemas import (
+    AvaliacaoCitacao,
     AvaliacaoConflito,
     AvaliacaoSinais,
     AvaliacaoTrecho,
@@ -39,3 +40,9 @@ class DecisionModel(Protocol):
     def avaliar_sinais(
         self, fornecedor: str, produto: ProdutoDoSinal, trechos: Sequence[Trecho]
     ) -> list[AvaliacaoSinais]: ...
+
+    def verificar_citacoes(
+        self, pares: Sequence[tuple[str, Trecho]]
+    ) -> list[AvaliacaoCitacao]:
+        """Uma avaliação por par (afirmação, trecho citado), na ordem dos pares."""
+        ...

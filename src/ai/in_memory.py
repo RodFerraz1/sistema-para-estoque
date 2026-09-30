@@ -13,6 +13,7 @@ from src.ai.registro import RegistrosDecisao
 from src.ai.repositorio import TrechosRepositorio
 from src.ai.schemas import (
     NENHUM_PRODUTO,
+    AvaliacaoCitacao,
     AvaliacaoConflito,
     AvaliacaoSinais,
     AvaliacaoTrecho,
@@ -21,6 +22,7 @@ from src.ai.schemas import (
     ProdutoCatalogo,
     ProdutoDoSinal,
     RegistroDecisao,
+    Relacao,
     Trecho,
     TrechoIndexado,
     TrechoRecuperado,
@@ -102,6 +104,9 @@ ENTENDIMENTO_PADRAO = Entendimento(
     produto=Escolha(escolha=NENHUM_PRODUTO, confianca=1.0, probabilidades={NENHUM_PRODUTO: 1.0}),
     modelo="in-memory",
 )
+CITACAO_PADRAO: Escolha[Relacao] = Escolha(
+    escolha="nao_trata", confianca=1.0, probabilidades={"nao_trata": 1.0}
+)
 
 
 class InMemoryDecisionModel(DecisionModel):
@@ -113,9 +118,11 @@ class InMemoryDecisionModel(DecisionModel):
     que também não está em `padrao` vale 0. Os sinais seguem a mesma regra com
     `sinais` e `sinais_padrao`, qualquer que seja o fornecedor ou o produto.
     Um par é procurado em `conflitos` nas duas ordens e, se não estiver lá,
-    vale `conflito_padrao`. Com `falhar_entendimento`, `falhar_trechos`,
-    `falhar_conflitos` ou `falhar_sinais`, o método correspondente lança
-    `DecisaoIndisponivel` como o Jev fora do ar.
+    vale `conflito_padrao`. A relação de uma citação é configurada pelo trecho
+    citado em `citacoes`, qualquer que seja a afirmação, e vale `citacao_padrao`
+    (`nao_trata` com confiança 1) para os outros. Com `falhar_entendimento`,
+    `falhar_trechos`, `falhar_conflitos`, `falhar_sinais` ou `falhar_citacoes`,
+    o método correspondente lança `DecisaoIndisponivel` como o Jev fora do ar.
     """
 
     def __init__(
@@ -129,11 +136,14 @@ class InMemoryDecisionModel(DecisionModel):
         entendimento_padrao: Entendimento = ENTENDIMENTO_PADRAO,
         sinais: Mapping[str, ProbabilidadesSinais] | None = None,
         sinais_padrao: ProbabilidadesSinais | None = None,
+        citacoes: Mapping[str, Escolha[Relacao]] | None = None,
+        citacao_padrao: Escolha[Relacao] = CITACAO_PADRAO,
         modelo: str = "in-memory",
         falhar_entendimento: bool = False,
         falhar_trechos: bool = False,
         falhar_conflitos: bool = False,
         falhar_sinais: bool = False,
+        falhar_citacoes: bool = False,
     ) -> None:
         self._entendimentos = dict(entendimentos or {})
         self._entendimento_padrao = entendimento_padrao
@@ -148,6 +158,9 @@ class InMemoryDecisionModel(DecisionModel):
         self._sinais = dict(sinais or {})
         self._sinais_padrao = sinais_padrao or {}
         self._falhar_sinais = falhar_sinais
+        self._citacoes = dict(citacoes or {})
+        self._citacao_padrao = citacao_padrao
+        self._falhar_citacoes = falhar_citacoes
 
     def entender_pergunta(
         self, pergunta: str, produtos: Sequence[ProdutoCatalogo]
@@ -210,6 +223,21 @@ class InMemoryDecisionModel(DecisionModel):
                 }
             )
             for trecho in trechos
+        ]
+
+    def verificar_citacoes(
+        self, pares: Sequence[tuple[str, Trecho]]
+    ) -> list[AvaliacaoCitacao]:
+        if self._falhar_citacoes:
+            raise DecisaoIndisponivel("InMemoryDecisionModel configurado para falhar em verificar_citacoes")
+        return [
+            AvaliacaoCitacao(
+                afirmacao=afirmacao,
+                trecho_id=trecho.id,
+                **self._citacoes.get(trecho.id, self._citacao_padrao).model_dump(),
+                modelo=self._modelo,
+            )
+            for afirmacao, trecho in pares
         ]
 
 

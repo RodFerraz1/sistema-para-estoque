@@ -1,4 +1,4 @@
-"""Testes do `InMemoryDecisionModel` no entendimento da pergunta e nos sinais."""
+"""Testes do `InMemoryDecisionModel` no entendimento da pergunta, nos sinais e nas citações."""
 from __future__ import annotations
 
 import pytest
@@ -6,7 +6,7 @@ import pytest
 from src.ai.decisao import DecisaoIndisponivel
 from src.ai.in_memory import InMemoryDecisionModel
 from src.ai.schemas import ProdutoDoSinal
-from tests.fakes import make_entendimento, make_trecho
+from tests.fakes import make_entendimento, make_relacao, make_trecho
 
 TOALHA = ProdutoDoSinal(nome="Toalha Banho Conforto", categoria="felpudo")
 
@@ -61,3 +61,25 @@ def test_sinais_configurados_por_trecho_com_padrao_e_zero_no_resto() -> None:
 def test_falha_nos_sinais_como_o_jev_fora_do_ar() -> None:
     with pytest.raises(DecisaoIndisponivel):
         InMemoryDecisionModel(falhar_sinais=True).avaliar_sinais("Katrina Têxtil", TOALHA, [make_trecho("a.md#s")])
+
+
+def test_citacoes_configuradas_pelo_trecho_citado_e_padrao_nao_trata() -> None:
+    decisao = InMemoryDecisionModel(citacoes={"a.md#atraso": make_relacao("sustenta", 0.9)}, modelo="jev-1.13.0")
+
+    sustenta, padrao = decisao.verificar_citacoes(
+        [("A Katrina atrasa.", make_trecho("a.md#atraso")), ("A Verdela atrasa.", make_trecho("b.md#outro"))]
+    )
+
+    assert (sustenta.afirmacao, sustenta.trecho_id, sustenta.escolha, sustenta.confianca, sustenta.modelo) == (
+        "A Katrina atrasa.",
+        "a.md#atraso",
+        "sustenta",
+        0.9,
+        "jev-1.13.0",
+    )
+    assert (padrao.trecho_id, padrao.escolha, padrao.confianca) == ("b.md#outro", "nao_trata", 1.0)
+
+
+def test_falha_nas_citacoes_como_o_jev_fora_do_ar() -> None:
+    with pytest.raises(DecisaoIndisponivel):
+        InMemoryDecisionModel(falhar_citacoes=True).verificar_citacoes([("A Katrina atrasa.", make_trecho("a.md#s"))])

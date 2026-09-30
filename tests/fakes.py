@@ -14,7 +14,7 @@ from uuid import UUID
 from src.ai.embeddings import Embedder
 from src.ai.in_memory import InMemoryTrechosRepositorio
 from src.ai.redator import Redator, RedatorIndisponivel
-from src.ai.schemas import NENHUM_PRODUTO, Entendimento, Escolha, Intencao, Trecho, TrechoIndexado
+from src.ai.schemas import NENHUM_PRODUTO, Entendimento, Escolha, Intencao, Relacao, Trecho, TrechoIndexado
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.in_memory import (
     ItemPedidoCompra,
@@ -232,6 +232,11 @@ def make_entendimento(
         ),
         modelo=modelo,
     )
+
+
+def make_relacao(escolha: Relacao, confianca: float = 0.95) -> Escolha[Relacao]:
+    """Resposta da pergunta de citação para configurar o `InMemoryDecisionModel`."""
+    return Escolha(escolha=escolha, confianca=confianca, probabilidades={escolha: confianca})
 
 
 class RedatorGravador(Redator):

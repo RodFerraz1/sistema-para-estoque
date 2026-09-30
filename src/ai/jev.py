@@ -3,8 +3,9 @@
 As perguntas de intenção e de trecho são as da rodada 2 do spike, em PT, com
 que as faixas do chat e os `LIMIARES` da busca foram calibrados. A de produto
 foi medida por `scripts/avaliar_entendimento.py`, que calibrou o
-`LIMIAR_PRODUTO`, e as de sinais por `scripts/avaliar_sinais.py`, que calibrou
-os `LIMIARES_SINAIS`. Mudar a redação exige medir de novo.
+`LIMIAR_PRODUTO`, as de sinais por `scripts/avaliar_sinais.py`, que calibrou
+os `LIMIARES_SINAIS`, e a de citação por `scripts/avaliar_citacoes.py`, que
+calibrou o `LIMIAR_CITACAO`. Mudar a redação exige medir de novo.
 """
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ from typesafe_sdk import (
 from src.ai.decisao import DecisaoIndisponivel, DecisionModel
 from src.ai.schemas import (
     NENHUM_PRODUTO,
+    AvaliacaoCitacao,
     AvaliacaoConflito,
     AvaliacaoSinais,
     AvaliacaoTrecho,
@@ -132,6 +134,17 @@ PERGUNTAS_SINAIS: dict[str, Question] = {
     ),
 }
 
+PERGUNTAS_CITACAO: dict[str, Question] = {
+    "relacao": Choice(
+        instructions="Como o `trecho` se relaciona com a `afirmacao`?",
+        criteria={
+            "sustenta": "O trecho afirma o que a afirmação diz, ou deixa claro que é verdade.",
+            "contradiz": "O trecho afirma o contrário da afirmação, ou deixa claro que ela é falsa.",
+            "nao_trata": "O trecho não fala do que a afirmação diz, nem a favor nem contra.",
+        },
+    )
+}
+
 
 class ClienteSystemOne(Protocol):
     def system_one(
@@ -226,6 +239,26 @@ class JevDecisionModel(DecisionModel):
             atraso_do_fornecedor=resposta.nouls["atraso_do_fornecedor"].noul,
             demanda_sazonal=resposta.nouls["demanda_sazonal"].noul,
             encalhe=resposta.nouls["encalhe"].noul,
+            modelo=resposta.model,
+        )
+
+    def verificar_citacoes(
+        self, pares: Sequence[tuple[str, Trecho]]
+    ) -> list[AvaliacaoCitacao]:
+        return _em_paralelo(self._verificar_citacao, pares)
+
+    def _verificar_citacao(self, par: tuple[str, Trecho]) -> AvaliacaoCitacao:
+        afirmacao, trecho = par
+        resposta = self._cliente.system_one(
+            {"afirmacao": afirmacao, "trecho": _trecho_para_o_state(trecho)}, PERGUNTAS_CITACAO
+        )
+        relacao = resposta.choices["relacao"]
+        return AvaliacaoCitacao(
+            afirmacao=afirmacao,
+            trecho_id=trecho.id,
+            escolha=relacao.choice,
+            confianca=relacao.confidence,
+            probabilidades=relacao.probabilities,
             modelo=resposta.model,
         )
 

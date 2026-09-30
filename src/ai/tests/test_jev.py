@@ -16,7 +16,8 @@ from src.ai.busca import LIMIARES
 from src.ai.corpus import ler_corpus
 from src.ai.decisao import DecisaoIndisponivel
 from src.ai.identificacao import LIMIAR_PRODUTO, produtos_do_catalogo
-from src.ai.jev import PERGUNTAS_SINAIS, JevDecisionModel, criar_cliente
+from src.ai.citacoes import LIMIAR_CITACAO, veredito
+from src.ai.jev import PERGUNTAS_CITACAO, PERGUNTAS_SINAIS, JevDecisionModel, criar_cliente
 from src.ai.schemas import ProdutoDoSinal, Trecho
 from src.ai.sinais import LIMIARES_SINAIS
 from src.db.config import get_settings
@@ -373,6 +374,79 @@ def test_erro_do_sdk_num_trecho_dos_sinais_vira_decisao_indisponivel_para_o_lote
         JevDecisionModel(cliente).avaliar_sinais("Katrina Têxtil", TOALHA, trechos)
 
 
+def test_cada_citacao_vai_num_request_com_a_afirmacao_e_o_trecho_no_state() -> None:
+    cliente = ClienteFalso()
+    prazos = make_trecho(
+        "contratos/katrina.md#prazos",
+        "Antecedência mínima de 45 dias.",
+        titulo="Contrato Katrina > Prazos",
+        tipo="contrato",
+        data=date(2025, 1, 20),
+    )
+
+    JevDecisionModel(cliente).verificar_citacoes([("A Katrina pede 45 dias.", prazos)])
+
+    assert [(state, sorted(perguntas)) for state, perguntas in cliente.pedidos] == [
+        (
+            {
+                "afirmacao": "A Katrina pede 45 dias.",
+                "trecho": {
+                    "titulo": "Contrato Katrina > Prazos",
+                    "tipo": "contrato",
+                    "data": "2025-01-20",
+                    "texto": "Antecedência mínima de 45 dias.",
+                },
+            },
+            ["relacao"],
+        )
+    ]
+
+
+def test_pergunta_de_citacao_e_a_da_spec() -> None:
+    cliente = ClienteFalso()
+
+    JevDecisionModel(cliente).verificar_citacoes([("A Katrina atrasa.", make_trecho("a.md#s", "Texto."))])
+
+    [(_, perguntas)] = cliente.pedidos
+    assert perguntas == PERGUNTAS_CITACAO
+    relacao = perguntas["relacao"]
+    assert isinstance(relacao, Choice)
+    assert relacao.instructions == "Como o `trecho` se relaciona com a `afirmacao`?"
+    assert relacao.criteria == {
+        "sustenta": "O trecho afirma o que a afirmação diz, ou deixa claro que é verdade.",
+        "contradiz": "O trecho afirma o contrário da afirmação, ou deixa claro que ela é falsa.",
+        "nao_trata": "O trecho não fala do que a afirmação diz, nem a favor nem contra.",
+    }
+
+
+def test_cada_resposta_de_citacao_vira_avaliacao_na_ordem_dos_pares() -> None:
+    cliente = ClienteFalso(
+        modelo="jev-1.13.1",
+        escolhas={
+            "relacao": {
+                "choice": "contradiz",
+                "confidence": 0.83,
+                "probabilities": {"sustenta": 0.05, "contradiz": 0.89, "nao_trata": 0.06},
+            }
+        },
+    )
+    pares = [(f"Afirmação {i}.", make_trecho(f"a.md#s{i}", f"Texto {i}.")) for i in range(12)]
+
+    avaliacoes = JevDecisionModel(cliente).verificar_citacoes(pares)
+
+    assert [(a.afirmacao, a.trecho_id) for a in avaliacoes] == [(af, t.id) for af, t in pares]
+    assert {(a.escolha, a.confianca, a.modelo) for a in avaliacoes} == {("contradiz", 0.83, "jev-1.13.1")}
+    assert avaliacoes[0].probabilidades == {"sustenta": 0.05, "contradiz": 0.89, "nao_trata": 0.06}
+
+
+def test_erro_do_sdk_numa_citacao_vira_decisao_indisponivel_para_o_lote_todo() -> None:
+    cliente = ClienteFalso(falha_no_texto="Texto 3.")
+    pares = [(f"Afirmação {i}.", make_trecho(f"a.md#s{i}", f"Texto {i}.")) for i in range(6)]
+
+    with pytest.raises(DecisaoIndisponivel, match="timed out"):
+        JevDecisionModel(cliente).verificar_citacoes(pares)
+
+
 @pytest.fixture
 def jev_real() -> Iterator[JevDecisionModel]:
     settings = get_settings()
@@ -441,3 +515,23 @@ def test_jev_real_ve_o_atraso_da_katrina_so_para_a_katrina(jev_real: JevDecision
     assert da_katrina.atraso_do_fornecedor > LIMIARES_SINAIS.atraso_do_fornecedor
     assert da_katrina.encalhe <= LIMIARES_SINAIS.encalhe
     assert da_malha_fina.atraso_do_fornecedor <= LIMIARES_SINAIS.atraso_do_fornecedor
+
+
+@pytest.mark.externo
+def test_jev_real_confirma_o_prazo_do_contrato_e_nao_o_numero_trocado(jev_real: JevDecisionModel) -> None:
+    prazos = next(
+        t for t in ler_corpus(RAIZ / "corpus") if t.id == "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos"
+    )
+
+    certa, trocada = jev_real.verificar_citacoes(
+        [
+            ("O contrato com a Katrina exige que os pedidos sejam colocados com antecedência mínima de 45 dias.", prazos),
+            ("O contrato da Katrina exige antecedência mínima de 30 dias para os pedidos.", prazos),
+        ]
+    )
+
+    assert certa.modelo == "jev-1.13.0"
+    assert veredito(certa) == "confirmada"
+    assert veredito(trocada) == "contradita"
+    assert set(certa.probabilidades) == {"sustenta", "contradiz", "nao_trata"}
+    assert certa.confianca >= LIMIAR_CITACAO
