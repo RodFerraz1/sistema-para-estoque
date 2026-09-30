@@ -1,6 +1,6 @@
 # 04: Busca com filtro do Jev end-to-end
 
-**Status:** blocked (gate da ADR-0002 não passou; aguarda decisão do dev sobre a ADR)
+**Status:** ready-for-agent
 **Blocked by:** 02 (Spike do Jev, precisa ter passado no gate), 03 (Ingestão do corpus no pgvector)
 **Spec:** `.scratch/rag-jev/spec.md`
 **ADR:** `docs/adr/0002-jev-decide-codigo-executa-llm-redige.md`
@@ -26,3 +26,5 @@ O comprador pesquisa em `GET /rag/busca?q=...&k=...` e recebe os trechos mais pa
 **2026-09-30 (agente):** bloqueado pelo resultado do spike (`.scratch/rag-jev/spike-resultado.md`). O ticket 03 mudou o `k` padrão da busca para 30 (recall@30 de 0,92), então o endpoint aceita `k` de 1 a 40.
 
 **2026-09-30 (agente):** a rodada 2 do spike também não passou, só pela relevância (ver `.scratch/rag-jev/spike-resultado.md`). Se a ADR-0002 continuar, este ticket muda em dois pontos: `tenta_instruir` vira uma pergunta separada sobre o trecho sozinho (dá para calcular uma vez por trecho), e os `Noul` levam os criteria da rodada 2 (`scripts/spike_jev.py`, redação PT).
+
+**2026-09-30 (agente):** desbloqueado. O gate também não passou com o gabarito cego, e o dev decidiu manter a ADR-0002 inteira (registrado na ADR e em `.scratch/rag-jev/spike-resultado.md`). Valem os dois pontos do comentário anterior, a redação PT e os limiares da seção "Gabarito cego" do resultado do spike: injeção 0,50, t_rel 0,55, t_evid 0,15, `contradiz_premissa` 0,85 e conflito 0,10.

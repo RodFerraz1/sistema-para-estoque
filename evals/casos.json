@@ -44,11 +44,12 @@
     "pergunta": "No Natal de 2024 o king size da Katrina encalhou, então esse ano compro só 3 meses de giro?",
     "intencao": "sugestao_compra",
     "trechos_relevantes": [
+      "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
+      "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+      "reunioes/2024-11-natal-king-size.md#contexto",
       "reunioes/2024-11-natal-king-size.md#decisao",
       "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
-      "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025",
-      "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
-      "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal"
+      "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025"
     ],
     "premissa_falsa": "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025"
   },
@@ -57,13 +58,12 @@
     "pergunta": "Vale a pena antecipar o pedido de toalha Conforto antes do reajuste de agosto da Katrina?",
     "intencao": "sugestao_compra",
     "trechos_relevantes": [
+      "contratos/contrato-katrina-2025.md#clausulas-comerciais/4-reajuste",
+      "mercado/algodao-brasil-q1-2026.md#situacao-atual-dezembro-2025-janeiro-2026",
+      "mercado/algodao-brasil-q1-2026.md#cenario-de-curto-prazo-proximos-6-meses",
       "mercado/algodao-brasil-q1-2026.md#implicacoes-para-a-linha-do-atacadista",
       "mercado/algodao-brasil-q1-2026.md#recomendacao-analitica",
-      "contratos/contrato-katrina-2025.md#clausulas-comerciais/4-reajuste",
-      "fornecedores/katrina-textil.md#condicoes-comerciais-padrao",
-      "fornecedores/katrina-textil.md#riscos-conhecidos",
-      "mercado/algodao-brasil-q1-2026.md#cenario-de-curto-prazo-proximos-6-meses",
-      "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025"
+      "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque"
     ],
     "premissa_falsa": null
   },
@@ -72,10 +72,9 @@
     "pergunta": "A Verdela lançou uma colcha nova, quanto eu peço no primeiro pedido?",
     "intencao": "sugestao_compra",
     "trechos_relevantes": [
+      "fornecedores/verdela-home.md#condicoes-comerciais-padrao",
       "politicas/estoque-e-giro.md#regras/r3-colecao-nova-sem-historico",
-      "reunioes/2024-07-erro-jogo-veraneio.md#aprendizados-formalizados",
-      "reunioes/2024-07-erro-jogo-veraneio.md#o-que-virou-politica",
-      "fornecedores/verdela-home.md#condicoes-comerciais-padrao"
+      "reunioes/2024-07-erro-jogo-veraneio.md#aprendizados-formalizados"
     ],
     "premissa_falsa": null
   },
@@ -84,11 +83,13 @@
     "pergunta": "A Katrina entrega em 45 dias, então posso esperar até outubro pra comprar o king do Natal?",
     "intencao": "sugestao_compra",
     "trechos_relevantes": [
+      "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+      "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
       "fornecedores/katrina-textil.md#lead-time",
       "fornecedores/katrina-textil.md#sazonalidade-e-capacidade",
-      "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+      "mercado/tendencia-cama-mesa-banho-2026.md#recomendacao-analitica",
       "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
-      "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos"
+      "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil"
     ],
     "premissa_falsa": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil"
   },
@@ -98,11 +99,14 @@
     "intencao": "sugestao_compra",
     "trechos_relevantes": [
       "fornecedores/malha-fina-textil.md#condicoes-comerciais-padrao",
+      "fornecedores/malha-fina-textil.md#lead-time",
       "fornecedores/malha-fina-textil.md#uso-estrategico",
       "fornecedores/malha-fina-textil.md#riscos",
-      "reunioes/2025-q1-revisao-fornecedores.md#malha-fina",
+      "politicas/aprovacao-compras.md#faixas-de-valor/faixa-2-r-15-000-ate-r-60-000",
+      "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
       "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
-      "politicas/aprovacao-compras.md#faixas-de-valor/faixa-2-r-15-000-ate-r-60-000"
+      "politicas/estoque-e-giro.md#regras/r5-prazo-de-pagamento-vs-giro",
+      "reunioes/2025-q1-revisao-fornecedores.md#malha-fina"
     ],
     "premissa_falsa": null
   },
@@ -111,11 +115,11 @@
     "pergunta": "Qual o lead time de verdade da Katrina?",
     "intencao": "politica_ou_fornecedor",
     "trechos_relevantes": [
-      "fornecedores/katrina-textil.md#lead-time",
-      "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
-      "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
-      "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
       "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+      "fornecedores/katrina-textil.md#lead-time",
+      "fornecedores/katrina-textil.md#sazonalidade-e-capacidade",
+      "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+      "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
       "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento"
     ],
     "premissa_falsa": null
@@ -125,6 +129,8 @@
     "pergunta": "Quem precisa aprovar um pedido de 80 mil?",
     "intencao": "politica_ou_fornecedor",
     "trechos_relevantes": [
+      "politicas/aprovacao-compras.md#faixas-de-valor",
+      "politicas/aprovacao-compras.md#faixas-de-valor/faixa-2-r-15-000-ate-r-60-000",
       "politicas/aprovacao-compras.md#faixas-de-valor/faixa-3-r-60-000-ate-r-150-000",
       "politicas/aprovacao-compras.md#excecoes-especificas"
     ],
@@ -135,11 +141,11 @@
     "pergunta": "A política deixa passar de 3 meses de estoque no Natal?",
     "intencao": "politica_ou_fornecedor",
     "trechos_relevantes": [
+      "mercado/algodao-brasil-q1-2026.md#recomendacao-analitica",
       "politicas/estoque-e-giro.md#regras/r1-teto-padrao-de-estoque",
       "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
       "politicas/estoque-e-giro.md#governanca",
-      "mercado/algodao-brasil-q1-2026.md#recomendacao-analitica",
-      "reunioes/2024-11-natal-king-size.md#o-que-ficou-pendente"
+      "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025"
     ],
     "premissa_falsa": null
   },
@@ -157,9 +163,11 @@
     "pergunta": "O contrato da Katrina tem exclusividade? Posso comprar felpudo de outro fornecedor?",
     "intencao": "politica_ou_fornecedor",
     "trechos_relevantes": [
+      "contratos/contrato-katrina-2025.md#clausulas-comerciais/2-volumes-minimos",
       "contratos/contrato-katrina-2025.md#clausulas-comerciais/6-exclusividade",
-      "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento",
-      "fornecedores/katrina-textil.md#riscos-conhecidos"
+      "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+      "fornecedores/katrina-textil.md#riscos-conhecidos",
+      "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento"
     ],
     "premissa_falsa": null
   },

@@ -1,12 +1,38 @@
 # Resultado do spike do Jev (gate da ADR-0002)
 
-Duas rodadas em 2026-09-30 contra `jev-1.13.0` (todas as respostas vieram desse modelo). O desenho da rodada 2 foi registrado no ticket 02 antes de rodar. Critérios do gate e rótulos não mudaram entre as rodadas.
+Duas rodadas em 2026-09-30 contra `jev-1.13.0` (todas as respostas vieram desse modelo). O desenho da rodada 2 foi registrado no ticket 02 antes de rodar. Critérios do gate e rótulos não mudaram entre as rodadas. Depois da rodada 2, o gabarito de relevância foi refeito às cegas e as métricas foram recalculadas sem chamar o Jev.
 
-## Rodada 2 (atual): NÃO PASSA, só pela relevância
+## Gabarito cego (recálculo da rodada 2): NÃO PASSA, ADR-0002 mantida por decisão do dev
 
-3.386 requests, respostas cruas em `evals/resultados/spike-2026-09-30-r2.json`. Para recalcular sem chamar o Jev:
+Os `trechos_relevantes` de c01 a c15 foram refeitos por um subagente sem ver as notas do Jev nem o gabarito antigo, pela regra registrada no ticket 02 antes da rotulagem. O gabarito novo substituiu o antigo em `evals/casos.json`. As métricas saem das respostas gravadas da rodada 2, com os mesmos critérios do gate:
 
     uv run python -m scripts.spike_jev --de-arquivo evals/resultados/spike-2026-09-30-r2.json
+
+Só a relevância depende do gabarito. Intenção, injeção e latência continuam passando, com os números da rodada 2.
+
+| Relevância (critério: recall >= 0,85 com precisão >= 0,6) | PT | EN |
+|---|---|---|
+| Melhor recall com precisão >= 0,6 | 0,709 (t_rel 0,80, t_evid 0,50) | 0,673 (t_rel 0,80, t_evid 0,40) |
+| Melhor precisão com recall >= 0,85 | 0,343 (t_rel 0,55, t_evid 0,15, recall 0,873) | 0,281 (t_rel 0,40, t_evid 0,15, recall 0,873) |
+| No ponto sugerido na rodada 2 (t_rel 0,70, t_evid 0,35) | recall 0,764, precisão 0,477 | - |
+
+Com o gabarito cego, a relevância ficou pior que com o antigo (0,709 contra 0,766 de recall com precisão >= 0,6, em PT). O timeout de `c01` continua lá, então o script ainda marca o gate como inválido, o que não muda o veredito.
+
+**Concordância entre os gabaritos**: o antigo tem 47 pares (caso, trecho), o cego tem 55, e 41 estão nos dois (Jaccard 0,67). Usado como se fosse o Jev, o gabarito antigo teria recall 0,75 e precisão 0,87 contra o cego. Ou seja, nem um segundo rotulador chega ao recall de 0,85, mas a precisão dele, no mesmo recall, fica bem acima da do Jev (0,48).
+
+**Decisão (2026-09-30)**: pela regra combinada, a ADR-0002 voltou para o dev, que decidiu mantê-la inteira e aceitar o risco na relevância. Essa não era uma das duas saídas combinadas no ticket 02 (usar o Jev só onde passou, ou substituir a ADR). A decisão está registrada na ADR-0002.
+
+**Redação e limiares da busca** (valem no lugar dos de "Se a ADR-0002 continuar", mais abaixo):
+
+- **Redação**: PT, com as perguntas e os criteria da rodada 2 (`scripts/spike_jev.py`).
+- **Injeção**: 0,50.
+- **Relevância**: t_rel 0,55 e t_evid 0,15, o ponto que cumpre o recall do gate (0,873) com a melhor precisão (0,343). A busca prefere recall porque o redator do M5 consegue ignorar um trecho que sobra, mas não recupera um trecho que o filtro jogou fora.
+- **`contradiz_premissa`**: 0,85.
+- **Conflito**: 0,10.
+
+## Rodada 2: NÃO PASSA, só pela relevância
+
+3.386 requests, respostas cruas em `evals/resultados/spike-2026-09-30-r2.json`. Os números de relevância desta seção usam o gabarito antigo (`git show 9721121:evals/casos.json`). O comando da seção acima recalcula com o gabarito atual.
 
 O que mudou em relação à rodada 1: a injeção é perguntada sobre o trecho sozinho (sem a pergunta do comprador no state); `tenta_instruir`, `relevante` e `tem_evidencia` ganharam criteria com os casos de fronteira; entraram 2 adversariais novos, escritos antes de rodar (injeção em inglês numa ficha de fornecedor e uma disfarçada de "nota de sistema").
 
