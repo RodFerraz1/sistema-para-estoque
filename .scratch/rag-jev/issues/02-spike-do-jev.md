@@ -49,3 +49,8 @@ Decisões de medição, para o dev confirmar antes de rodar:
 - Saída em `evals/resultados/spike-<data>-r2.json`. A rodada 1 se recalcula com o script do commit `c98167d`.
 
 **2026-09-30 (agente), resultado da rodada 2:** **não passa, só pela relevância.** Intenção, injeção e latência passam em PT e EN. A injeção se resolveu (adversariais de 0,95 a 0,99, corpus no máximo 0,07). A relevância chegou a recall 0,766 com precisão >= 0,6 (PT); com recall 0,851, a precisão é 0,455. De novo 1 timeout em `c01`, que só poderia piorar a relevância. Uma auditoria minha dos 48 falsos positivos (não às cegas, então não vale para o gate) achou 17 pares com rótulo faltando, 17 discutíveis e 14 erros reais. Só corrigindo os 17, a precisão iria para cerca de 0,65. Detalhes em `.scratch/rag-jev/spike-resultado.md`. O 04 continua `blocked` até o dev decidir a ADR-0002.
+
+**2026-09-30 (agente), gabarito cego:** o dev vai refazer os `trechos_relevantes` de c01 a c15 às cegas (sem ver as notas do Jev nem o gabarito antigo), numa página com as 15 perguntas e os 79 trechos. c16 a c20 (fora de escopo) continuam sem trecho. Regra combinada antes de ver o gabarito novo:
+- As métricas são recalculadas a partir das respostas gravadas da rodada 2 (`spike-2026-09-30-r2.json`), sem chamar o Jev de novo, com os mesmos critérios do gate.
+- Se passar com o gabarito do dev, a ADR-0002 continua, com a redação e os limiares que saírem da varredura, e o ticket 04 é liberado. Se não passar, a ADR-0002 volta para decisão (usar o Jev só onde passou, ou substituir).
+- O gabarito do dev substitui o antigo em `evals/casos.json`. A concordância entre os dois é reportada.
