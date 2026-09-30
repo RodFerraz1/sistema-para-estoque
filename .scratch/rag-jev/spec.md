@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: done
 Escopo: M4 do roadmap (spike do Jev + RAG com filtro de trechos)
 Vocabulário: ver /CONTEXT.md
 Decisões arquiteturais base: /docs/adr/0001-monolito-modular-por-dominio.md, /docs/adr/0002-jev-decide-codigo-executa-llm-redige.md, /docs/adr/0004-embeddings-locais.md

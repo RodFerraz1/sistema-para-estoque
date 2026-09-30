@@ -32,14 +32,18 @@ Cada milestone é um bloco de trabalho de 1 sessão a 2-3 dias. Você marca como
 
 ## M3 - Sugestão determinística (sem IA)
 
-- Módulo `purchasing.sugerir_pedido` implementado sem LLM.
-- Regras: pega fornecedor mais barato, calcula quantidade pra levar cobertura pra 3 meses (piso da política), respeita MOQ do fornecedor.
-- Aplica política (checa teto de estoque, alerta se violação).
-- Endpoint `/skus/{id}/sugerir-compra` retorna `SugestaoPedido` completa em JSON.
+Spec: `.scratch/sugestao-compra/spec.md`. Decisão base: ADR-0003 (mecanismo fixo, parâmetros do comprador).
+
+- Política de compra versionada no schema `copilot`, editável via `GET/PUT /politica-compra`. A v1 usa os valores da política v3 do corpus.
+- `inventory.em_transito`: o que falta chegar de pedidos de compra abertos.
+- `purchasing.sugerir_pedido` sem LLM: posição com em trânsito, estoque na chegada descontando o lead time, ponto de reposição, MOQ, escolha de fornecedor pelo critério da política, teto e alertas.
+- Endpoint `/skus/{sku_code}/sugestao-compra` retorna `SugestaoPedido` em JSON, com quantidade zero e motivo quando não há compra.
 
 **Saída visível**: pergunta "quanto comprar do SKU X?" e recebe sugestão estruturada, sem envolver LLM.
 
 **Ponto de reflexão**: nesta altura você já tem um sistema *útil* sem IA. Isso é intencional - se a IA falhar depois, o sistema ainda funciona. IA é aumento de valor, não fundação.
+
+**Concluído em 2026-09-29.**
 
 ## Divisão de papéis na IA (M4 em diante)
 
@@ -47,9 +51,11 @@ A partir do M4 o `ai` segue a ADR-0002: **Jev decide, código executa, LLM redig
 
 ## M4 - Spike do Jev + RAG com filtro de trechos
 
+Spec: `.scratch/rag-jev/spec.md`. Decisões base: ADR-0002 (Jev decide) e ADR-0004 (embeddings locais).
+
 - **Spike primeiro (gate da ADR-0002)**: rodar o Jev em português contra o corpus e umas 20 perguntas típicas do comprador. Medir acerto de intenção, acerto de relevância de trecho, custo e latência. Se não passar, reabrir a ADR-0002 antes de seguir.
 - Módulo `ai` com port `DecisionModel` (adapter Jev + adapter in-memory pra teste).
-- Pipeline de ingestão dos 11 documentos seed: chunking, embedding (`text-embedding-3-small`), gravação em pgvector.
+- Pipeline de ingestão dos 11 documentos seed: chunking, embedding local com fastembed (ADR-0004), gravação em pgvector.
 - `ai.buscar_contexto(query, k)`: busca vetorial seguida de um filtro com o Jev, que pergunta por trecho se é relevante, se contradiz outro trecho e se tenta dar instrução ao modelo. Devolve trechos classificados como aceito, conflitante ou descartado.
 - Endpoint `/rag/busca?q=...` que retorna os trechos com a classificação e a confiança.
 
@@ -83,6 +89,8 @@ A partir do M4 o `ai` segue a ADR-0002: **Jev decide, código executa, LLM redig
 - Sugestões com alertas do Jev ou baixa confiança aparecem destacadas no topo da fila. A confiança só prioriza, nunca aprova.
 - `purchasing.submeter_pedido` só é acionado por endpoint que exige aprovação.
 - Sugestão aprovada vira `pedido_compra` no ERP fake com status `aprovado`.
+- Tela de onboarding que preenche a política de compra, a partir de `.scratch/sugestao-compra/perguntas-comprador.md`.
+- Faixa de aprovação (`politicas/aprovacao-compras.md`) calculada sobre o pedido inteiro.
 
 **Saída visível**: workflow end-to-end. Copilot sugere, você aprova, aparece no ERP.
 
@@ -103,6 +111,8 @@ A partir do M4 o `ai` segue a ADR-0002: **Jev decide, código executa, LLM redig
 - Deploy real (Fly.io, Railway, ou AWS - decidir depois).
 - Métricas de retrieval quality (RAGAs, etc).
 - Fine-tuning ou avaliação sistemática.
+- Modo `ajustar` da sazonalidade na política de compra, com `sales.previsao_venda`.
+- Sugestão em lote e agrupamento de SKUs por fornecedor num mesmo pedido.
 
 ## Onde marcar progresso
 

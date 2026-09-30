@@ -22,6 +22,10 @@ _Avoid_: produto (impreciso), item.
 Compromisso formal do atacadista com um fornecedor pra receber quantidades específicas de SKUs em uma data futura, sob condições comerciais definidas (preço, prazo de pagamento, frete).
 _Avoid_: purchase order (usar em inglês só em código quando for API/DTO), ordem de compra, encomenda.
 
+**Comprador chefe**:
+Quem decide as compras no atacadista. Define a política de compra e aprova todo pedido de compra. Não é o desenvolvedor do Copilot.
+_Avoid_: usuário (genérico demais), cliente (é o varejista).
+
 **Copilot**:
 A aplicação em si. Um assistente que sugere decisões de compra a partir de dados do ERP fake e do corpus de documentos, sempre com humano aprovando no fim.
 _Avoid_: agente autônomo (não é autônomo por design - human-in-the-loop é premissa), assistente.
@@ -44,6 +48,48 @@ _Avoid_: prazo de entrega (ambíguo - pode significar do atacadista pro varejist
 Composição de leitura que devolve o estado atual de um SKU pronto pra decisão de compra - dados do catálogo, estoque atual, giro, cobertura e fornecedores disponíveis. Materializada no módulo `ficha_sku` e servida pelo endpoint `/skus/{sku_code}/analise`.
 _Avoid_: análise (ambíguo), dashboard, resumo.
 
+**Em trânsito**:
+Quantidade de um SKU que ainda falta chegar de pedidos de compra `aprovado`, `enviado` ou `recebido_parcial`. Rascunho e cancelado não contam.
+_Avoid_: a receber, pendente, pedido em aberto (é o documento, não a quantidade).
+
+**Posição (de estoque)**:
+Estoque disponível mais o que está em trânsito. É a base da sugestão de pedido. A cobertura continua usando só o disponível.
+_Avoid_: estoque total, saldo.
+
+### Compra
+
+**Política de compra**:
+Conjunto versionado de parâmetros definidos pelo comprador chefe (teto, pisos, ciclo de compra, lead time base, critério de fornecedor, sazonalidade, regra de SKU novo) que a sugestão de pedido usa. É a fonte da verdade do cálculo. O documento de política no corpus é só contexto. Ver ADR-0003.
+_Avoid_: regras, configuração, estratégia.
+
+**Teto**:
+Cobertura máxima, em meses, que o SKU pode ter quando a compra chega. Parâmetro da política (R1).
+_Avoid_: estoque máximo, limite.
+
+**Piso de alerta**:
+Cobertura, em dias, abaixo da qual o SKU aparece na lista de abaixo do piso. Parâmetro da política (R4).
+_Avoid_: piso (sozinho é ambíguo), estoque mínimo.
+
+**Piso de reposição**:
+Cobertura, em dias, que o comprador quer ainda ter quando a compra chega, como folga. Parâmetro da política (R4).
+_Avoid_: estoque de segurança, piso (sozinho).
+
+**Ponto de reposição**:
+Momento em que o estoque previsto na chegada da compra fica abaixo do piso de reposição. A partir dele a sugestão de pedido passa a ter quantidade maior que zero.
+_Avoid_: gatilho, ponto de pedido.
+
+**Ciclo de compra**:
+Meses de giro que cada compra cobre além do piso de reposição. Parâmetro da política.
+_Avoid_: frequência, periodicidade.
+
+**Sugestão de pedido**:
+Resultado determinístico de `purchasing` para um SKU: quantidade, fornecedor, memória de cálculo, alertas e versão da política usada. Quando não há compra, quantidade zero com motivo. Nunca vira pedido de compra sem aprovação do comprador chefe.
+_Avoid_: recomendação, pedido sugerido, proposta.
+
+**Onboarding**:
+Sequência de perguntas em linguagem de comprador que preenche a política de compra. Rascunho em `.scratch/sugestao-compra/perguntas-comprador.md`.
+_Avoid_: setup, configuração inicial.
+
 ### Sistemas
 
 **ERP fake**:
@@ -53,6 +99,18 @@ _Avoid_: banco (é ambíguo), simulador, mock.
 **Corpus**:
 Conjunto de documentos sintéticos (contratos, notas de reunião, relatórios de mercado, políticas) alimentados no RAG. Fica em `corpus/`, um documento markdown por arquivo com frontmatter YAML.
 _Avoid_: base de conhecimento, docs, arquivos.
+
+**Trecho**:
+Pedaço de um documento do corpus, uma seção de markdown (`##` ou `###`), com id estável no formato `<documento>#<slug-dos-titulos>`. É a unidade que o RAG indexa, busca e manda ao Jev.
+_Avoid_: chunk (só em código técnico quando for o nome do algoritmo), passagem, fragmento.
+
+**Classificação (de trecho)**:
+Rótulo que o código dá a um trecho recuperado a partir das respostas do Jev: `aceito` (evidência utilizável), `conflitante` (contradiz uma premissa da pergunta) ou `descartado` (irrelevante, sem evidência ou tentando dar instrução ao modelo). Quem classifica é o código, com limiares. O Jev só responde as perguntas.
+_Avoid_: filtro, score, ranking.
+
+**Conflito entre trechos**:
+Dois trechos de documentos diferentes que afirmam coisas incompatíveis sobre o mesmo fato. Ex: lead time contratado da Katrina (45 dias) contra o observado na revisão Q1/2025 (62 dias). O Copilot sinaliza o conflito e não escolhe um lado.
+_Avoid_: contradição (sozinho é ambíguo com premissa da pergunta), divergência.
 
 **Jev**:
 Modelo System One da TypeSafe que toma as decisões semânticas do Copilot: intenção da pergunta, relevância de trecho do corpus, sinais qualitativos sobre fornecedor. Responde perguntas tipadas (`Choice`, `Score`, `Noul`) com confiança. Nunca faz conta, contagem ou comparação de data. Ver ADR-0002.
