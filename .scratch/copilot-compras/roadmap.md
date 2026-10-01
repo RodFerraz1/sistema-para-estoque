@@ -113,6 +113,8 @@ Spec: `.scratch/refinamentos/spec.md`.
 
 **Saída visível**: projeto de portfólio publicável.
 
+**Concluído em 2026-10-01.** O redator Claude está atrás de `REDATOR` e passou no teste real (`externo_llm("anthropic")`) quando a `ANTHROPIC_API_KEY` entrou no `.env`, no fim do milestone; as rodadas de medição do M8 foram feitas com a Groq gratuita, então a qualidade, a latência e o custo da redação do Claude ainda não foram medidos. O prompt novo zerou os colchetes sem id de trecho e fez a redação citar os sinais e as quantidades, mas as citações dos sinais de encalhe não se confirmam (a mensagem do sinal generaliza para a categoria). Os limiares saíram de uma regra de calibração única; as faixas de confiança e o limiar do produto ficaram por amostra insuficiente. O limiar de conflito subiu de 0,10 para 0,40 e só sinaliza conflitos reais, mas perde 4 dos 7 rotulados, inclusive o par canônico da Katrina (cláusula 3 contra a revisão Q1). O vídeo de demo virou o roteiro em `docs/demo.md` (`.scratch/refinamentos/spec.md`).
+
 ## Depois do MVP (fora do escopo agora)
 
 - Quebrar `ai` em microserviço separado (aí faz sentido).
