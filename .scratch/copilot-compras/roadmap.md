@@ -102,11 +102,14 @@ Spec: `.scratch/rag-jev/spec.md`. Decisões base: ADR-0002 (Jev decide) e ADR-00
 
 ## M8 - Refinamentos e apresentabilidade
 
-- Trocar o redator Groq por Claude/GPT no deploy final (chave em env var).
-- Ajustar perguntas do Jev e thresholds de confiança com base no log de decisões.
-- Melhorar prompt do redator com base em observação real.
-- README com fluxo, screenshots, arquitetura desenhada.
-- Vídeo de demo curto.
+Spec: `.scratch/refinamentos/spec.md`.
+
+- Redator Claude (Opus 5.5) com o SDK oficial `anthropic`, esforço baixo, tratamento de recusa e fallback do lado do servidor. `REDATOR` escolhe o provedor; em `auto`, Anthropic, depois Groq, depois sem LLM.
+- Prompt do redator reescrito pelos riscos medidos no M5 e no M6 (contas, recomendação de fornecedor, citação sem id de trecho, sinais ignorados, quantidade ignorada), com limpeza em código do hífen não separável, `reasoning_effort` na Groq e medida antes e depois.
+- Regra de calibração única para os limiares, que não degenera sem erro na amostra; limiares dos sinais e da citação recalculados.
+- Calibração do entendimento pelo registro de decisão (relatório e perguntas rotuladas às cegas), critérios da intenção refinados onde o spike errou e faixas revistas (mantidas se houver pouco dado).
+- Limiar de conflito medido com pares reais.
+- README com arquitetura e fluxos em mermaid e screenshots da UI; roteiro de demo em `docs/demo.md` no lugar do vídeo.
 
 **Saída visível**: projeto de portfólio publicável.
 
