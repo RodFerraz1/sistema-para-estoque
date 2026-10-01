@@ -90,6 +90,10 @@ _Avoid_: recomendação, pedido sugerido, proposta.
 Uma das quatro faixas de `politicas/aprovacao-compras.md` que dizem quem precisa aprovar um pedido de compra. Sai do valor dos itens, com os limites como parâmetros da política de compra, e das exceções do documento, que são mecanismo: reposição regular desce uma faixa, violação do teto sobe uma e fornecedor sem pedido anterior vai no mínimo para a 3. Da faixa 2 em diante o pedido exige justificativa.
 _Avoid_: alçada, nível de aprovação.
 
+**Fila de aprovação**:
+As sugestões de pedido com compra que esperam a decisão do comprador chefe, geradas de uma vez para todos os SKUs ativos, cada uma com os sinais do corpus e a faixa de aprovação. Vêm primeiro as em destaque (alerta de ruptura, de teto ou de lead time observado acima do contratado, ou algum sinal do corpus) e, depois, as mais urgentes (menor cobertura na chegada sem contar a compra). Aprovar, com a quantidade sugerida ou outra, cria o pedido de compra no ERP fake; rejeitar exige motivo. Gerar de novo substitui as pendentes. O destaque só ordena, nunca aprova.
+_Avoid_: caixa de entrada, backlog, pendências.
+
 **Sinal (do corpus)**:
 O que os documentos do corpus relatam sobre o fornecedor e o produto de uma sugestão de pedido: atraso do fornecedor, venda forte do produto numa época do ano ou encalhe do produto (ou da categoria dele) numa compra anterior. O Jev responde trecho a trecho e o código transforma em sinal o que passa do limiar, com os trechos de origem. Acompanha a sugestão e nunca altera a quantidade.
 _Avoid_: alerta (é o que o `purchasing` calcula a partir do ERP), insight, risco.

@@ -6,6 +6,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.catalog.schemas import FornecedorParaSKU
+from src.politica_compra.schemas import DIAS_POR_MES
 
 
 class MotivoSemCompra(StrEnum):
@@ -49,6 +50,14 @@ class MemoriaCalculo(BaseModel):
     estoque_na_chegada: float
     qtd_necessaria: int
     cobertura_na_chegada_meses: float
+
+    @property
+    def cobertura_na_chegada_sem_compra_meses(self) -> float:
+        """Cobertura quando a compra chega, sem contar a compra. Negativa quando o
+        estoque acaba antes da chegada, ao contrário de `estoque_na_chegada`, que
+        para em zero: mede a urgência da compra."""
+        consumo_no_lead_time = self.giro_mensal * self.lead_time_dias / DIAS_POR_MES
+        return (self.posicao - consumo_no_lead_time) / self.giro_mensal
 
 
 class SugestaoPedido(BaseModel):

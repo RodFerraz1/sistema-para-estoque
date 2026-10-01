@@ -23,6 +23,7 @@ from src.ai.schemas import (
     TipoSinal,
     Veredito,
 )
+from src.aprovacao.schemas import StatusSugestao
 from src.inventory.schemas import Cobertura, Estoque
 from src.politica_compra.schemas import ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
@@ -233,3 +234,62 @@ class RegistroDecisaoResponse(BaseModel):
     duracao_ms: int
     sinais: list[SinaisDoSKUResponse]
     citacoes: list[VerificacaoCitacaoResponse]
+
+
+class FaixaAprovacaoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    faixa: int
+    aprovadores: str
+    exige_justificativa: bool
+    ajustes: list[str]
+
+
+class SugestaoNaFilaResponse(BaseModel):
+    """Os campos de decisão ficam nulos enquanto a sugestão está pendente ou quando foi
+    substituída."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    criado_em: datetime
+    status: StatusSugestao
+    destaque: bool
+    sku_code: str
+    produto_nome: str
+    cobertura_na_chegada_sem_compra_meses: float
+    sugestao: SugestaoComSinaisResponse
+    faixa: FaixaAprovacaoResponse
+    decidido_em: datetime | None
+    decidido_por: str | None
+    quantidade_aprovada: int | None
+    justificativa: str | None
+    motivo_rejeicao: str | None
+    pedido_compra_id: UUID | None
+
+
+class ResultadoGeracaoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    geradas: int
+    substituidas: int
+    skus_avaliados: int
+    sinais_indisponiveis: bool
+
+
+Nome = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+TextoLivre = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
+
+
+class AprovarSugestaoRequest(BaseModel):
+    """Sem `quantidade`, aprova a sugerida. A `justificativa` é obrigatória quando a faixa
+    da quantidade aprovada exige."""
+
+    aprovado_por: Nome
+    quantidade: int | None = None
+    justificativa: TextoLivre | None = None
+
+
+class RejeitarSugestaoRequest(BaseModel):
+    rejeitado_por: Nome
+    motivo: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
