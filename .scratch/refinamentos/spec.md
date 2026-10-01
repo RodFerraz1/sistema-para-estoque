@@ -130,7 +130,7 @@ Vale para todo limiar que o M8 recalcula. Entrada: os casos rotulados, cada um c
 
 O que muda em relação ao M5 e ao M6: nenhuma regra escolhe "o menor" ou "o mais alto" de um intervalo em que tudo empata; amostra sem erro não move limiar; e a folga sai sempre no relatório.
 
-Implementação: função pura em `scripts/calibracao.py` (por exemplo `calibrar(positivos, negativos, atual, limiares) -> Calibracao` com `limiar`, `regra`, `folga` e `motivo`, e uma variante ou parâmetro para o erro crítico), com testes, usada por `avaliar_sinais.py`, `avaliar_citacoes.py`, `avaliar_entendimento.py` e `avaliar_conflitos.py`.
+Implementação: funções puras em `scripts/calibracao.py`, `calibrar(positivos, negativos, atual) -> Calibracao` e `calibrar_erro_critico(erros, acertos, atual) -> Calibracao` (`limiar`, `regra`, `motivo`, `atual`, `lados` e a `folga` derivada), mais `descrever(calibracao)` para a linha do relatório, com testes, usadas por `avaliar_sinais.py`, `avaliar_citacoes.py`, `avaliar_entendimento.py` e `avaliar_conflitos.py`. A faixa de mais acertos sai dos valores da amostra, e não da varredura de cada script (ticket 04).
 
 **Sinais** (`LIMIARES_SINAIS`, por tipo, sem erro crítico; um sinal falso só destaca, um sinal perdido perde informação, então vale a regra de acertos). Conta de referência com `evals/resultados/sinais-2026-09-30.json`: atraso separável entre 0,67 e 0,94, limiar 0,80 (era 0,90; o trecho do Natal king size de 0,86 passa a virar sinal); venda por época não separável (positivo de 0,58 abaixo de negativos de 0,69), 21/22 de 0,70 a 0,80, limiar 0,75 (era 0,80); encalhe separável entre 0,48 e 0,65, limiar 0,55 (era 0,60).
 

@@ -23,9 +23,10 @@ from src.ai.schemas import (
     VerificacaoCitacao,
 )
 
-# Calibrado por `scripts/avaliar_citacoes.py` com o jev-1.13.0: o menor limiar sem
-# `confirmada` errada (`.scratch/sinais-e-citacoes/issues/02-verificacao-de-citacoes.md`).
-LIMIAR_CITACAO = 0.50
+# Recalibrado pela regra de calibração do M8 com erro crítico (`scripts/avaliar_citacoes.py`
+# sobre as respostas do jev-1.13.0 gravadas no M6): acima dos trechos de outro fornecedor
+# lidos como `contradiz` (`.scratch/refinamentos/issues/04-regra-de-calibracao.md`).
+LIMIAR_CITACAO = 0.80
 
 _VEREDITOS: dict[str, Veredito] = {
     "sustenta": "confirmada",

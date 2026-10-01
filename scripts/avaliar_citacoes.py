@@ -4,8 +4,13 @@ Roda `JevDecisionModel.verificar_citacoes` nos pares de `evals/citacoes.json`, u
 request por par com o trecho do corpus, grava as respostas cruas e imprime o acerto
 por relação e a varredura do limiar: para cada limiar, quantas citações ficariam
 `incerta` (confiança abaixo dele), quantos erros sobram entre as decididas e quantas
-seriam `confirmada` sem o trecho sustentar a afirmação. Pela regra da spec, o
-`LIMIAR_CITACAO` é o menor limiar sem nenhuma `confirmada` errada; se nenhum zerar, 0,95.
+seriam `confirmada` sem o trecho sustentar a afirmação. O `LIMIAR_CITACAO` sai da
+regra de calibração do M8 (`scripts/calibracao.py`) com erro crítico: qualquer
+veredito errado entre as citações decididas, porque `confirmada` sem o trecho
+sustentar e `contradita` para trecho que só não trata do assunto dizem algo falso.
+O limiar é o ponto médio entre o erro de maior confiança e o acerto de menor
+confiança acima dele; com menos de 3 erros, o limiar atual fica. O relatório traz a
+regra e a folga.
 
     uv run python -m scripts.avaliar_citacoes          # chama o Jev (precisa de JEV_KEY)
     uv run python -m scripts.avaliar_citacoes --de-arquivo evals/resultados/citacoes-AAAA-MM-DD.json
@@ -22,7 +27,8 @@ from pathlib import Path
 from time import perf_counter
 from typing import get_args
 
-from src.ai.citacoes import veredito
+from scripts.calibracao import Calibracao, calibrar_erro_critico, descrever, formatar_limiar
+from src.ai.citacoes import LIMIAR_CITACAO, veredito
 from src.ai.corpus import ler_corpus
 from src.ai.decisao import DecisionModel
 from src.ai.jev import PERGUNTAS_CITACAO, JevDecisionModel, criar_cliente
@@ -34,7 +40,6 @@ CASOS = RAIZ / "evals" / "citacoes.json"
 RESULTADOS = RAIZ / "evals" / "resultados"
 
 LIMIARES = tuple(round(0.50 + 0.05 * i, 2) for i in range(10))
-LIMIAR_SEM_ZERO = 0.95
 RELACOES: tuple[Relacao, ...] = get_args(Relacao)
 
 
@@ -92,9 +97,11 @@ def varrer_limiar(casos: list[dict], por_caso: dict[str, AvaliacaoCitacao]) -> l
     return pontos
 
 
-def escolher_limiar(varredura: list[PontoVarredura]) -> float:
-    sem_confirmada_errada = [p.limiar for p in varredura if p.confirmadas_erradas == 0]
-    return min(sem_confirmada_errada, default=LIMIAR_SEM_ZERO)
+def calibrar_limiar(casos: list[dict], por_caso: dict[str, AvaliacaoCitacao]) -> Calibracao:
+    def confiancas(certa: bool) -> list[float]:
+        return [por_caso[c["id"]].confianca for c in casos if (por_caso[c["id"]].escolha == c["esperado"]) == certa]
+
+    return calibrar_erro_critico(erros=confiancas(False), acertos=confiancas(True), atual=LIMIAR_CITACAO)
 
 
 def relatorio(resultado: dict, casos: list[dict]) -> str:
@@ -122,12 +129,9 @@ def relatorio(resultado: dict, casos: list[dict]) -> str:
         linhas.append(
             f"  {ponto.limiar:.2f}    {ponto.incertas:>8}  {ponto.erros:>24}  {ponto.confirmadas_erradas:>19}"
         )
-    escolhido = escolher_limiar(varredura)
-    if all(p.confirmadas_erradas for p in varredura):
-        linhas.append(f"\nNenhum limiar zera as confirmadas erradas: {escolhido:.2f}, com o risco registrado.")
-    else:
-        linhas.append("\nMenor limiar sem confirmada errada.")
-    linhas.append(f"LIMIAR_CITACAO = {escolhido:.2f}")
+    calibracao = calibrar_limiar(casos, por_caso)
+    linhas.append(f"\nRegra de calibração: {descrever(calibracao)}")
+    linhas.append(f"LIMIAR_CITACAO = {formatar_limiar(calibracao.limiar)}")
     return "\n".join(linhas)
 
 

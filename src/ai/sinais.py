@@ -24,9 +24,11 @@ from src.purchasing.schemas import SugestaoPedido
 K_SINAIS = 15
 MAX_TRECHOS_SINAIS = 10
 
-# Calibrados por `scripts/avaliar_sinais.py` com o jev-1.13.0
-# (`.scratch/sinais-e-citacoes/issues/01-sinais-do-corpus.md`).
-LIMIARES_SINAIS: dict[TipoSinal, float] = {"atraso_do_fornecedor": 0.90, "demanda_sazonal": 0.80, "encalhe": 0.60}
+# Recalibrados pela regra de calibração do M8 (`scripts/avaliar_sinais.py` sobre as
+# respostas do jev-1.13.0 gravadas no M6): atraso e encalhe pelo ponto médio, venda
+# por época pelo meio da faixa de mais acertos
+# (`.scratch/refinamentos/issues/04-regra-de-calibracao.md`).
+LIMIARES_SINAIS: dict[TipoSinal, float] = {"atraso_do_fornecedor": 0.80, "demanda_sazonal": 0.75, "encalhe": 0.55}
 
 _MENSAGENS: dict[TipoSinal, str] = {
     "atraso_do_fornecedor": "Os documentos relatam atraso de entrega da {fornecedor}.",

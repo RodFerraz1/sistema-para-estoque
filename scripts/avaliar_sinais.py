@@ -3,8 +3,12 @@
 Roda `JevDecisionModel.avaliar_sinais` nos casos de `evals/sinais.json`, um
 request por caso com o trecho do corpus, grava as respostas cruas e imprime, por
 tipo de sinal, a probabilidade de cada caso e a varredura do limiar. Um trecho
-vira sinal quando a probabilidade passa do limiar. Pela regra da spec, o limiar
-de cada tipo é o de mais acertos na varredura; no empate, o mais alto.
+vira sinal quando a probabilidade passa do limiar. O limiar de cada tipo sai da
+regra de calibração do M8 (`scripts/calibracao.py`), sem erro crítico: positivos
+são os casos em que o trecho relata o sinal e negativos os outros. Separável, o
+ponto médio entre o maior negativo e o menor positivo; senão, o meio da faixa de
+mais acertos; com menos de 3 positivos ou 3 negativos, o limiar atual fica. O
+relatório traz a regra e a folga de cada tipo.
 
     uv run python -m scripts.avaliar_sinais          # chama o Jev (precisa de JEV_KEY)
     uv run python -m scripts.avaliar_sinais --de-arquivo evals/resultados/sinais-AAAA-MM-DD.json
@@ -21,10 +25,12 @@ from pathlib import Path
 from time import perf_counter
 from typing import get_args
 
+from scripts.calibracao import Calibracao, calibrar, descrever, formatar_limiar
 from src.ai.corpus import ler_corpus
 from src.ai.decisao import DecisionModel
 from src.ai.jev import PERGUNTAS_SINAIS, JevDecisionModel, criar_cliente
 from src.ai.schemas import AvaliacaoSinais, ProdutoDoSinal, TipoSinal, Trecho
+from src.ai.sinais import LIMIARES_SINAIS
 from src.db.config import get_settings
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -78,8 +84,11 @@ def varrer_limiar(tipo: TipoSinal, casos: list[dict], por_caso: dict[str, Avalia
     return pontos
 
 
-def escolher_limiar(varredura: list[PontoVarredura]) -> float:
-    return max(varredura, key=lambda p: (p.acertos, p.limiar)).limiar
+def calibrar_tipo(tipo: TipoSinal, casos: list[dict], por_caso: dict[str, AvaliacaoSinais]) -> Calibracao:
+    def probabilidades(esperado: bool) -> list[float]:
+        return [por_caso[c["id"]].probabilidades[tipo] for c in casos if c["esperado"][tipo] == esperado]
+
+    return calibrar(probabilidades(True), probabilidades(False), atual=LIMIARES_SINAIS[tipo])
 
 
 def relatorio(resultado: dict, casos: list[dict]) -> str:
@@ -88,7 +97,7 @@ def relatorio(resultado: dict, casos: list[dict]) -> str:
     latencias = sorted(r["latencia_s"] for r in resultado["respostas"])
     linhas.append(f"Latência: mediana {latencias[len(latencias) // 2]:.3f} s, máxima {latencias[-1]:.3f} s")
 
-    escolhidos: dict[TipoSinal, float] = {}
+    escolhidos: dict[TipoSinal, Calibracao] = {}
     for tipo in TIPOS:
         positivos = sum(caso["esperado"][tipo] for caso in casos)
         linhas.append(f"\n## {tipo} ({positivos} positivos em {len(casos)} casos)")
@@ -104,10 +113,10 @@ def relatorio(resultado: dict, casos: list[dict]) -> str:
             linhas.append(
                 f"  {ponto.limiar:.2f}    {ponto.acertos:>7}  {ponto.falsos_positivos:>7}  {ponto.falsos_negativos:>7}"
             )
-        escolhidos[tipo] = escolher_limiar(varredura)
-        linhas.append(f"  {tipo}: {escolhidos[tipo]:.2f} (mais acertos; no empate, o mais alto)")
+        escolhidos[tipo] = calibrar_tipo(tipo, casos, por_caso)
+        linhas.append(f"  {tipo}: {descrever(escolhidos[tipo])}")
 
-    limiares = ", ".join(f'"{tipo}": {escolhidos[tipo]:.2f}' for tipo in TIPOS)
+    limiares = ", ".join(f'"{tipo}": {formatar_limiar(escolhidos[tipo].limiar)}' for tipo in TIPOS)
     linhas.append(f"\nLIMIARES_SINAIS = {{{limiares}}}")
     return "\n".join(linhas)
 
