@@ -1,9 +1,12 @@
 """Adapter do `DecisionModel` com o Jev (TypeSafe, System One).
 
-As perguntas de intenção e de trecho são as da rodada 2 do spike, em PT, com
-que as faixas do chat e os `LIMIARES` da busca foram calibrados. A de produto
-foi medida por `scripts/avaliar_entendimento.py`, que calibrou o
-`LIMIAR_PRODUTO`, as de sinais por `scripts/avaliar_sinais.py`, que calibrou
+As perguntas de trecho são as da rodada 2 do spike, em PT, com que os
+`LIMIARES` da busca foram calibrados. A de intenção partiu do spike e ganhou
+critérios estruturados no M8 (o que cada opção cobre, o que é da vizinha e
+exemplos), medidos por `scripts/avaliar_entendimento.py` em `evals/casos.json` e
+`evals/intencoes.json`, com que as faixas do chat foram revistas; os exemplos não
+repetem perguntas dos evals. A de produto foi medida pelo mesmo script, que
+calibrou o `LIMIAR_PRODUTO`, as de sinais por `scripts/avaliar_sinais.py`, que calibrou
 os `LIMIARES_SINAIS`, e a de citação por `scripts/avaliar_citacoes.py`, que
 calibrou o `LIMIAR_CITACAO`. Mudar a redação exige medir de novo.
 """
@@ -45,10 +48,39 @@ MAX_PARALELO = 8
 PERGUNTA_INTENCAO = Choice(
     instructions="Qual é a intenção do comprador na `pergunta`?",
     criteria={
-        "situacao_sku": "Quer saber estoque, giro ou cobertura de um SKU",
-        "sugestao_compra": "Quer saber se deve comprar e quanto",
-        "politica_ou_fornecedor": "Pergunta sobre política de compras ou fornecedor",
-        "fora_de_escopo": "Nada a ver com compras",
+        "situacao_sku": {
+            "cobre": "Estoque, giro, vendas, cobertura ou ruptura de um produto ou SKU: quanto tem, quanto vende, para quantos dias dá.",
+            "nao_cobre": "Prazo de entrega, lead time, atraso, contrato ou condições de um fornecedor, mesmo quando a pergunta cita um produto dele, é politica_ou_fornecedor. Quanto comprar é sugestao_compra.",
+            "exemplos": [
+                "Quanto vendeu a toalha de mesa redonda no último mês?",
+                "Estou com ruptura de jogo de cama queen?",
+            ],
+        },
+        "sugestao_compra": {
+            "cobre": "Se deve comprar, quanto pedir, quando fazer o pedido ou se vale antecipar a compra de um produto ou SKU.",
+            "nao_cobre": "Só a situação do estoque, sem decidir uma compra, é situacao_sku. Regras da política ou condições de um fornecedor, sem decidir uma compra, são politica_ou_fornecedor.",
+            "exemplos": [
+                "Quantas unidades do jogo de cama casal eu encomendo?",
+                "Já está na hora de repor o guardanapo branco?",
+            ],
+        },
+        "politica_ou_fornecedor": {
+            "cobre": "Regras da política de compra (teto de estoque, exceções, aprovação por valor) e tudo sobre um fornecedor: prazo de entrega, lead time contratado e real, atrasos, histórico de entregas, contrato, condições comerciais, pedido mínimo, reajuste e exclusividade.",
+            "nao_cobre": "Estoque, giro ou cobertura de um produto, mesmo quando a pergunta cita o fornecedor dele, é situacao_sku.",
+            "exemplos": [
+                "Quanto tempo a Riva Têxtil leva para entregar na prática?",
+                "A Aurora Home Center já entregou pedido fora do prazo?",
+                "Quem aprova uma compra acima do teto de estoque?",
+            ],
+        },
+        "fora_de_escopo": {
+            "cobre": "Assuntos sem relação com as compras do atacadista de cama, mesa e banho, como clima, esporte, receitas e pedidos pessoais.",
+            "nao_cobre": "Qualquer pergunta sobre produtos, estoque, compras, fornecedores ou política de compra.",
+            "exemplos": [
+                "Qual a capital da Austrália?",
+                "Me recomenda um restaurante no centro?",
+            ],
+        },
     },
 )
 

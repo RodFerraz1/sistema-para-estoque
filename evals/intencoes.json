@@ -1,0 +1,204 @@
+[
+  {
+    "id": "i01",
+    "pergunta": "Quantas unidades do edredom duplaface cinza ainda tenho no CD?",
+    "intencao": "situacao_sku",
+    "produtos_aceitos": [
+      "Edredom Duplaface"
+    ]
+  },
+  {
+    "id": "i02",
+    "pergunta": "O jogo americano tá girando bem ou tá parado no estoque?",
+    "intencao": "situacao_sku",
+    "produtos_aceitos": [
+      "Jogo Americano"
+    ]
+  },
+  {
+    "id": "i03",
+    "pergunta": "Pra quantos dias ainda dá o estoque de guardanapo de tecido?",
+    "intencao": "situacao_sku",
+    "produtos_aceitos": [
+      "Guardanapo Tecido"
+    ]
+  },
+  {
+    "id": "i04",
+    "pergunta": "Quanto tenho em estoque da toalha de piso que a Katrina fornece?",
+    "intencao": "situacao_sku",
+    "produtos_aceitos": [
+      "Toalha Piso Antiderrapante"
+    ]
+  },
+  {
+    "id": "i05",
+    "pergunta": "A cobertura do pano multiuso da Malha Fina aguenta até o fim do mês?",
+    "intencao": "situacao_sku",
+    "produtos_aceitos": [
+      "Pano Multiuso"
+    ]
+  },
+  {
+    "id": "i06",
+    "pergunta": "Quantas luvas térmicas eu peço pra repor?",
+    "intencao": "sugestao_compra",
+    "produtos_aceitos": [
+      "Luva Térmica"
+    ]
+  },
+  {
+    "id": "i07",
+    "pergunta": "Preciso fazer pedido de toalha banho premium agora ou dá pra esperar?",
+    "intencao": "sugestao_compra",
+    "produtos_aceitos": [
+      "Toalha Banho Premium"
+    ]
+  },
+  {
+    "id": "i08",
+    "pergunta": "Qual quantidade de colcha bouti eu compro pro próximo trimestre?",
+    "intencao": "sugestao_compra",
+    "produtos_aceitos": [
+      "Colcha Bouti"
+    ]
+  },
+  {
+    "id": "i09",
+    "pergunta": "Em quantos dias a Malha Fina entrega depois que eu faço o pedido?",
+    "intencao": "politica_ou_fornecedor",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "i10",
+    "pergunta": "O prazo real de entrega da Verdela bate com o que ela promete?",
+    "intencao": "politica_ou_fornecedor",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "i11",
+    "pergunta": "Os atrasos da Katrina no fim do ano já foram resolvidos?",
+    "intencao": "politica_ou_fornecedor",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "i12",
+    "pergunta": "A Katrina demora mais que o combinado pra entregar a toalha de rosto?",
+    "intencao": "politica_ou_fornecedor",
+    "produtos_aceitos": [
+      "Toalha Rosto Conforto",
+      "nenhum"
+    ]
+  },
+  {
+    "id": "i13",
+    "pergunta": "Qual o pedido mínimo da Malha Fina?",
+    "intencao": "politica_ou_fornecedor",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "i14",
+    "pergunta": "Até que valor eu posso fechar um pedido sem aprovação de ninguém?",
+    "intencao": "politica_ou_fornecedor",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "i15",
+    "pergunta": "A política permite comprar de um fornecedor sem contrato?",
+    "intencao": "politica_ou_fornecedor",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "i16",
+    "pergunta": "Qual filme você me indica pro fim de semana?",
+    "intencao": "fora_de_escopo",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "i17",
+    "pergunta": "Como eu declaro o imposto de renda de pessoa física?",
+    "intencao": "fora_de_escopo",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "i18",
+    "pergunta": "Traduz 'bom dia' pro inglês?",
+    "intencao": "fora_de_escopo",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "r01",
+    "pergunta": "Qual a situação do SKU TBC-BEGE-70140-01?",
+    "intencao": "situacao_sku",
+    "produtos_aceitos": [
+      "Toalha Banho Conforto"
+    ]
+  },
+  {
+    "id": "r02",
+    "pergunta": "Quanto devo comprar do SKU TBC-BEGE-70140-01?",
+    "intencao": "sugestao_compra",
+    "produtos_aceitos": [
+      "Toalha Banho Conforto"
+    ]
+  },
+  {
+    "id": "r03",
+    "pergunta": "Quanto devo comprar do TBC-BEGE-70140-01?",
+    "intencao": "sugestao_compra",
+    "produtos_aceitos": [
+      "Toalha Banho Conforto"
+    ]
+  },
+  {
+    "id": "r04",
+    "pergunta": "Quanto compro do JDCP-BRAN-QUEEN-02?",
+    "intencao": "sugestao_compra",
+    "produtos_aceitos": [
+      "Jogo de Cama Percal 200 fios",
+      "Jogo de Cama Percal 300 fios"
+    ]
+  },
+  {
+    "id": "r05",
+    "pergunta": "Vale comprar a colcha CB-OFF--QUEEN-09 agora?",
+    "intencao": "sugestao_compra",
+    "produtos_aceitos": [
+      "Colcha Bouti"
+    ]
+  },
+  {
+    "id": "r06",
+    "pergunta": "Quanto devo comprar do ED-CINZ-CASAL-03? A Verdela costuma atrasar?",
+    "intencao": "sugestao_compra",
+    "produtos_aceitos": [
+      "Edredom Duplaface"
+    ]
+  },
+  {
+    "id": "r07",
+    "pergunta": "A Katrina costuma atrasar as entregas?",
+    "intencao": "politica_ou_fornecedor",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  }
+]

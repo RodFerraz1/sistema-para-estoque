@@ -14,6 +14,9 @@ from uuid import UUID
 from src.ai.schemas import NENHUM_PRODUTO, Entendimento, Identificacao, OrigemIdentificacao, ProdutoCatalogo
 from src.catalog.schemas import SKU
 
+# Mantido no M8 pela regra de calibração com erro crítico (produto errado usado): um só
+# erro (c08, a colcha nova da Verdela, com 0,47) dá `amostra_insuficiente`
+# (`.scratch/refinamentos/issues/03-calibracao-do-entendimento.md`).
 LIMIAR_PRODUTO = 0.60
 MAX_SKUS_POR_RESPOSTA = 12
 PROBABILIDADE_MINIMA_CANDIDATO = 0.15

@@ -6,6 +6,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from scripts.relatorio_registros import normalizar_pergunta
 from scripts.seed import FORNECEDORES, PRODUTOS
 from src.ai.corpus import ler_corpus
 from src.ai.schemas import NENHUM_PRODUTO, Trecho
@@ -110,3 +111,22 @@ def test_casos_do_redator_tem_o_formato_dos_casos_sem_repetir_pergunta() -> None
         assert set(caso) == {"id", "pergunta", "intencao"}, caso["id"]
         assert caso["intencao"] in INTENCOES, caso["id"]
         assert caso["pergunta"] not in perguntas_dos_casos, caso["id"]
+
+
+def test_intencoes_tem_as_quatro_intencoes_sem_repetir_casos_e_com_produtos_do_seed() -> None:
+    casos = carregar("intencoes.json")
+    perguntas_dos_casos = {normalizar_pergunta(caso["pergunta"]) for caso in carregar("casos.json")}
+    nomes = {produto.nome for produto in PRODUTOS} | {NENHUM_PRODUTO}
+
+    assert len(casos) >= 12
+    assert len({caso["id"] for caso in casos}) == len(casos)
+    assert len({normalizar_pergunta(caso["pergunta"]) for caso in casos}) == len(casos)
+    assert {caso["id"] for caso in casos} & {caso["id"] for caso in carregar("casos.json")} == set()
+    por_intencao = Counter(caso["intencao"] for caso in casos)
+    assert set(por_intencao) == INTENCOES
+    assert min(por_intencao.values()) >= 3
+    for caso in casos:
+        assert set(caso) == {"id", "pergunta", "intencao", "produtos_aceitos"}, caso["id"]
+        assert normalizar_pergunta(caso["pergunta"]) not in perguntas_dos_casos, caso["id"]
+        assert caso["produtos_aceitos"], caso["id"]
+        assert set(caso["produtos_aceitos"]) <= nomes, caso["id"]

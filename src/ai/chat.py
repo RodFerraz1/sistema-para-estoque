@@ -50,7 +50,11 @@ from src.purchasing.service import Purchasing
 @dataclass(frozen=True)
 class FaixasConfianca:
     """Partem do spike do M4 (acertos de 0,64 a 1,00, erro em 0,36) e do piso de 0,5
-    da doc do Jev. Recalibrar com o registro de decisão é tarefa do M8."""
+    da doc do Jev. Mantidas no M8 pela regra de calibração (`scripts/avaliar_entendimento.py`
+    sobre `evals/casos.json` e `evals/intencoes.json`, com os critérios estruturados da
+    intenção): 45 intenções certas e nenhuma errada dão `amostra_insuficiente` para a
+    `media`, e sem intenção errada com confiança de pelo menos a `alta` ela não muda
+    (`.scratch/refinamentos/issues/03-calibracao-do-entendimento.md`)."""
 
     alta: float
     media: float

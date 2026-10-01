@@ -12,12 +12,14 @@ from pathlib import Path
 import pytest
 from typesafe_sdk import Choice, JSONContent, Noul, Question, SystemOneResponse, TypeSafeAPITimeoutError
 
+from scripts.relatorio_registros import normalizar_pergunta
 from src.ai.busca import LIMIARES
+from src.ai.chat import FAIXAS
 from src.ai.corpus import ler_corpus
 from src.ai.decisao import DecisaoIndisponivel
 from src.ai.identificacao import LIMIAR_PRODUTO, produtos_do_catalogo
 from src.ai.citacoes import LIMIAR_CITACAO, veredito
-from src.ai.jev import PERGUNTAS_CITACAO, PERGUNTAS_SINAIS, JevDecisionModel, criar_cliente
+from src.ai.jev import PERGUNTA_INTENCAO, PERGUNTAS_CITACAO, PERGUNTAS_SINAIS, JevDecisionModel, criar_cliente
 from src.ai.schemas import ProdutoDoSinal, Trecho
 from src.ai.sinais import LIMIARES_SINAIS
 from src.db.config import get_settings
@@ -26,6 +28,7 @@ from tests.fakes import make_sku, make_trecho
 RAIZ = Path(__file__).resolve().parents[3]
 EVALS = RAIZ / "evals"
 SPIKE_R2 = EVALS / "resultados" / "spike-2026-09-30-r2.json"
+ENTENDIMENTO_M8 = EVALS / "resultados" / "entendimento-2026-10-01-depois.json"
 
 
 class ClienteFalso:
@@ -92,14 +95,27 @@ def test_entendimento_vai_num_request_com_a_pergunta_no_state() -> None:
     ]
 
 
-def test_intencao_e_a_calibrada_no_spike_em_pt() -> None:
+def test_intencao_e_a_medida_na_calibracao_do_m8() -> None:
     cliente = ClienteFalso()
-    calibrada = json.loads(SPIKE_R2.read_text(encoding="utf-8"))["perguntas"]["intencao"]["pt"]["intencao"]
+    medida = json.loads(ENTENDIMENTO_M8.read_text(encoding="utf-8"))["perguntas"]["intencao"]
 
     JevDecisionModel(cliente).entender_pergunta("como tá a toalha conforto?", PRODUTOS)
 
     [(_, perguntas)] = cliente.pedidos
-    assert perguntas["intencao"].model_dump() == calibrada
+    assert perguntas["intencao"].model_dump() == medida
+
+
+def test_exemplos_da_intencao_nao_repetem_perguntas_dos_evals() -> None:
+    perguntas_dos_evals = {
+        normalizar_pergunta(caso["pergunta"])
+        for arquivo in ("casos.json", "intencoes.json")
+        for caso in json.loads((EVALS / arquivo).read_text(encoding="utf-8"))
+    }
+
+    exemplos = [exemplo for criterio in PERGUNTA_INTENCAO.criteria.values() for exemplo in criterio["exemplos"]]
+
+    assert len(exemplos) >= 8
+    assert {normalizar_pergunta(exemplo) for exemplo in exemplos} & perguntas_dos_evals == set()
 
 
 def test_produto_tem_uma_opcao_por_produto_do_catalogo_mais_nenhum() -> None:
@@ -500,6 +516,14 @@ def test_jev_real_entende_a_situacao_da_toalha_conforto_branca(jev_real: JevDeci
     assert entendimento.produto.escolha == "Toalha Banho Conforto"
     assert entendimento.produto.confianca >= LIMIAR_PRODUTO
     assert set(entendimento.produto.probabilidades) == {p.nome for p in PRODUTOS} | {"nenhum"}
+
+
+@pytest.mark.externo
+def test_jev_real_entende_o_lead_time_real_como_pergunta_de_fornecedor(jev_real: JevDecisionModel) -> None:
+    entendimento = jev_real.entender_pergunta("Qual o lead time de verdade da Katrina?", PRODUTOS)
+
+    assert entendimento.intencao.escolha == "politica_ou_fornecedor"
+    assert entendimento.intencao.confianca >= FAIXAS.media
 
 
 @pytest.mark.externo
