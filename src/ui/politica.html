@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Política de compra - Copilot de Compras</title>
+  <link rel="stylesheet" href="estilo.css">
+  <script type="module" src="politica.js"></script>
+</head>
+<body>
+  <header>
+    <div class="conteudo">
+      <strong>Copilot de Compras</strong>
+      <nav>
+        <a href="index.html">Fila</a>
+        <a href="chat.html">Chat</a>
+        <a href="politica.html" aria-current="page">Política</a>
+      </nav>
+    </div>
+  </header>
+  <main class="conteudo">
+    <h1>Política de compra</h1>
+    <p class="suave">O Copilot sugere quanto comprar de cada produto seguindo as suas regras. Responda do jeito que você faz na prática, não do jeito "certo". Cada resposta já vem preenchida com o valor que o sistema usa hoje; salvar cria uma versão nova da política.</p>
+    <p id="versao" class="suave">Carregando a política ativa...</p>
+    <div id="carregamento"></div>
+
+    <form id="politica" hidden>
+      <h2>Estoque máximo</h2>
+      <div class="card pergunta">
+        <label for="teto_meses">1. Logo depois que uma compra chega, qual o máximo de meses de estoque que você aceita ter de um produto?</label>
+        <div class="unidade"><input id="teto_meses" name="teto_meses" type="number" min="0.1" step="0.1" required> meses</div>
+      </div>
+      <div class="card pergunta">
+        <label for="extra_sazonal_meses">2. Em datas fortes, quantos meses a mais você aceita ter? E quais são essas datas para vocês?</label>
+        <p class="suave">A política de estoque de 2024 também cita a volta às aulas.</p>
+        <div class="unidade campo"><input id="extra_sazonal_meses" name="extra_sazonal_meses" type="number" min="0" step="0.1" required> meses a mais</div>
+        <fieldset class="opcoes">
+          <legend class="suave">Meses de datas fortes</legend>
+          <div id="meses" class="meses"></div>
+        </fieldset>
+      </div>
+
+      <h2>Estoque mínimo</h2>
+      <div class="card pergunta">
+        <label for="piso_alerta_dias">3. Com quantos dias de estoque um produto deve acender o alerta de "está acabando"?</label>
+        <div class="unidade"><input id="piso_alerta_dias" name="piso_alerta_dias" type="number" min="1" step="1" required> dias</div>
+      </div>
+      <div class="card pergunta">
+        <label for="piso_reposicao_dias">4. Quando uma compra chega, quantos dias de estoque você quer ainda ter como folga, antes de começar a vender a mercadoria nova?</label>
+        <div class="unidade"><input id="piso_reposicao_dias" name="piso_reposicao_dias" type="number" min="1" step="1" required> dias</div>
+      </div>
+
+      <h2>Ritmo de compra</h2>
+      <div class="card pergunta">
+        <label for="ciclo_compra_meses">5. De quanto em quanto tempo você costuma comprar de novo o mesmo produto?</label>
+        <p class="suave">Quanto maior, maiores e mais raros os pedidos.</p>
+        <div class="unidade"><input id="ciclo_compra_meses" name="ciclo_compra_meses" type="number" min="0.1" step="0.1" required> meses</div>
+      </div>
+
+      <h2>Fornecedor</h2>
+      <fieldset class="card pergunta opcoes">
+        <legend><strong>6. Quando dois fornecedores vendem o mesmo produto, o que pesa mais: preço ou prazo de entrega?</strong></legend>
+        <label><input type="radio" name="criterio_fornecedor" value="menor_preco" required> Preço</label>
+        <label><input type="radio" name="criterio_fornecedor" value="menor_lead_time"> Prazo de entrega</label>
+      </fieldset>
+      <fieldset class="card pergunta opcoes">
+        <legend><strong>7. Para planejar, você confia no prazo que o fornecedor promete, no prazo que ele costuma cumprir de verdade, ou sempre no mais longo dos dois?</strong></legend>
+        <p class="suave">Exemplo: a Katrina promete 45 dias e tem entregado em 62.</p>
+        <label><input type="radio" name="lead_time_base" value="contratado" required> No prazo que ele promete</label>
+        <label><input type="radio" name="lead_time_base" value="observado"> No prazo que ele costuma cumprir</label>
+        <label><input type="radio" name="lead_time_base" value="maior"> Sempre no mais longo dos dois</label>
+      </fieldset>
+
+      <h2>Épocas do ano</h2>
+      <fieldset class="card pergunta opcoes">
+        <legend><strong>8. Quando uma compra vai chegar numa data forte, você quer que o sistema avise, ou prefere que ignore?</strong></legend>
+        <p class="suave">Ajustar a quantidade automaticamente pela época ainda não existe.</p>
+        <label><input type="radio" name="sazonalidade_modo" value="alertar" required> Quero que avise</label>
+        <label><input type="radio" name="sazonalidade_modo" value="ignorar"> Pode ignorar</label>
+      </fieldset>
+
+      <h2>Produto novo</h2>
+      <div class="card pergunta">
+        <label for="dias_historico_minimo">9. Quantos dias de venda um produto novo precisa ter antes do sistema sugerir recompra sozinho?</label>
+        <p class="suave">Antes disso, o sistema não sugere e a decisão fica com você.</p>
+        <div class="unidade"><input id="dias_historico_minimo" name="dias_historico_minimo" type="number" min="0" step="1" required> dias</div>
+      </div>
+
+      <h2>Aprovação de pedidos</h2>
+      <div class="card pergunta">
+        <p><strong>Até que valor um pedido fica em cada faixa de aprovação?</strong></p>
+        <p class="suave">Quanto mais alta a faixa, mais gente precisa aprovar, e da faixa 2 em diante o pedido exige justificativa. Acima do limite da faixa 3, o pedido é da faixa 4.</p>
+        <div class="campo">
+          <label for="faixa_1_ate_reais">Faixa 1 até</label>
+          <div class="unidade">R$ <input id="faixa_1_ate_reais" name="faixa_1_ate_reais" type="number" min="1" step="1" required></div>
+        </div>
+        <div class="campo">
+          <label for="faixa_2_ate_reais">Faixa 2 até</label>
+          <div class="unidade">R$ <input id="faixa_2_ate_reais" name="faixa_2_ate_reais" type="number" min="1" step="1" required></div>
+        </div>
+        <div class="campo">
+          <label for="faixa_3_ate_reais">Faixa 3 até</label>
+          <div class="unidade">R$ <input id="faixa_3_ate_reais" name="faixa_3_ate_reais" type="number" min="1" step="1" required></div>
+        </div>
+      </div>
+
+      <div class="acoes">
+        <button id="salvar" type="submit" class="primario">Salvar nova versão</button>
+      </div>
+      <div id="resultado"></div>
+    </form>
+
+    <h2>Como o sistema entende o ERP</h2>
+    <p class="suave">Aqui não é preferência: é como o sistema lê os dados do ERP hoje. Se algo estiver errado, avise o desenvolvedor.</p>
+    <div class="card">
+      <p><strong>10. O que é a quantidade "reservada" no estoque? Ela já está vendida e não pode contar como disponível?</strong><br>O sistema usa só a quantidade disponível e ignora a reservada.</p>
+      <p><strong>11. Um pedido de compra aprovado, mas que ainda não foi enviado ao fornecedor, já conta como mercadoria a caminho?</strong><br>Sim. Rascunho não conta.</p>
+      <p><strong>12. O pedido mínimo por produto (MOQ) é uma quantidade mínima, ou tem que ser múltiplo de uma caixa fechada?</strong><br>Quantidade mínima, sem múltiplo.</p>
+      <p><strong>13. Um pedido que já está a caminho sempre chega antes de um pedido novo que eu faço hoje?</strong><br>O sistema assume que sim.</p>
+      <p><strong>14. Para medir quanto um produto vende por mês, a média dos últimos 6 meses faz sentido para vocês?</strong><br>O sistema usa a média dos 6 últimos meses fechados. Esta não é configurável por enquanto.</p>
+    </div>
+  </main>
+</body>
+</html>

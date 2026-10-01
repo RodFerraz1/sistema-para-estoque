@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chat - Copilot de Compras</title>
+  <link rel="stylesheet" href="estilo.css">
+  <script type="module" src="chat.js"></script>
+</head>
+<body>
+  <header>
+    <div class="conteudo">
+      <strong>Copilot de Compras</strong>
+      <nav>
+        <a href="index.html">Fila</a>
+        <a href="chat.html" aria-current="page">Chat</a>
+        <a href="politica.html">Política</a>
+      </nav>
+    </div>
+  </header>
+  <main class="conteudo">
+    <h1>Chat</h1>
+    <p class="suave">Pergunte sobre um SKU, uma sugestão de compra, a política ou um fornecedor. Cada resposta mostra o que o Copilot entendeu e as fontes usadas.</p>
+
+    <form id="pergunta-form" class="card">
+      <div class="campo">
+        <label for="pergunta">Pergunta</label>
+        <textarea id="pergunta" required maxlength="1000" placeholder="Ex.: quanto devo comprar da toalha de banho bege TBC-BEGE-70140-01?"></textarea>
+      </div>
+      <div class="acoes">
+        <button id="perguntar" type="submit" class="primario">Perguntar</button>
+        <span class="suave">Ctrl+Enter também envia.</span>
+      </div>
+    </form>
+
+    <div id="respostas"></div>
+  </main>
+</body>
+</html>
