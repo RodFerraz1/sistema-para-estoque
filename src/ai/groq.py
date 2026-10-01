@@ -11,6 +11,9 @@ TIMEOUT_SEGUNDOS = 30.0
 
 
 class GroqRedator(Redator):
+    """`reasoning_effort` vazio não vai no corpo. Nos modelos de raciocínio (como o
+    `gpt-oss-120b`) o raciocínio conta nos `max_tokens` e pode consumir todos eles."""
+
     usa_llm = True
 
     def __init__(
@@ -19,9 +22,11 @@ class GroqRedator(Redator):
         modelo: str,
         base_url: str,
         *,
+        reasoning_effort: str = "",
         transport: httpx2.BaseTransport | None = None,
     ) -> None:
         self._modelo = modelo
+        self._reasoning_effort = reasoning_effort
         self._cliente = httpx2.Client(
             base_url=base_url,
             headers={"Authorization": f"Bearer {chave}"},
@@ -47,7 +52,7 @@ class GroqRedator(Redator):
         return conteudo.strip()
 
     def _corpo(self, pergunta: str, contexto: str) -> dict:
-        return {
+        corpo = {
             "model": self._modelo,
             "messages": [
                 {"role": "system", "content": INSTRUCOES_REDATOR},
@@ -56,3 +61,6 @@ class GroqRedator(Redator):
             "temperature": TEMPERATURA,
             "max_tokens": MAX_TOKENS,
         }
+        if self._reasoning_effort:
+            corpo["reasoning_effort"] = self._reasoning_effort
+        return corpo

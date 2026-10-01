@@ -796,3 +796,33 @@ def test_registro_distingue_sinais_calculados_sem_sinal_de_sinais_nao_calculados
 
     assert sinais_registrados(falhar_sinais=False) == [SinaisDoSKU(sku_code="TBC-BEGE-70140-01", sinais=[])]
     assert sinais_registrados(falhar_sinais=True) == [SinaisDoSKU(sku_code="TBC-BEGE-70140-01", sinais=None)]
+
+
+def test_redacao_de_llm_sai_limpa_antes_da_verificacao_das_citacoes() -> None:
+    redacao = f"O teto do TBC‑BEGE‑70140‑01 é de 3 meses 【{POLITICA_TETO}】."
+
+    resposta = copilot(
+        make_entendimento("politica_ou_fornecedor", 0.95),
+        redator=RedatorGravador(redacao),
+        trechos=[make_trecho(POLITICA_TETO)],
+        avaliacoes={POLITICA_TETO: ACEITO},
+        citacoes={POLITICA_TETO: make_relacao("sustenta")},
+    ).responder(PERGUNTA)
+
+    assert resposta.resposta == f"O teto do TBC-BEGE-70140-01 é de 3 meses [{POLITICA_TETO}]."
+    [citacao] = resposta.citacoes
+    assert (citacao.afirmacao, citacao.veredito) == ("O teto do TBC-BEGE-70140-01 é de 3 meses.", "confirmada")
+
+
+def test_resposta_sem_llm_nao_passa_pela_limpeza() -> None:
+    texto = "Teto do TBC‑BEGE de 3 meses 【nota】."
+
+    resposta = copilot(
+        make_entendimento("politica_ou_fornecedor", 0.95),
+        redator=RedatorSemLLM(),
+        trechos=[make_trecho(POLITICA_TETO, texto)],
+        avaliacoes={POLITICA_TETO: ACEITO},
+    ).responder(PERGUNTA)
+
+    assert resposta.redator == "sem_llm"
+    assert texto in resposta.resposta

@@ -20,7 +20,7 @@ from src.ai.citacoes import conferir_citacoes
 from src.ai.contexto import renderizar_contexto
 from src.ai.decisao import DecisaoIndisponivel, DecisionModel
 from src.ai.identificacao import identificar_skus, produtos_do_catalogo
-from src.ai.redator import LLM_INDISPONIVEL, Redator, RedatorIndisponivel, RedatorSemLLM
+from src.ai.redator import LLM_INDISPONIVEL, Redator, RedatorIndisponivel, RedatorSemLLM, limpar_redacao
 from src.ai.registro import RegistrosDecisao
 from src.ai.schemas import (
     Acao,
@@ -258,14 +258,16 @@ class Copilot:
         return trechos, conflitos
 
     def _redigir(self, pergunta: str, montagem: Montagem) -> tuple[str, Redator]:
-        """O texto e o redator que o escreveu, que é o `RedatorSemLLM` na queda do configurado."""
+        """O texto e o redator que o escreveu, que é o `RedatorSemLLM` na queda do configurado.
+        A redação de LLM sai limpa (`limpar_redacao`), antes da verificação das citações."""
         try:
-            return self._redator.redigir(pergunta, renderizar_contexto(montagem)), self._redator
+            texto = self._redator.redigir(pergunta, renderizar_contexto(montagem))
         except RedatorIndisponivel:
             sem_llm = RedatorSemLLM(LLM_INDISPONIVEL)
             observacao = f"O redator {self._redator.nome} falhou; a resposta vai sem redação."
             montagem = montagem.model_copy(update={"observacoes": [*montagem.observacoes, observacao]})
             return sem_llm.redigir(pergunta, renderizar_contexto(montagem)), sem_llm
+        return (limpar_redacao(texto) if self._redator.usa_llm else texto), self._redator
 
 
 def _registro(pergunta: str, resposta: RespostaCopilot, duracao_ms: int) -> RegistroDecisao:

@@ -105,7 +105,7 @@ Por fim, o projeto precisa ficar apresentável como portfólio: o README tem um 
 
 A regra 8 também ataca o alarme falso da verificação (frase com duas citações vira `incerta`, porque a afirmação é a frase inteira), sem mudar a extração.
 
-**Limpeza em código** (`limpar_redacao(texto) -> str`, função pura em `src/ai/redator.py`): troca U+2010 e U+2011 por `-`, U+00A0 e U+202F por espaço e `【` `】` por `[` `]`. O `Copilot._redigir` aplica a limpeza à redação de todo redator com `usa_llm`, antes da verificação de citações. É o que garante o código do SKU copiável, independentemente do modelo. A tolerância da extração de citações (M6) fica como está.
+**Limpeza em código** (`limpar_redacao(texto) -> str`, função pura em `src/ai/redator.py`): troca U+2010 e U+2011 por `-`, U+00A0 e U+202F por espaço e `【` `】` por `[` `]`, e tira o espaço de largura zero (U+200B), que a rodada de base mostrou dentro dos colchetes e impedia a extração da citação. O `Copilot._redigir` aplica a limpeza à redação de todo redator com `usa_llm`, antes da verificação de citações. É o que garante o código do SKU copiável, independentemente do modelo. A tolerância da extração de citações (M6) fica como está.
 
 **Groq**: `GROQ_REASONING_EFFORT` (`Settings` e `.env.example`, padrão `low`; vazio não envia o campo) vai no corpo como `reasoning_effort`, para o raciocínio do `gpt-oss-120b` não consumir os 2048 `max_tokens`.
 

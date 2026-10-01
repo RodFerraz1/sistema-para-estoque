@@ -27,8 +27,22 @@ def resposta_da_api(conteudo: str | None) -> dict:
     }
 
 
-def redator_com(handler: Callable[[httpx2.Request], httpx2.Response]) -> GroqRedator:
-    return GroqRedator("chave-teste", MODELO, BASE_URL, transport=httpx2.MockTransport(handler))
+def redator_com(handler: Callable[[httpx2.Request], httpx2.Response], *, reasoning_effort: str = "") -> GroqRedator:
+    return GroqRedator(
+        "chave-teste", MODELO, BASE_URL, reasoning_effort=reasoning_effort, transport=httpx2.MockTransport(handler)
+    )
+
+
+def corpo_enviado(*, reasoning_effort: str) -> dict:
+    corpos: list[dict] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        corpos.append(json.loads(request.content))
+        return httpx2.Response(200, json=resposta_da_api("Ok."))
+
+    redator_com(handler, reasoning_effort=reasoning_effort).redigir("Pergunta", CONTEXTO)
+    [corpo] = corpos
+    return corpo
 
 
 def test_chama_chat_completions_no_formato_da_openai_sem_tools() -> None:
@@ -52,6 +66,14 @@ def test_chama_chat_completions_no_formato_da_openai_sem_tools() -> None:
     [system, user] = corpo["messages"]
     assert system == {"role": "system", "content": INSTRUCOES_REDATOR}
     assert user == {"role": "user", "content": mensagem_do_usuario("Como tá a toalha bege?", CONTEXTO)}
+
+
+def test_reasoning_effort_configurado_vai_no_corpo() -> None:
+    assert corpo_enviado(reasoning_effort="low")["reasoning_effort"] == "low"
+
+
+def test_reasoning_effort_vazio_nao_vai_no_corpo() -> None:
+    assert "reasoning_effort" not in corpo_enviado(reasoning_effort="")
 
 
 def test_timeout_do_pedido_e_de_30_segundos() -> None:
@@ -118,7 +140,12 @@ def test_resposta_fora_do_formato_vira_redator_indisponivel(corpo: bytes) -> Non
 def test_groq_real_redige_com_o_numero_do_contexto() -> None:
     settings = get_settings()
     assert settings.groq_api_key, "o marcador externo_llm pula sem GROQ_API_KEY"
-    redator = GroqRedator(settings.groq_api_key, settings.groq_model, settings.groq_base_url)
+    redator = GroqRedator(
+        settings.groq_api_key,
+        settings.groq_model,
+        settings.groq_base_url,
+        reasoning_effort=settings.groq_reasoning_effort,
+    )
 
     resposta = redator.redigir("Quanto tem em estoque da TBC-BEGE-70140-01?", CONTEXTO)
 

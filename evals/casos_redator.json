@@ -1,0 +1,22 @@
+[
+  {
+    "id": "p01",
+    "pergunta": "Quanto devo comprar do SKU TBC-BEGE-70140-01?",
+    "intencao": "sugestao_compra"
+  },
+  {
+    "id": "p02",
+    "pergunta": "Quanto compro do JDCP-BRAN-QUEEN-02?",
+    "intencao": "sugestao_compra"
+  },
+  {
+    "id": "p03",
+    "pergunta": "Vale comprar a colcha CB-OFF--QUEEN-09 agora?",
+    "intencao": "sugestao_compra"
+  },
+  {
+    "id": "p04",
+    "pergunta": "Qual a situação do SKU TBC-BEGE-70140-01?",
+    "intencao": "situacao_sku"
+  }
+]

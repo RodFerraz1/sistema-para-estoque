@@ -8,7 +8,7 @@ from src.ai.claude import ClaudeRedator
 from src.ai.dependencies import get_redator
 from src.ai.groq import GroqRedator
 from src.ai.redator import RedatorSemLLM
-from src.db.config import get_settings
+from src.db.config import Settings, get_settings
 from src.main import create_app
 
 
@@ -99,3 +99,11 @@ def test_a_aplicacao_nao_sobe_com_o_provedor_sem_a_chave(monkeypatch: pytest.Mon
 
     with pytest.raises(ValidationError, match="ANTHROPIC_API_KEY"):
         create_app()
+
+
+def test_reasoning_effort_da_groq_e_baixo_por_padrao_e_pode_ficar_vazio(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GROQ_REASONING_EFFORT", raising=False)
+    assert Settings(_env_file=None).groq_reasoning_effort == "low"
+
+    monkeypatch.setenv("GROQ_REASONING_EFFORT", "")
+    assert Settings(_env_file=None).groq_reasoning_effort == ""

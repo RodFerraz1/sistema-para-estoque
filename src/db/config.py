@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     groq_model: str = Field(default="openai/gpt-oss-120b", alias="GROQ_MODEL")
     groq_base_url: str = Field(default="https://api.groq.com/openai/v1", alias="GROQ_BASE_URL")
+    groq_reasoning_effort: str = Field(default="low", alias="GROQ_REASONING_EFFORT")
     embedding_model: str = Field(
         default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         alias="EMBEDDING_MODEL",

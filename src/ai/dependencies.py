@@ -62,7 +62,7 @@ def get_redator() -> Redator:
     if provedor == "anthropic" and settings.anthropic_api_key:
         return _claude(settings.anthropic_api_key, settings.anthropic_model)
     if provedor == "groq" and settings.groq_api_key:
-        return _groq(settings.groq_api_key, settings.groq_model, settings.groq_base_url)
+        return _groq(settings.groq_api_key, settings.groq_model, settings.groq_base_url, settings.groq_reasoning_effort)
     return RedatorSemLLM()
 
 
@@ -82,8 +82,8 @@ def _claude(chave: str, modelo: str) -> Redator:
 
 
 @lru_cache(maxsize=1)
-def _groq(chave: str, modelo: str, base_url: str) -> Redator:
-    return GroqRedator(chave, modelo, base_url)
+def _groq(chave: str, modelo: str, base_url: str, reasoning_effort: str) -> Redator:
+    return GroqRedator(chave, modelo, base_url, reasoning_effort=reasoning_effort)
 
 
 def get_busca_contexto(

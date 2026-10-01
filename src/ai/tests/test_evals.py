@@ -99,3 +99,14 @@ def test_pares_de_citacao_tem_ao_menos_5_de_cada_relacao() -> None:
     por_relacao = Counter(caso["esperado"] for caso in casos)
     assert set(por_relacao) == {"sustenta", "contradiz", "nao_trata"}
     assert min(por_relacao.values()) >= 5
+
+
+def test_casos_do_redator_tem_o_formato_dos_casos_sem_repetir_pergunta() -> None:
+    casos = carregar("casos_redator.json")
+    perguntas_dos_casos = {caso["pergunta"] for caso in carregar("casos.json")}
+
+    assert len({caso["id"] for caso in casos}) == len(casos) == 4
+    for caso in casos:
+        assert set(caso) == {"id", "pergunta", "intencao"}, caso["id"]
+        assert caso["intencao"] in INTENCOES, caso["id"]
+        assert caso["pergunta"] not in perguntas_dos_casos, caso["id"]
