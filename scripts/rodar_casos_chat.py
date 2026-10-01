@@ -16,7 +16,7 @@ origem citado e sugestões com a quantidade escrita como no contexto (`1.234`).
     uv run python -m scripts.rodar_casos_chat               # precisa de JEV_KEY, do seed e do corpus ingerido
     uv run python -m scripts.rodar_casos_chat --casos evals/casos_redator.json
     uv run python -m scripts.rodar_casos_chat --respostas   # imprime também o texto de cada resposta
-    uv run python -m scripts.rodar_casos_chat --pausa 30    # espera entre os casos (limite de tokens por minuto da Groq)
+    uv run python -m scripts.rodar_casos_chat --pausa 30    # espera entre os casos (limite de requisições do provedor)
     uv run python -m scripts.rodar_casos_chat --sem-llm     # troca o redator pelo RedatorSemLLM
 """
 from __future__ import annotations

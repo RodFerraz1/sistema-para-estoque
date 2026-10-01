@@ -88,13 +88,13 @@ def test_somar_junta_as_contagens_dos_casos() -> None:
 
 
 def test_redator_com_quedas_guarda_o_motivo_e_repassa_a_queda() -> None:
-    redator = RedatorComQuedas(RedatorGravador(nome="groq:modelo", falhar=True))
+    redator = RedatorComQuedas(RedatorGravador(nome="anthropic:modelo", falhar=True))
 
     with pytest.raises(RedatorIndisponivel):
         redator.redigir("Pergunta", "Contexto")
 
-    assert redator.queda == "groq:modelo configurado para falhar"
-    assert (redator.nome, redator.usa_llm) == ("groq:modelo", True)
+    assert redator.queda == "anthropic:modelo configurado para falhar"
+    assert (redator.nome, redator.usa_llm) == ("anthropic:modelo", True)
 
 
 def test_redator_com_quedas_sem_queda_devolve_o_texto() -> None:

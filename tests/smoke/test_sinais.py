@@ -1,5 +1,5 @@
 """Smoke dos sinais do corpus contra o Postgres real, com o Jev de verdade. O chat
-troca o redator pelo `RedatorSemLLM`, para não depender da Groq."""
+troca o redator pelo `RedatorSemLLM`, para não depender do LLM."""
 from __future__ import annotations
 
 from collections.abc import Iterator

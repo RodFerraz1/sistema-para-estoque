@@ -168,7 +168,7 @@ REDACAO_REAL = (
 )
 
 
-def test_redacao_real_do_groq() -> None:
+def test_redacao_real_de_um_llm() -> None:
     compostas = (
         "Não. O contrato exige antecedência mínima de 45 dias entre o pedido e a data desejada de recebimento, "
         "mas o lead-time real observado costuma ficar entre 55 e 65 dias."

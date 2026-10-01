@@ -17,7 +17,7 @@ def criar_cliente_claude(chave: str) -> anthropic.Anthropic:
 
 
 class ClaudeRedator(Redator):
-    """No Opus 5.5 o raciocínio não desliga, então o esforço baixo é o que o encurta. Numa
+    """No Sonnet 5.5 o raciocínio fica ligado, e o esforço baixo é o que o encurta. Numa
     recusa dos classificadores, o `fallbacks="default"` repete o pedido no servidor, no modelo
     recomendado para a categoria; `refusal` na resposta quer dizer que a cadeia inteira recusou."""
 

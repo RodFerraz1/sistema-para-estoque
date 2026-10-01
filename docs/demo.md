@@ -1,12 +1,12 @@
 # Roteiro de demo
 
-Roteiro de 5 a 8 minutos que mostra o Copilot de Compras de ponta a ponta, no lugar de um vídeo. Cada passo tem o comando ou a tela, o que mostrar e o que esperar. Os números abaixo saíram do ambiente local em 2026-10-01 (seed, corpus ingerido, Jev `jev-1.13.0` e redator da Groq) e mudam com a data em que o seed rodou e com a política ativa. Vocabulário em [`CONTEXT.md`](../CONTEXT.md).
+Roteiro de 5 a 8 minutos que mostra o Copilot de Compras de ponta a ponta, no lugar de um vídeo. Cada passo tem o comando ou a tela, o que mostrar e o que esperar. Os números abaixo saíram do ambiente local em 2026-10-01 (seed, corpus ingerido, Jev `jev-1.13.0` e o redator da época, a Groq, que saiu depois do M8) e mudam com a data em que o seed rodou e com a política ativa. Vocabulário em [`CONTEXT.md`](../CONTEXT.md).
 
 ## Pré-requisitos
 
 - Docker com `docker compose`, [`uv`](https://docs.astral.sh/uv/), `curl`, [`jq`](https://jqlang.org/) e um navegador.
 - `.env` copiado do `.env.example`, com a `JEV_KEY` (TypeSafe). Sem ela, a busca, os sinais, o chat e a geração da fila respondem 503.
-- Uma chave de redator, opcional: `ANTHROPIC_API_KEY` (Claude) ou `GROQ_API_KEY` (Groq). Sem nenhuma, o chat responde com os dados que reuniu, sem redação. Na Groq gratuita, espere um minuto entre as perguntas do chat (8.000 tokens por minuto; uma redação pede uns 3.100).
+- A chave do redator, opcional: `ANTHROPIC_API_KEY` (Claude). Sem ela, o chat responde com os dados que reuniu, sem redação.
 
 ## Preparação (antes de apresentar, uns 5 minutos)
 
@@ -62,7 +62,7 @@ curl -s http://localhost:8000/chat -H 'Content-Type: application/json' \
   | jq '{resposta, acao, faixa, intencao: .entendimento.intencao, sinais: [.sugestoes[].sinais[]?.tipo], citacoes: [.citacoes[] | {trecho_id, veredito, confianca}], redator}'
 ```
 
-Mostrar: o Jev entende a pergunta (`sugestao_compra` com 1,00, faixa alta), o código calcula a sugestão e os sinais, o LLM só redige e o Jev confere cada citação. Esperado: a resposta começa pela quantidade (213 unidades da Katrina, "o fornecedor escolhido pela política"), repete a memória de cálculo e os alertas sem converter nem comparar números, fala do sinal de atraso com um trecho de origem por frase (ficha `#lead-time`, revisão Q1 e justificativa do Natal) e termina com "A decisão sobre a quantidade e o fechamento do pedido é sua". Na execução de referência, com o Claude (`anthropic:claude-opus-5-5`), as três citações saíram `confirmada` com confiança 1,00, em uns 16 s. Com a Groq, a resposta vem em uns 5 s e o texto muda de uma execução para outra; na Groq gratuita, se o limite de tokens estourar, a resposta vem sem redação (ver "Se algo der errado").
+Mostrar: o Jev entende a pergunta (`sugestao_compra` com 1,00, faixa alta), o código calcula a sugestão e os sinais, o LLM só redige e o Jev confere cada citação. Esperado: a resposta começa pela quantidade (213 unidades da Katrina, "o fornecedor escolhido pela política"), repete a memória de cálculo e os alertas sem converter nem comparar números, fala do sinal de atraso com um trecho de origem por frase (ficha `#lead-time`, revisão Q1 e justificativa do Natal) e termina com "A decisão sobre a quantidade e o fechamento do pedido é sua". Na execução de referência, com o Claude (`anthropic:claude-opus-5-5`), as três citações saíram `confirmada` com confiança 1,00, em uns 16 s. Se o Claude cair, a resposta vem sem redação (ver "Se algo der errado").
 
 Na tela do chat, mostre também o painel "o que o Copilot entendeu" (intenção, confiança, faixa, ação, SKUs), a sugestão com o sinal e a lista de citações com o veredito. Citação que não se confirma aparece marcada no texto, como `[<id> - não confirmada]`.
 
@@ -131,5 +131,5 @@ Esperado: a versão ativa sobe uma, com o valor novo. A fila só muda quando for
 ## Se algo der errado
 
 - 503 na busca, nos sinais, no chat ou na geração: falta a `JEV_KEY` ou o Jev está fora do ar.
-- O chat abre com "O LLM que redige a resposta está indisponível no momento": o redator caiu (na Groq gratuita, em geral um 429 por tokens por minuto) e a resposta saiu sem redação. Espere um minuto e pergunte de novo.
+- O chat abre com "O LLM que redige a resposta está indisponível no momento": o Claude caiu (chave inválida, limite de requisições ou erro da API) e a resposta saiu sem redação. Confira a `ANTHROPIC_API_KEY` e pergunte de novo.
 - Fila vazia: rode o `POST /sugestoes/gerar` da preparação.

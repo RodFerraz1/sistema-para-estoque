@@ -387,7 +387,7 @@ def test_faixa_baixa_pede_esclarecimento_com_as_duas_intencoes_mais_provaveis() 
 
 
 def test_queda_do_redator_cai_no_sem_llm_com_a_observacao() -> None:
-    redator = RedatorGravador(nome="groq:modelo", falhar=True)
+    redator = RedatorGravador(nome="anthropic:modelo", falhar=True)
 
     resposta = copilot(make_entendimento("situacao_sku", 0.95), redator=redator).responder(
         "Situação do TBC-BEGE-70140-01"
@@ -397,7 +397,7 @@ def test_queda_do_redator_cai_no_sem_llm_com_a_observacao() -> None:
     assert resposta.redator == "sem_llm"
     assert resposta.resposta.startswith("O LLM que redige a resposta está indisponível no momento.")
     assert "### TBC-BEGE-70140-01" in resposta.resposta
-    assert resposta.resposta.endswith("- O redator groq:modelo falhou; a resposta vai sem redação.")
+    assert resposta.resposta.endswith("- O redator anthropic:modelo falhou; a resposta vai sem redação.")
 
 
 def test_jev_fora_do_ar_propaga_decisao_indisponivel_sem_registro() -> None:
@@ -502,7 +502,7 @@ def test_confirmacao_e_queda_do_redator_ficam_no_registro() -> None:
 
     resposta = copilot(
         make_entendimento("situacao_sku", 0.6),
-        redator=RedatorGravador(nome="groq:modelo", falhar=True),
+        redator=RedatorGravador(nome="anthropic:modelo", falhar=True),
         registros=registros,
     ).responder("Situação do TBC-BEGE-70140-01")
 
@@ -734,7 +734,7 @@ def test_resposta_sem_llm_nao_passa_pela_verificacao() -> None:
 def test_queda_do_redator_nao_passa_pela_verificacao() -> None:
     resposta = copilot(
         make_entendimento("politica_ou_fornecedor", 0.95),
-        redator=RedatorGravador(nome="groq:modelo", falhar=True),
+        redator=RedatorGravador(nome="anthropic:modelo", falhar=True),
         trechos=[make_trecho(POLITICA_TETO)],
         avaliacoes={POLITICA_TETO: ACEITO},
         falhar_citacoes=True,

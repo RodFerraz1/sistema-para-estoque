@@ -5,7 +5,7 @@ import pytest
 
 from src.db.config import get_settings
 
-CHAVES_DOS_LLMS = {"anthropic": "ANTHROPIC_API_KEY", "groq": "GROQ_API_KEY"}
+CHAVES_DOS_LLMS = {"anthropic": "ANTHROPIC_API_KEY"}
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:

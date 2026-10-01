@@ -15,7 +15,7 @@ from src.ai.claude import ClaudeRedator, criar_cliente_claude
 from src.ai.redator import INSTRUCOES_REDATOR, RedatorIndisponivel, mensagem_do_usuario
 from src.db.config import get_settings
 
-MODELO = "claude-opus-5-5"
+MODELO = "claude-sonnet-5-5"
 CONTEXTO = "## Fichas de SKU (dados do ERP)\n\n### TBC-BEGE-70140-01\n- Estoque disponível: 120 unidades"
 PERGUNTA = "Como tá a toalha bege?"
 

@@ -24,7 +24,6 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://copilot:copilot@db:5432/copilot
       JEV_KEY: ${JEV_KEY:-}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       REDATOR: ${REDATOR:-auto}
     ports:

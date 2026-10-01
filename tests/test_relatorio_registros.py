@@ -75,7 +75,7 @@ REGISTROS = [
         "sugestao_compra",
         0.98,
         duracao_ms=4000,
-        redator="groq:openai/gpt-oss-120b",
+        redator="anthropic:claude-sonnet-5-5",
         citacoes=[citacao("confirmada", 0.85), citacao("incerta", 0.75), citacao("inventada", None)],
         sinais=[
             SinaisDoSKU(sku_code="TBC-BEGE-70140-01", sinais=[sinal("atraso_do_fornecedor"), sinal("encalhe")]),

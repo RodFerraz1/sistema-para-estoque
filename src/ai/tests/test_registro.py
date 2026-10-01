@@ -86,7 +86,7 @@ def registro(minutos: int = 0, **campos: object) -> RegistroDecisao:
                 modelo="jev-1.13.0",
             ),
             "trechos": ["contratos/katrina.md#prazos", "reunioes/q1.md#katrina"],
-            "redator": "groq:openai/gpt-oss-120b",
+            "redator": "anthropic:claude-sonnet-5-5",
             "resposta": "A toalha bege tem 40 unidades.",
             "duracao_ms": 3412,
             "sinais": [],

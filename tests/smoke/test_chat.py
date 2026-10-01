@@ -1,8 +1,7 @@
 """Smoke do `/chat` contra o Postgres real, com o Jev de verdade.
 
 O primeiro teste troca o redator pelo `RedatorSemLLM` e é pulado sem `JEV_KEY`.
-O segundo força a Groq real com `REDATOR=groq` (com as duas chaves, o `auto` escolheria o
-Claude) e é pulado sem `GROQ_API_KEY`.
+O segundo usa o Claude real com `REDATOR=anthropic` e é pulado sem `ANTHROPIC_API_KEY`.
 """
 from __future__ import annotations
 
@@ -52,11 +51,11 @@ def test_chat_com_jev_real_responde_a_situacao_do_sku_e_grava_o_registro(client:
     assert registro.resposta == resposta.resposta
 
 
-@pytest.mark.externo_llm("groq")
-def test_chat_com_jev_e_groq_reais_redige_a_situacao_do_sku(
+@pytest.mark.externo_llm("anthropic")
+def test_chat_com_jev_e_claude_reais_redige_a_situacao_do_sku(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("REDATOR", "groq")
+    monkeypatch.setenv("REDATOR", "anthropic")
 
     response = client.post("/chat", json={"pergunta": PERGUNTA})
 
@@ -65,5 +64,5 @@ def test_chat_com_jev_e_groq_reais_redige_a_situacao_do_sku(
     assert resposta.entendimento.intencao.escolha == "situacao_sku"
     assert resposta.identificacao is not None
     assert resposta.identificacao.skus == ["TBC-BEGE-70140-01"]
-    assert resposta.redator is not None and resposta.redator.startswith("groq:")
+    assert resposta.redator is not None and resposta.redator.startswith("anthropic:")
     assert resposta.resposta.strip()
