@@ -2,10 +2,9 @@
 
 Indexa o corpus em memória com o modelo de `EMBEDDING_MODEL` (não precisa de
 banco) e, para cada pergunta rotulada, confere quantos trechos relevantes
-aparecem entre os k mais parecidos. Critério da spec 04: recall@10 >= 0,9,
-contado sobre todos os trechos rotulados (micro). A média por pergunta
-(macro) sai junto como referência. Se não bater, a troca de modelo passa
-pela ADR-0004.
+aparecem entre os k mais parecidos. Critério: recall@30 >= 0,9 (o k padrão
+da busca, ver ADR-0004), contado sobre todos os trechos rotulados (micro).
+A média por pergunta (macro) sai junto como referência.
 
     uv run python -m scripts.avaliar_recuperacao
 """
@@ -21,8 +20,8 @@ from src.db.config import get_settings
 
 RAIZ = Path(__file__).resolve().parents[1]
 CASOS = RAIZ / "evals" / "casos.json"
-CORTES_K = (5, 10, 15)
-K_CRITERIO = 10
+CORTES_K = (10, 20, 30)
+K_CRITERIO = 30
 RECALL_MINIMO = 0.9
 
 

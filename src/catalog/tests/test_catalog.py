@@ -59,3 +59,11 @@ def test_fornecedores_de_sku_sem_relacao_retorna_vazio() -> None:
     catalog = Catalog(InMemoryERPAdapter(skus=[make_sku("A")]))
 
     assert catalog.fornecedores_de("A") == []
+
+
+def test_listar_skus_devolve_so_os_ativos_por_codigo() -> None:
+    catalog = Catalog(
+        InMemoryERPAdapter(skus=[make_sku("B"), make_sku("C", ativo=False), make_sku("A")])
+    )
+
+    assert [s.sku_code for s in catalog.listar_skus()] == ["A", "B"]

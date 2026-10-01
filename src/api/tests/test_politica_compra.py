@@ -41,6 +41,10 @@ def _parametros(**overrides: Any) -> dict[str, Any]:
         "meses_quentes": [11, 12],
         "extra_sazonal_meses": 1.0,
         "dias_historico_minimo": 90,
+        "faixa_1_ate_reais": 20_000,
+        "faixa_2_ate_reais": 80_000,
+        "faixa_3_ate_reais": 200_000,
+        "motivos_de_destaque": ["ruptura_antes_da_chegada", "encalhe"],
     }
     return base | overrides
 
@@ -63,6 +67,10 @@ def test_get_devolve_a_politica_ativa(client: TestClient) -> None:
             "meses_quentes": [5, 6, 11, 12],
             "extra_sazonal_meses": 2.0,
             "dias_historico_minimo": 60,
+            "faixa_1_ate_reais": 15_000,
+            "faixa_2_ate_reais": 60_000,
+            "faixa_3_ate_reais": 150_000,
+            "motivos_de_destaque": ["ruptura_antes_da_chegada", "viola_teto"],
         },
     }
 
@@ -85,6 +93,17 @@ def test_put_invalido_devolve_422_e_nao_grava(
 ) -> None:
     response = client.put(
         "/politica-compra", json=_parametros(piso_alerta_dias=40, piso_reposicao_dias=30)
+    )
+
+    assert response.status_code == 422
+    assert repo.ativa().versao == 1
+
+
+def test_put_com_faixas_fora_de_ordem_devolve_422(
+    client: TestClient, repo: InMemoryPoliticaCompraRepositorio
+) -> None:
+    response = client.put(
+        "/politica-compra", json=_parametros(faixa_1_ate_reais=90_000)
     )
 
     assert response.status_code == 422

@@ -22,3 +22,4 @@ Escolhemos isso porque a hipótese é que decisões tipadas e calibradas são ma
 - Números, contagens e comparações de datas nunca vão para o Jev. A doc do Jev 1.13 aponta essas tarefas como fraquezas conhecidas.
 - Passamos a depender de dois fornecedores de IA.
 - **Condição de revisão**: o spike do início do M4 precisa mostrar que o Jev funciona em português com o corpus e as perguntas do comprador, com custo e latência aceitáveis. Se falhar, esta ADR é substituída e o `ai` volta ao tool use via LLM.
+- **2026-09-30**: o spike não cumpriu a condição de revisão na relevância de trecho. Com o gabarito refeito às cegas, o melhor recall com precisão >= 0,6 foi 0,71, e o critério pedia 0,85. Intenção, injeção, latência e custo passaram. O dev decidiu manter esta ADR e aceitar o risco: a busca usa o limiar que dá o recall do critério (0,87) com precisão de 0,34, e os trechos que sobram chegam ao redator. Detalhes em `.scratch/rag-jev/spike-resultado.md`.

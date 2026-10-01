@@ -32,14 +32,18 @@ Cada milestone é um bloco de trabalho de 1 sessão a 2-3 dias. Você marca como
 
 ## M3 - Sugestão determinística (sem IA)
 
-- Módulo `purchasing.sugerir_pedido` implementado sem LLM.
-- Regras: pega fornecedor mais barato, calcula quantidade pra levar cobertura pra 3 meses (piso da política), respeita MOQ do fornecedor.
-- Aplica política (checa teto de estoque, alerta se violação).
-- Endpoint `/skus/{id}/sugerir-compra` retorna `SugestaoPedido` completa em JSON.
+Spec: `.scratch/sugestao-compra/spec.md`. Decisão base: ADR-0003 (mecanismo fixo, parâmetros do comprador).
+
+- Política de compra versionada no schema `copilot`, editável via `GET/PUT /politica-compra`. A v1 usa os valores da política v3 do corpus.
+- `inventory.em_transito`: o que falta chegar de pedidos de compra abertos.
+- `purchasing.sugerir_pedido` sem LLM: posição com em trânsito, estoque na chegada descontando o lead time, ponto de reposição, MOQ, escolha de fornecedor pelo critério da política, teto e alertas.
+- Endpoint `/skus/{sku_code}/sugestao-compra` retorna `SugestaoPedido` em JSON, com quantidade zero e motivo quando não há compra.
 
 **Saída visível**: pergunta "quanto comprar do SKU X?" e recebe sugestão estruturada, sem envolver LLM.
 
 **Ponto de reflexão**: nesta altura você já tem um sistema *útil* sem IA. Isso é intencional - se a IA falhar depois, o sistema ainda funciona. IA é aumento de valor, não fundação.
+
+**Concluído em 2026-09-29.**
 
 ## Divisão de papéis na IA (M4 em diante)
 
@@ -47,13 +51,17 @@ A partir do M4 o `ai` segue a ADR-0002: **Jev decide, código executa, LLM redig
 
 ## M4 - Spike do Jev + RAG com filtro de trechos
 
+Spec: `.scratch/rag-jev/spec.md`. Decisões base: ADR-0002 (Jev decide) e ADR-0004 (embeddings locais).
+
 - **Spike primeiro (gate da ADR-0002)**: rodar o Jev em português contra o corpus e umas 20 perguntas típicas do comprador. Medir acerto de intenção, acerto de relevância de trecho, custo e latência. Se não passar, reabrir a ADR-0002 antes de seguir.
 - Módulo `ai` com port `DecisionModel` (adapter Jev + adapter in-memory pra teste).
-- Pipeline de ingestão dos 11 documentos seed: chunking, embedding (`text-embedding-3-small`), gravação em pgvector.
+- Pipeline de ingestão dos 11 documentos seed: chunking, embedding local com fastembed (ADR-0004), gravação em pgvector.
 - `ai.buscar_contexto(query, k)`: busca vetorial seguida de um filtro com o Jev, que pergunta por trecho se é relevante, se contradiz outro trecho e se tenta dar instrução ao modelo. Devolve trechos classificados como aceito, conflitante ou descartado.
 - Endpoint `/rag/busca?q=...` que retorna os trechos com a classificação e a confiança.
 
 **Saída visível**: pesquisa "lead time da Katrina" e vê os trechos relevantes, com o conflito entre lead time contratual e observado sinalizado.
+
+**Concluído em 2026-09-30.** O gate da ADR-0002 reprovou na relevância de trecho, e o dev manteve a ADR aceitando o risco (`.scratch/rag-jev/spike-resultado.md`).
 
 ## M5 - Primeira conversa: Jev roteia, LLM redige
 
@@ -66,6 +74,8 @@ A partir do M4 o `ai` segue a ADR-0002: **Jev decide, código executa, LLM redig
 
 **Saída visível**: "qual a situação do SKU TBC-BEG-70140?" gera resposta em texto, e o log mostra a intenção escolhida e a confiança.
 
+**Concluído em 2026-09-30.** O redator da Groq ainda descumpre regras das instruções (compara cobertura com teto e piso, inventa citação) e o limite de tokens por minuto do plano gratuito derruba perguntas seguidas no redator sem LLM (`.scratch/chat/issues/05-readme-e-smoke.md`).
+
 ## M6 - Sugestão com sinais do corpus
 
 - Intenção "pedido de sugestão" leva o código a chamar `purchasing.sugerir_pedido` (determinístico, do M3).
@@ -75,24 +85,35 @@ A partir do M4 o `ai` segue a ADR-0002: **Jev decide, código executa, LLM redig
 
 **Saída visível**: pergunta livre gera resposta que combina dados, sugestão e contexto do RAG, com citações verificadas.
 
+**Concluído em 2026-09-30.** Os sinais saem como sinais do corpus ao lado da sugestão (atraso do fornecedor, venda por época e encalhe, cada um um `Noul` trecho a trecho), não como alertas da `SugestaoPedido`, e a citação sem suporte é marcada no texto, não removida (`.scratch/sinais-e-citacoes/spec.md`). O redator ainda ignora a maioria dos sinais e cita dados do ERP e da política com colchetes que não são id de trecho, que a verificação não marca (`.scratch/sinais-e-citacoes/issues/03-chat-com-sinais-e-citacoes.md`).
+
 ## M7 - Aprovação humana (workflow completo)
 
 - UI mínima (HTML puro ou React simples) com: lista de sugestões pendentes, botão aprovar/rejeitar/editar.
 - Sugestões com alertas do Jev ou baixa confiança aparecem destacadas no topo da fila. A confiança só prioriza, nunca aprova.
 - `purchasing.submeter_pedido` só é acionado por endpoint que exige aprovação.
 - Sugestão aprovada vira `pedido_compra` no ERP fake com status `aprovado`.
+- Tela de onboarding que preenche a política de compra, a partir de `.scratch/sugestao-compra/perguntas-comprador.md`.
+- Faixa de aprovação (`politicas/aprovacao-compras.md`) calculada sobre o pedido inteiro.
 
 **Saída visível**: workflow end-to-end. Copilot sugere, você aprova, aparece no ERP.
 
+**Concluído em 2026-09-30.** A UI é HTML, CSS e JS puros servidos pelo FastAPI em `/ui/`, e cada sugestão aprovada vira um pedido de um item, então a faixa é calculada sobre esse pedido. O destaque vem dos alertas do `purchasing` e dos sinais do corpus que o comprador escolhe na política (`motivos_de_destaque`, padrão ruptura e teto), não de uma confiança do Jev; com o padrão, marca 10 de 31 sugestões no seed (eram 30 de 31 com todos os alertas de risco e sinais). A aprovação reserva a sugestão antes de criar o pedido, então duas aprovações simultâneas criam um pedido só (`.scratch/aprovacao/spec.md`, seção "Fila de aprovação").
+
 ## M8 - Refinamentos e apresentabilidade
 
-- Trocar o redator Groq por Claude/GPT no deploy final (chave em env var).
-- Ajustar perguntas do Jev e thresholds de confiança com base no log de decisões.
-- Melhorar prompt do redator com base em observação real.
-- README com fluxo, screenshots, arquitetura desenhada.
-- Vídeo de demo curto.
+Spec: `.scratch/refinamentos/spec.md`.
+
+- Redator Claude (Opus 5.5) com o SDK oficial `anthropic`, esforço baixo, tratamento de recusa e fallback do lado do servidor. `REDATOR` escolhe o provedor; em `auto`, Anthropic, depois Groq, depois sem LLM.
+- Prompt do redator reescrito pelos riscos medidos no M5 e no M6 (contas, recomendação de fornecedor, citação sem id de trecho, sinais ignorados, quantidade ignorada), com limpeza em código do hífen não separável, `reasoning_effort` na Groq e medida antes e depois.
+- Regra de calibração única para os limiares, que não degenera sem erro na amostra; limiares dos sinais e da citação recalculados.
+- Calibração do entendimento pelo registro de decisão (relatório e perguntas rotuladas às cegas), critérios da intenção refinados onde o spike errou e faixas revistas (mantidas se houver pouco dado).
+- Limiar de conflito medido com pares reais.
+- README com arquitetura e fluxos em mermaid e screenshots da UI; roteiro de demo em `docs/demo.md` no lugar do vídeo.
 
 **Saída visível**: projeto de portfólio publicável.
+
+**Concluído em 2026-10-01.** O redator Claude está atrás de `REDATOR`; as rodadas de medição do M8 foram feitas com a Groq gratuita. No fechamento, a Groq foi removida e o padrão virou o Claude Sonnet 5.5, que mediu sem quedas, sem colchetes sem id e sem citação inventada (`casos_redator.json`: sinais 3/3, quantidades 3/3; `casos.json`: intenção 20/20, 56 citações confirmadas e 1 incerta). O prompt novo zerou os colchetes sem id de trecho e fez a redação citar os sinais e as quantidades, mas as citações dos sinais de encalhe não se confirmam (a mensagem do sinal generaliza para a categoria). Os limiares saíram de uma regra de calibração única; as faixas de confiança e o limiar do produto ficaram por amostra insuficiente. O limiar de conflito subiu de 0,10 para 0,40 e só sinaliza conflitos reais, mas perde 4 dos 7 rotulados, inclusive o par canônico da Katrina (cláusula 3 contra a revisão Q1). O vídeo de demo virou o roteiro em `docs/demo.md` (`.scratch/refinamentos/spec.md`).
 
 ## Depois do MVP (fora do escopo agora)
 
@@ -101,6 +122,8 @@ A partir do M4 o `ai` segue a ADR-0002: **Jev decide, código executa, LLM redig
 - Deploy real (Fly.io, Railway, ou AWS - decidir depois).
 - Métricas de retrieval quality (RAGAs, etc).
 - Fine-tuning ou avaliação sistemática.
+- Modo `ajustar` da sazonalidade na política de compra, com `sales.previsao_venda`.
+- Sugestão em lote e agrupamento de SKUs por fornecedor num mesmo pedido.
 
 ## Onde marcar progresso
 

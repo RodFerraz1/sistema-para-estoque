@@ -1,4 +1,4 @@
-"""Fábricas de DTOs de domínio para montar `InMemoryERPAdapter` em testes.
+"""Fábricas de DTOs de domínio para montar os adapters em memória nos testes.
 
 Mantém defaults sensatos para que cada teste especifique apenas o que
 importa. UUIDs são derivados por `uuid5` a partir do nome/código para
@@ -7,9 +7,14 @@ serem estáveis entre runs.
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from datetime import UTC, date, datetime
 from uuid import UUID
 
+from src.ai.embeddings import Embedder
+from src.ai.in_memory import InMemoryTrechosRepositorio
+from src.ai.redator import Redator, RedatorIndisponivel
+from src.ai.schemas import NENHUM_PRODUTO, Entendimento, Escolha, Intencao, Relacao, Trecho, TrechoIndexado
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.in_memory import (
     ItemPedidoCompra,
@@ -171,3 +176,87 @@ def make_item_pedido_compra(
         quantidade=quantidade,
         quantidade_recebida=quantidade_recebida,
     )
+
+
+def make_trecho(
+    id: str,
+    texto: str = "Texto do trecho.",
+    *,
+    titulo: str = "Documento > Seção",
+    tipo: str = "reuniao",
+    data: date = date(2025, 3, 14),
+    tags: list[str] | None = None,
+) -> Trecho:
+    return Trecho(
+        id=id,
+        documento=id.split("#")[0],
+        titulo=titulo,
+        tipo=tipo,
+        data=data,
+        tags=tags or [],
+        texto=texto,
+    )
+
+
+def repositorio_com(trechos: list[Trecho], embedder: Embedder) -> InMemoryTrechosRepositorio:
+    """Grava os `trechos` já com embedding, agrupados por documento como na ingestão."""
+    repositorio = InMemoryTrechosRepositorio()
+    por_documento: dict[str, list[TrechoIndexado]] = defaultdict(list)
+    for trecho, vetor in zip(trechos, embedder.embed([t.texto for t in trechos]), strict=True):
+        por_documento[trecho.documento].append(TrechoIndexado(**trecho.model_dump(), embedding=vetor))
+    for documento, indexados in por_documento.items():
+        repositorio.substituir_documento(documento, f"hash de {documento}", indexados)
+    return repositorio
+
+
+def make_entendimento(
+    intencao: Intencao = "situacao_sku",
+    confianca: float = 0.95,
+    *,
+    produto: str = NENHUM_PRODUTO,
+    confianca_produto: float = 0.95,
+    probabilidades_intencao: dict[str, float] | None = None,
+    probabilidades_produto: dict[str, float] | None = None,
+    modelo: str = "in-memory",
+) -> Entendimento:
+    return Entendimento(
+        intencao=Escolha(
+            escolha=intencao,
+            confianca=confianca,
+            probabilidades=probabilidades_intencao or {intencao: confianca},
+        ),
+        produto=Escolha(
+            escolha=produto,
+            confianca=confianca_produto,
+            probabilidades=probabilidades_produto or {produto: confianca_produto},
+        ),
+        modelo=modelo,
+    )
+
+
+def make_relacao(escolha: Relacao, confianca: float = 0.95) -> Escolha[Relacao]:
+    """Resposta da pergunta de citação para configurar o `InMemoryDecisionModel`."""
+    return Escolha(escolha=escolha, confianca=confianca, probabilidades={escolha: confianca})
+
+
+class RedatorGravador(Redator):
+    """Redator que guarda o que recebeu e devolve `texto`. Com `falhar`, lança
+    `RedatorIndisponivel` como um LLM fora do ar."""
+
+    usa_llm = True
+
+    def __init__(self, texto: str = "Resposta redigida.", *, nome: str = "gravador", falhar: bool = False) -> None:
+        self._nome = nome
+        self.chamadas: list[tuple[str, str]] = []
+        self._texto = texto
+        self._falhar = falhar
+
+    @property
+    def nome(self) -> str:
+        return self._nome
+
+    def redigir(self, pergunta: str, contexto: str) -> str:
+        self.chamadas.append((pergunta, contexto))
+        if self._falhar:
+            raise RedatorIndisponivel(f"{self.nome} configurado para falhar")
+        return self._texto

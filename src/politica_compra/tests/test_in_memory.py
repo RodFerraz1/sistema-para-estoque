@@ -20,6 +20,10 @@ def test_nasce_com_a_v1_padrao() -> None:
     assert ativa.parametros.piso_alerta_dias == 20
     assert ativa.parametros.piso_reposicao_dias == 30
     assert ativa.parametros.dias_historico_minimo == 60
+    assert ativa.parametros.faixa_1_ate_reais == 15_000
+    assert ativa.parametros.faixa_2_ate_reais == 60_000
+    assert ativa.parametros.faixa_3_ate_reais == 150_000
+    assert ativa.parametros.motivos_de_destaque == ("ruptura_antes_da_chegada", "viola_teto")
 
 
 def test_salvar_nova_versao_incrementa_e_vira_ativa() -> None:

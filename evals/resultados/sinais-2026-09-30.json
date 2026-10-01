@@ -1,0 +1,318 @@
+{
+  "executado_em": "2026-09-30T19:36:10+00:00",
+  "modelo_pedido": "jev-1.13.0",
+  "perguntas": {
+    "atraso_do_fornecedor": {
+      "type": "noul",
+      "instructions": "O `trecho` relata que o fornecedor `fornecedor` atrasou entregas ou entregou depois do prazo combinado?",
+      "criteria": {
+        "true": "O trecho conta atraso, entrega fora do prazo ou lead time real maior que o contratado desse mesmo fornecedor.",
+        "false": "O trecho não fala de entrega desse fornecedor, fala de outro fornecedor ou diz que ele cumpre os prazos."
+      }
+    },
+    "demanda_sazonal": {
+      "type": "noul",
+      "instructions": "O `trecho` relata que o `produto` ou a categoria dele vende mais numa data comemorativa ou época do ano?",
+      "criteria": {
+        "true": "O trecho cita venda maior desse produto ou da categoria dele no Natal, no Dia das Mães, no inverno, no verão ou em outra época.",
+        "false": "O trecho não fala de venda por época desse produto nem da categoria dele."
+      }
+    },
+    "encalhe": {
+      "type": "noul",
+      "instructions": "O `trecho` relata que o `produto` ou a categoria dele encalhou ou sobrou em estoque depois de uma compra?",
+      "criteria": {
+        "true": "O trecho conta que uma compra desse produto ou da categoria dele vendeu abaixo do esperado, ficou parada ou precisou de liquidação.",
+        "false": "O trecho não fala de sobra de estoque desse produto nem da categoria dele."
+      }
+    }
+  },
+  "respostas": [
+    {
+      "caso": "s01",
+      "latencia_s": 0.384,
+      "avaliacao": {
+        "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.98,
+          "demanda_sazonal": 0.03,
+          "encalhe": 0.02
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s02",
+      "latencia_s": 0.246,
+      "avaliacao": {
+        "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.96,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.02
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s03",
+      "latencia_s": 0.289,
+      "avaliacao": {
+        "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.94,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.02
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s04",
+      "latencia_s": 0.262,
+      "avaliacao": {
+        "trecho_id": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.09,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.02
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s05",
+      "latencia_s": 0.256,
+      "avaliacao": {
+        "trecho_id": "fornecedores/katrina-textil.md#lead-time",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.13,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.02
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s06",
+      "latencia_s": 0.268,
+      "avaliacao": {
+        "trecho_id": "fornecedores/verdela-home.md#lead-time",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.02
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s07",
+      "latencia_s": 0.259,
+      "avaliacao": {
+        "trecho_id": "fornecedores/malha-fina-textil.md#lead-time",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.67,
+          "demanda_sazonal": 0.02,
+          "encalhe": 0.01
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s08",
+      "latencia_s": 0.249,
+      "avaliacao": {
+        "trecho_id": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.07,
+          "demanda_sazonal": 0.57,
+          "encalhe": 0.03
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s09",
+      "latencia_s": 0.297,
+      "avaliacao": {
+        "trecho_id": "reunioes/2024-11-natal-king-size.md#contexto",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.98,
+          "encalhe": 0.05
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s10",
+      "latencia_s": 0.261,
+      "avaliacao": {
+        "trecho_id": "reunioes/2024-11-natal-king-size.md#contexto",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.94,
+          "encalhe": 0.05
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s11",
+      "latencia_s": 0.298,
+      "avaliacao": {
+        "trecho_id": "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.03,
+          "demanda_sazonal": 0.58,
+          "encalhe": 0.07
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s12",
+      "latencia_s": 0.255,
+      "avaliacao": {
+        "trecho_id": "mercado/tendencia-cama-mesa-banho-2026.md#movimento-macro",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.01,
+          "demanda_sazonal": 0.82,
+          "encalhe": 0.02
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s13",
+      "latencia_s": 0.278,
+      "avaliacao": {
+        "trecho_id": "reunioes/2024-11-natal-king-size.md#contexto",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.43,
+          "encalhe": 0.04
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s14",
+      "latencia_s": 0.323,
+      "avaliacao": {
+        "trecho_id": "fornecedores/katrina-textil.md#sazonalidade-e-capacidade",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.1,
+          "demanda_sazonal": 0.69,
+          "encalhe": 0.02
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s15",
+      "latencia_s": 0.259,
+      "avaliacao": {
+        "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.35,
+          "encalhe": 0.98
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s16",
+      "latencia_s": 0.274,
+      "avaliacao": {
+        "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#introducao",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.03,
+          "demanda_sazonal": 0.61,
+          "encalhe": 0.79
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s17",
+      "latencia_s": 0.269,
+      "avaliacao": {
+        "trecho_id": "fornecedores/katrina-textil.md#linhas-ativas",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.03,
+          "encalhe": 0.65
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s18",
+      "latencia_s": 0.299,
+      "avaliacao": {
+        "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.15,
+          "encalhe": 0.27
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s19",
+      "latencia_s": 0.292,
+      "avaliacao": {
+        "trecho_id": "reunioes/2024-11-natal-king-size.md#riscos-aceitos",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.03,
+          "demanda_sazonal": 0.63,
+          "encalhe": 0.48
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s20",
+      "latencia_s": 0.255,
+      "avaliacao": {
+        "trecho_id": "politicas/estoque-e-giro.md#principios",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.07,
+          "encalhe": 0.03
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s21",
+      "latencia_s": 0.26,
+      "avaliacao": {
+        "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#causas-identificadas",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.02,
+          "demanda_sazonal": 0.04,
+          "encalhe": 0.8
+        },
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "caso": "s22",
+      "latencia_s": 0.334,
+      "avaliacao": {
+        "trecho_id": "reunioes/2024-07-erro-jogo-veraneio.md#prejuizo-estimado",
+        "probabilidades": {
+          "atraso_do_fornecedor": 0.03,
+          "demanda_sazonal": 0.03,
+          "encalhe": 0.15
+        },
+        "modelo": "jev-1.13.0"
+      }
+    }
+  ]
+}

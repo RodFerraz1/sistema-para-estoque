@@ -1,0 +1,268 @@
+{
+  "executado_em": "2026-10-01T06:12:54+00:00",
+  "modelo_pedido": "jev-1.13.0",
+  "perguntas": {
+    "conflitam": {
+      "type": "noul",
+      "instructions": "O `trecho_a` e o `trecho_b` afirmam coisas incompatíveis sobre o mesmo fato?",
+      "criteria": {
+        "true": "Os dois trechos afirmam sobre o mesmo fato coisas que não podem ser verdade ao mesmo tempo, como prazos, valores, regras ou resultados diferentes para a mesma coisa.",
+        "false": "Os trechos concordam, se complementam ou falam de fatos diferentes. Discordar de opinião ou de recomendação não é conflito."
+      }
+    }
+  },
+  "respostas": [
+    {
+      "latencia_s": 0.488,
+      "avaliacao": {
+        "trecho_a": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+        "trecho_b": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+        "conflitam": 0.45,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.272,
+      "avaliacao": {
+        "trecho_a": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+        "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+        "conflitam": 0.65,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.285,
+      "avaliacao": {
+        "trecho_a": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+        "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+        "conflitam": 0.13,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.264,
+      "avaliacao": {
+        "trecho_a": "fornecedores/katrina-textil.md#linhas-ativas",
+        "trecho_b": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+        "conflitam": 0.3,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.374,
+      "avaliacao": {
+        "trecho_a": "contratos/contrato-katrina-2025.md#clausulas-comerciais/3-prazos",
+        "trecho_b": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+        "conflitam": 0.16,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.294,
+      "avaliacao": {
+        "trecho_a": "contratos/contrato-katrina-2025.md#clausulas-comerciais/2-volumes-minimos",
+        "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+        "conflitam": 0.07,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.34,
+      "avaliacao": {
+        "trecho_a": "fornecedores/malha-fina-textil.md#riscos",
+        "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#malha-fina",
+        "conflitam": 0.12,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.244,
+      "avaliacao": {
+        "trecho_a": "politicas/estoque-e-giro.md#regras/r3-colecao-nova-sem-historico",
+        "trecho_b": "reunioes/2024-07-erro-jogo-veraneio.md#o-que-virou-politica",
+        "conflitam": 0.04,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.293,
+      "avaliacao": {
+        "trecho_a": "fornecedores/katrina-textil.md#lead-time",
+        "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+        "conflitam": 0.08,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.3,
+      "avaliacao": {
+        "trecho_a": "fornecedores/verdela-home.md#condicoes-comerciais-padrao",
+        "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#verdela-home",
+        "conflitam": 0.07,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.247,
+      "avaliacao": {
+        "trecho_a": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+        "trecho_b": "reunioes/2024-11-natal-king-size.md#contexto",
+        "conflitam": 0.12,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.281,
+      "avaliacao": {
+        "trecho_a": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+        "trecho_b": "reunioes/2024-11-natal-king-size.md#o-que-ficou-pendente",
+        "conflitam": 0.12,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.312,
+      "avaliacao": {
+        "trecho_a": "contratos/contrato-katrina-2025.md#clausulas-comerciais/1-precos",
+        "trecho_b": "fornecedores/katrina-textil.md#riscos-conhecidos",
+        "conflitam": 0.2,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.243,
+      "avaliacao": {
+        "trecho_a": "fornecedores/katrina-textil.md#riscos-conhecidos",
+        "trecho_b": "contratos/contrato-katrina-2025.md#clausulas-comerciais/4-reajuste",
+        "conflitam": 0.32,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.237,
+      "avaliacao": {
+        "trecho_a": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
+        "trecho_b": "fornecedores/verdela-home.md#condicoes-comerciais-padrao",
+        "conflitam": 0.19,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.379,
+      "avaliacao": {
+        "trecho_a": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
+        "trecho_b": "politicas/estoque-e-giro.md#regras/r3-colecao-nova-sem-historico",
+        "conflitam": 0.39,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.363,
+      "avaliacao": {
+        "trecho_a": "fornecedores/malha-fina-textil.md#uso-estrategico",
+        "trecho_b": "mercado/tendencia-cama-mesa-banho-2026.md#recomendacao-analitica",
+        "conflitam": 0.32,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.269,
+      "avaliacao": {
+        "trecho_a": "mercado/tendencia-cama-mesa-banho-2026.md#recomendacao-analitica",
+        "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#malha-fina",
+        "conflitam": 0.11,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.322,
+      "avaliacao": {
+        "trecho_a": "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento",
+        "trecho_b": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+        "conflitam": 0.12,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.246,
+      "avaliacao": {
+        "trecho_a": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+        "trecho_b": "fornecedores/katrina-textil.md#lead-time",
+        "conflitam": 0.64,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.272,
+      "avaliacao": {
+        "trecho_a": "fornecedores/katrina-textil.md#lead-time",
+        "trecho_b": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+        "conflitam": 0.12,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.276,
+      "avaliacao": {
+        "trecho_a": "fornecedores/katrina-textil.md#sazonalidade-e-capacidade",
+        "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+        "conflitam": 0.13,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.263,
+      "avaliacao": {
+        "trecho_a": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+        "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+        "conflitam": 0.12,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.238,
+      "avaliacao": {
+        "trecho_a": "reunioes/2024-11-natal-king-size.md#riscos-aceitos",
+        "trecho_b": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+        "conflitam": 0.52,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.236,
+      "avaliacao": {
+        "trecho_a": "reunioes/2024-11-natal-king-size.md#o-que-ficou-pendente",
+        "trecho_b": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+        "conflitam": 0.21,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.274,
+      "avaliacao": {
+        "trecho_a": "reunioes/2024-11-natal-king-size.md#decisao",
+        "trecho_b": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+        "conflitam": 0.4,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.285,
+      "avaliacao": {
+        "trecho_a": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+        "trecho_b": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+        "conflitam": 0.28,
+        "modelo": "jev-1.13.0"
+      }
+    },
+    {
+      "latencia_s": 0.291,
+      "avaliacao": {
+        "trecho_a": "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025",
+        "trecho_b": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+        "conflitam": 0.23,
+        "modelo": "jev-1.13.0"
+      }
+    }
+  ]
+}

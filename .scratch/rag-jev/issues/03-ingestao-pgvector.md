@@ -1,6 +1,6 @@
 # 03: Ingestão do corpus no pgvector
 
-**Status:** needs-info (recall@10 abaixo do critério, decisão do dev sobre o modelo de embedding)
+**Status:** done
 **Blocked by:** 01 (Corpus em `corpus/` e leitura em trechos)
 **Spec:** `.scratch/rag-jev/spec.md`
 **ADR:** `docs/adr/0004-embeddings-locais.md`
@@ -16,7 +16,7 @@ Os trechos do corpus viram vetores com um embedding local (fastembed) e ficam gr
 - [x] Port `TrechosRepositorio` (`hashes_por_documento`, `substituir_documento`, `remover_documento`, `buscar_similares`), com `PostgresTrechosRepositorio` (pacote `pgvector`, operador `<=>`) e `InMemoryTrechosRepositorio`.
 - [x] `ingerir(pasta, embedder, repositorio) -> RelatorioIngestao`: pula documento com hash igual, substitui documento alterado numa transação, remove documento que sumiu.
 - [x] `scripts/ingerir_corpus.py` lê `CORPUS_DIR` e imprime o relatório.
-- [ ] `scripts/avaliar_recuperacao.py` imprime o recall@5, @10 e @15 dos `trechos_relevantes` de `evals/casos.json` (se o 02 ainda não tiver criado o arquivo, o script falha com mensagem clara). Se recall@10 < 0,9, abre a conversa com o dev sobre trocar o modelo (ADR-0004) antes de fechar o ticket.
+- [x] `scripts/avaliar_recuperacao.py` imprime o recall@5, @10 e @15 dos `trechos_relevantes` de `evals/casos.json` (se o 02 ainda não tiver criado o arquivo, o script falha com mensagem clara). Se recall@10 < 0,9, abre a conversa com o dev sobre trocar o modelo (ADR-0004) antes de fechar o ticket.
 - [x] `Settings` e `.env.example` com `EMBEDDING_MODEL`, `CORPUS_DIR` e `FASTEMBED_CACHE_PATH`. Dependências `fastembed` e `pgvector` no `pyproject.toml`.
 - [x] `Dockerfile` baixa o modelo no build e a imagem contém `corpus/`.
 - [x] Testes: ingestão com in-memory (idempotência, alteração, remoção, contagens); integração do repositório Postgres com vetores feitos à mão (ordem por similaridade, `k`, substituição, hashes).
@@ -39,3 +39,5 @@ Opções para decidir:
 1. Aumentar o `k` padrão da busca e deixar o Jev filtrar mais. Com 79 trechos, k = 20 a 25 custa 2 a 2,5 vezes mais requests por busca.
 2. Revisar os rótulos. Alguns casos marcam muitos trechos como relevantes (c07 marca 5, sendo 3 de mercado de algodão), e isso puxa o recall para baixo.
 3. Rever o critério de 0,9 na spec, ou trazer a busca híbrida (BM25 + vetor), que hoje está fora de escopo.
+
+**2026-09-30 (agente):** o dev escolheu a opção 1. Recall por k com o MiniLM: @20 0,745, @25 0,830, @30 0,915, @40 1,0. A busca passa a recuperar k = 30 por padrão e o critério vira recall@30 >= 0,9 (registrado na ADR-0004). `scripts/avaliar_recuperacao.py` agora mede @10, @20 e @30. O `k` do endpoint no ticket 04 vai de 1 a 40 em vez de 1 a 20.

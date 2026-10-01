@@ -8,18 +8,19 @@ dados coerentes.
 
 `PedidoCompra` e `ItemPedidoCompra` espelham as linhas de
 `erp.pedidos_compra` e `erp.pedidos_compra_itens`. Não são DTOs de domínio:
-existem só para alimentar `itens_em_transito_de`.
+alimentam as leituras de pedido e guardam o que `criar_pedido_compra` grava.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Literal, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict
 
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.port import ERPAdapter
+from src.erp_adapter.schemas import ItemNovoPedido
 from src.inventory.schemas import (
     STATUS_EM_TRANSITO,
     Estoque,
@@ -47,6 +48,9 @@ class PedidoCompra(BaseModel):
     fornecedor_id: UUID
     status: StatusPedidoCompra
     data_prevista_entrega: date | None
+    aprovado_em: datetime | None = None
+    valor_total_centavos: int = 0
+    observacao: str | None = None
 
 
 class ItemPedidoCompra(BaseModel):
@@ -56,6 +60,7 @@ class ItemPedidoCompra(BaseModel):
     sku_id: UUID
     quantidade: int
     quantidade_recebida: int
+    preco_unitario_centavos: int = 0
 
 
 class InMemoryERPAdapter(ERPAdapter):
@@ -152,3 +157,46 @@ class InMemoryERPAdapter(ERPAdapter):
                 i.pedido_id,
             ),
         )
+
+    def fornecedor_tem_pedido(self, fornecedor_id: UUID) -> bool:
+        return any(
+            p.fornecedor_id == fornecedor_id and p.status not in ("rascunho", "cancelado")
+            for p in self.pedidos_compra
+        )
+
+    def criar_pedido_compra(
+        self,
+        fornecedor_id: UUID,
+        itens: list[ItemNovoPedido],
+        data_prevista_entrega: date,
+        observacao: str,
+    ) -> UUID:
+        if not itens:
+            raise ValueError("pedido de compra sem itens")
+        if self.carregar_fornecedor(fornecedor_id) is None:
+            raise ValueError(f"fornecedor {fornecedor_id} não existe")
+        sku_ids = {i.sku_code: self._sku_id(i.sku_code) for i in itens}
+        if faltando := [code for code, sku_id in sku_ids.items() if sku_id is None]:
+            raise ValueError(f"SKU inexistente: {', '.join(faltando)}")
+
+        pedido = PedidoCompra(
+            id=uuid4(),
+            fornecedor_id=fornecedor_id,
+            status="aprovado",
+            data_prevista_entrega=data_prevista_entrega,
+            aprovado_em=datetime.now(UTC),
+            valor_total_centavos=sum(i.quantidade * i.preco_unitario_centavos for i in itens),
+            observacao=observacao,
+        )
+        self.pedidos_compra.append(pedido)
+        self.itens_pedido_compra.extend(
+            ItemPedidoCompra(
+                pedido_id=pedido.id,
+                sku_id=cast(UUID, sku_ids[i.sku_code]),
+                quantidade=i.quantidade,
+                quantidade_recebida=0,
+                preco_unitario_centavos=i.preco_unitario_centavos,
+            )
+            for i in itens
+        )
+        return pedido.id

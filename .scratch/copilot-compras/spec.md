@@ -1,5 +1,5 @@
 ---
-Status: ready-for-agent
+Status: done
 Escopo: M0-M2 do roadmap (fundação + ERP fake + primeira leitura útil de SKU)
 Vocabulário: ver /CONTEXT.md
 Decisão arquitetural base: ver /docs/adr/0001-monolito-modular-por-dominio.md

@@ -106,6 +106,7 @@ def _purchasing(
         inventory,
         sales,
         politicas or InMemoryPoliticaCompraRepositorio(),
+        adapter,
         now=NOW,
     )
 
@@ -223,6 +224,14 @@ def test_em_transito_entra_na_posicao_e_reduz_a_quantidade() -> None:
     # 250 - 206,7 = 43,3 na chegada; ceil(200 - 43,3) = 157.
     assert sugestao.calculo.estoque_na_chegada == pytest.approx(250 - 100 * 62 / 30)
     assert sugestao.quantidade == 157
+
+
+@pytest.mark.parametrize(("disponivel", "esperada"), [(150, 1.5 - 62 / 30), (250, 2.5 - 62 / 30)])
+def test_cobertura_na_chegada_sem_compra_nao_para_em_zero(disponivel: int, esperada: float) -> None:
+    sugestao = _purchasing(disponivel=disponivel).sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None and sugestao.calculo is not None
+    assert sugestao.calculo.cobertura_na_chegada_sem_compra_meses == pytest.approx(esperada)
 
 
 def test_sem_ruptura_quando_a_posicao_cobre_o_lead_time() -> None:
