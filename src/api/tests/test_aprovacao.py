@@ -15,13 +15,14 @@ from fastapi.testclient import TestClient
 
 from src.ai.dependencies import get_decision_model, get_embedder, get_trechos_repositorio
 from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel
-from src.aprovacao.dependencies import get_sugestoes_fila
-from src.aprovacao.in_memory import InMemorySugestoesFila
+from src.aprovacao.dependencies import get_sugestoes_fila_repositorio
+from src.aprovacao.in_memory import InMemorySugestoesFilaRepositorio
 from src.erp_adapter.dependencies import get_erp_adapter
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.main import app
 from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
+from src.politica_compra.schemas import PARAMETROS_V1, MotivoDestaque
 from tests.fakes import (
     make_estoque,
     make_fornecedor,
@@ -44,7 +45,7 @@ DEPENDENCIAS = (
     get_embedder,
     get_trechos_repositorio,
     get_decision_model,
-    get_sugestoes_fila,
+    get_sugestoes_fila_repositorio,
 )
 
 
@@ -66,7 +67,10 @@ def _meses_fechados(quantos: int) -> list[datetime]:
 
 
 def preparar(
-    decisao: InMemoryDecisionModel | None = None, *, com_pedido_anterior: bool = True
+    decisao: InMemoryDecisionModel | None = None,
+    *,
+    com_pedido_anterior: bool = True,
+    motivos_de_destaque: tuple[MotivoDestaque, ...] | None = None,
 ) -> InMemoryERPAdapter:
     disponiveis = {URGENTE: 50, REGULAR: 150, SOBRANDO: 900}
     erp = InMemoryERPAdapter(
@@ -87,14 +91,16 @@ def preparar(
     embedder = FakeEmbedder()
     trechos = repositorio_com([make_trecho(ATRASO, "Boa Vista atrasou as entregas")], embedder)
     politicas = InMemoryPoliticaCompraRepositorio()
-    fila = InMemorySugestoesFila()
+    if motivos_de_destaque is not None:
+        politicas.salvar_nova_versao(PARAMETROS_V1.model_copy(update={"motivos_de_destaque": motivos_de_destaque}))
+    fila = InMemorySugestoesFilaRepositorio()
     decisao = decisao or InMemoryDecisionModel(padrao={"relevante": 0.9, "tem_evidencia": 0.9})
     app.dependency_overrides[get_erp_adapter] = lambda: erp
     app.dependency_overrides[get_politica_compra_repositorio] = lambda: politicas
     app.dependency_overrides[get_embedder] = lambda: embedder
     app.dependency_overrides[get_trechos_repositorio] = lambda: trechos
     app.dependency_overrides[get_decision_model] = lambda: decisao
-    app.dependency_overrides[get_sugestoes_fila] = lambda: fila
+    app.dependency_overrides[get_sugestoes_fila_repositorio] = lambda: fila
     return erp
 
 
@@ -142,17 +148,25 @@ def test_gerar_devolve_o_resultado_e_a_fila_fica_em_ordem(client: TestClient) ->
     assert regular["pedido_compra_id"] is None
 
 
-def test_gerar_com_sinal_do_corpus_mostra_o_sinal_e_os_trechos(client: TestClient) -> None:
+@pytest.mark.parametrize(
+    ("motivos_de_destaque", "destaque"),
+    [(None, False), ((MotivoDestaque.ATRASO_DO_FORNECEDOR,), True)],
+    ids=["politica-padrao", "atraso-na-politica"],
+)
+def test_gerar_com_sinal_do_corpus_mostra_o_sinal_e_destaca_se_a_politica_manda(
+    client: TestClient, motivos_de_destaque: tuple[MotivoDestaque, ...] | None, destaque: bool
+) -> None:
     preparar(
         InMemoryDecisionModel(
             padrao={"relevante": 0.9, "tem_evidencia": 0.9}, sinais={ATRASO: {"atraso_do_fornecedor": 0.97}}
-        )
+        ),
+        motivos_de_destaque=motivos_de_destaque,
     )
 
     client.post("/sugestoes/gerar")
 
     regular = next(s for s in pendentes(client) if s["sku_code"] == REGULAR.sku_code)
-    assert regular["destaque"] is True
+    assert regular["destaque"] is destaque
     assert regular["sugestao"]["sinais"] == [
         {
             "tipo": "atraso_do_fornecedor",
@@ -208,6 +222,40 @@ def test_carregar_inexistente_da_404(client: TestClient) -> None:
 
     assert response.status_code == 404
     assert response.json()["detail"]
+
+
+def test_faixa_da_quantidade_editada(client: TestClient) -> None:
+    erp = preparar()
+    client.post("/sugestoes/gerar")
+    id = id_de(client, REGULAR.sku_code)
+
+    response = client.get(f"/sugestoes/{id}/faixa", params={"quantidade": 400})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "faixa": 2,
+        "aprovadores": "comprador chefe + gerente comercial ou sócio financeiro",
+        "exige_justificativa": True,
+        "ajustes": ["Viola o teto da política de estoque: sobe da faixa 1 para a 2."],
+    }
+    assert erp.itens_pedido_compra == []
+    assert client.get(f"/sugestoes/{id}").json()["status"] == "pendente"
+
+
+@pytest.mark.parametrize("params", [{"quantidade": 10}, {}], ids=["abaixo-do-moq", "sem-quantidade"])
+def test_faixa_com_quantidade_invalida_da_422(client: TestClient, params: dict) -> None:
+    preparar()
+    client.post("/sugestoes/gerar")
+
+    response = client.get(f"/sugestoes/{id_de(client, REGULAR.sku_code)}/faixa", params=params)
+
+    assert response.status_code == 422
+
+
+def test_faixa_de_sugestao_inexistente_da_404(client: TestClient) -> None:
+    preparar()
+
+    assert client.get(f"/sugestoes/{uuid4()}/faixa", params={"quantidade": 100}).status_code == 404
 
 
 def test_aprovar_cria_o_pedido_e_tira_da_fila(client: TestClient) -> None:

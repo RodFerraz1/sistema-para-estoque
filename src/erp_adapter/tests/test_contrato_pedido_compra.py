@@ -20,7 +20,7 @@ from src.db.engine import get_engine
 from src.erp_adapter.in_memory import InMemoryERPAdapter, StatusPedidoCompra
 from src.erp_adapter.port import ERPAdapter
 from src.erp_adapter.postgres import PostgresERPAdapter
-from src.purchasing.schemas import ItemNovoPedido
+from src.erp_adapter.schemas import ItemNovoPedido
 from tests.fakes import make_fornecedor, make_pedido_compra, make_sku, uid
 
 

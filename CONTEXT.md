@@ -59,7 +59,7 @@ _Avoid_: estoque total, saldo.
 ### Compra
 
 **Política de compra**:
-Conjunto versionado de parâmetros definidos pelo comprador chefe (teto, pisos, ciclo de compra, lead time base, critério de fornecedor, sazonalidade, regra de SKU novo, limites das faixas de aprovação) que a sugestão de pedido usa. É a fonte da verdade do cálculo. O documento de política no corpus é só contexto. Ver ADR-0003.
+Conjunto versionado de parâmetros definidos pelo comprador chefe (teto, pisos, ciclo de compra, lead time base, critério de fornecedor, sazonalidade, regra de SKU novo, limites das faixas de aprovação, motivos de destaque da fila) que a sugestão de pedido e a fila de aprovação usam. É a fonte da verdade do cálculo. O documento de política no corpus é só contexto. Ver ADR-0003.
 _Avoid_: regras, configuração, estratégia.
 
 **Teto**:
@@ -91,7 +91,11 @@ Uma das quatro faixas de `politicas/aprovacao-compras.md` que dizem quem precisa
 _Avoid_: alçada, nível de aprovação.
 
 **Fila de aprovação**:
-As sugestões de pedido com compra que esperam a decisão do comprador chefe, geradas de uma vez para todos os SKUs ativos, cada uma com os sinais do corpus e a faixa de aprovação. Vêm primeiro as em destaque (alerta de ruptura, de teto ou de lead time observado acima do contratado, ou algum sinal do corpus) e, depois, as mais urgentes (menor cobertura na chegada sem contar a compra). Aprovar, com a quantidade sugerida ou outra, cria o pedido de compra no ERP fake; rejeitar exige motivo. Gerar de novo substitui as pendentes. O destaque só ordena, nunca aprova.
+As sugestões de pedido com compra que esperam a decisão do comprador chefe, geradas de uma vez para todos os SKUs ativos, cada uma com os sinais do corpus e a faixa de aprovação. Vêm primeiro as em destaque e, depois, as mais urgentes (menor cobertura na chegada sem contar a compra). Aprovar, com a quantidade sugerida ou outra, cria o pedido de compra no ERP fake; rejeitar exige motivo. Gerar de novo substitui todas as pendentes. O destaque só ordena, nunca aprova.
+
+**Motivo de destaque**:
+Alerta do `purchasing` ou sinal do corpus que o comprador chefe escolheu, na política de compra, para pôr uma sugestão no topo da fila de aprovação. Vale a versão da política com que a sugestão foi gerada. Padrão: ruptura antes da chegada e violação do teto.
+_Avoid_: prioridade, risco (genérico demais), alerta (é o que o `purchasing` calcula).
 _Avoid_: caixa de entrada, backlog, pendências.
 
 **Sinal (do corpus)**:

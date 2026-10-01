@@ -35,3 +35,10 @@ A política de compra ganha os limites das faixas de aprovação, e o `purchasin
 - **Fora do escopo, sem mexer**: o contexto da intenção de política no chat (`ai/contexto.py::_politica`) não mostra os limites das faixas. Fica para quando o chat precisar responder sobre aprovação.
 - **`CONTEXT.md`**: verbete novo "Faixa de aprovação"; "Política de compra" passa a listar os limites das faixas.
 - **Testes**: `uv run pytest -q -m "not externo"` com 625 passando (eram 561).
+
+**2026-09-30 (revisão):** ajustes da revisão de código do M7:
+
+- **Ciclo `purchasing` <-> `erp_adapter`**: `ItemNovoPedido` saiu de `purchasing/schemas.py` para `src/erp_adapter/schemas.py`. O `erp_adapter` não importa mais nada do `purchasing`; a aresta `purchasing -> erp_adapter` ficou de um sentido só e registrada em `module-interfaces.md`.
+- **Política usada na faixa** (substitui a decisão acima): `Purchasing.faixa_aprovacao` usa a versão da política com que a sugestão foi gerada (`politica_versao`), via `Purchasing.politica_da(sugestao)`, e não a ativa. O port `PoliticaCompraRepositorio` ganhou `versao(n)`, que os dois adapters já tinham. Versão inexistente dá `LookupError`.
+- **`aprovado_por`**: `submeter_pedido` não valida mais; a validação no domínio fica só na `Aprovacao` (mais o `Nome` do DTO HTTP). O teste `test_submeter_exige_quem_aprovou` saiu.
+- **`faixa.py`**: `exige_justificativa` usa a constante `FAIXA_MINIMA_COM_JUSTIFICATIVA = 2`.

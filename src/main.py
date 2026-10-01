@@ -12,6 +12,8 @@ from src.api.politica_compra import router as politica_compra_router
 from src.api.rag import decisao_indisponivel
 from src.api.rag import router as rag_router
 from src.api.skus import router as skus_router
+from src.api.skus import sku_sem_estoque
+from src.ficha_sku.service import SKUSemEstoque
 
 UI_DIR = Path(__file__).parent / "ui"
 
@@ -26,6 +28,7 @@ def create_app() -> FastAPI:
     app.include_router(aprovacao_router)
     # Handler no app, e não no endpoint, porque a dependência do Jev também lança sem JEV_KEY.
     app.add_exception_handler(DecisaoIndisponivel, decisao_indisponivel)
+    app.add_exception_handler(SKUSemEstoque, sku_sem_estoque)
     app.mount("/ui", StaticFiles(directory=UI_DIR, html=True), name="ui")
 
     @app.get("/", include_in_schema=False)

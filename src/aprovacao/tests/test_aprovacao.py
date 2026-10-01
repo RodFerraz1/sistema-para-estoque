@@ -5,7 +5,7 @@ Cenário: giro de 100 por mês em todos os SKUs, fornecedor Boa Vista com lead t
 30 dias, R$ 20,00 a unidade e MOQ 48. O consumo no lead time é de 100 unidades, então:
 
 - `MEIO` (150 disponíveis) chega com 0,5 mês e compra 150; só tem os alertas de pedido
-  mínimo e de época forte, que não destacam.
+  mínimo e de época forte, que não estão nos motivos de destaque da política padrão.
 - `RUPTURA` (50 disponíveis) acaba antes da chegada (-0,5 mês) e compra 200.
 - `QUASE` (120 disponíveis) chega com 0,2 mês e compra 180.
 - `SOBRANDO` (900 disponíveis) não compra.
@@ -15,15 +15,17 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from uuid import uuid4
+from threading import Event, Thread
+from typing import get_args
+from uuid import UUID, uuid4
 
 import pytest
 
 from src.ai.busca import BuscaContexto
 from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel
-from src.ai.schemas import AvaliacaoSinais, ProdutoDoSinal, SinaisDasSugestoes, SinalCorpus, Trecho
+from src.ai.schemas import AvaliacaoSinais, ProdutoDoSinal, SinaisDasSugestoes, SinalCorpus, TipoSinal, Trecho
 from src.ai.sinais import SinaisCorpus
-from src.aprovacao.in_memory import InMemorySugestoesFila
+from src.aprovacao.in_memory import InMemorySugestoesFilaRepositorio
 from src.aprovacao.schemas import SugestaoNaFila
 from src.aprovacao.service import (
     Aprovacao,
@@ -36,7 +38,9 @@ from src.catalog.service import Catalog
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.ficha_sku.service import FichaSKU
 from src.inventory.service import Inventory
+from src.erp_adapter.schemas import ItemNovoPedido
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
+from src.politica_compra.schemas import PARAMETROS_V1, MotivoDestaque
 from src.purchasing.schemas import SugestaoPedido, TipoAlerta
 from src.purchasing.service import Purchasing, QuantidadeInvalida
 from src.sales.service import Sales
@@ -102,12 +106,34 @@ SINAL_DE_ATRASO = SinalCorpus(
 )
 
 
+class ERPComDefeito(InMemoryERPAdapter):
+    """Falha a primeira criação de pedido, ou espera `soltar` antes de criar."""
+
+    def __init__(self, *args, falhar: bool = False, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.falhar = falhar
+        self.criando = Event()
+        self.soltar = Event()
+        self.soltar.set()
+
+    def criar_pedido_compra(
+        self, fornecedor_id: UUID, itens: list[ItemNovoPedido], data_prevista_entrega: date, observacao: str
+    ) -> UUID:
+        self.criando.set()
+        assert self.soltar.wait(5)
+        if self.falhar:
+            self.falhar = False
+            raise ConnectionError("ERP fora do ar")
+        return super().criar_pedido_compra(fornecedor_id, itens, data_prevista_entrega, observacao)
+
+
 @dataclass
 class Cenario:
     aprovacao: Aprovacao
     purchasing: Purchasing
-    erp: InMemoryERPAdapter
-    fila: InMemorySugestoesFila
+    erp: ERPComDefeito
+    fila: InMemorySugestoesFilaRepositorio
+    politicas: InMemoryPoliticaCompraRepositorio
 
 
 def montar(
@@ -115,9 +141,10 @@ def montar(
     *,
     com_pedido_anterior: bool = True,
     agora: datetime = NOW,
+    motivos_de_destaque: tuple[MotivoDestaque, ...] | None = None,
 ) -> Cenario:
     disponiveis = disponiveis or DISPONIVEIS
-    erp = InMemoryERPAdapter(
+    erp = ERPComDefeito(
         skus=list(disponiveis),
         fornecedores=[BOA_VISTA],
         fornecedores_por_sku={
@@ -135,11 +162,12 @@ def montar(
     sales = Sales(erp, now=agora)
     inventory = Inventory(erp, sales)
     catalog = Catalog(erp)
-    purchasing = Purchasing(
-        FichaSKU(catalog, inventory, sales), inventory, sales, InMemoryPoliticaCompraRepositorio(), erp, now=agora
-    )
-    fila = InMemorySugestoesFila()
-    return Cenario(Aprovacao(catalog, purchasing, fila, now=agora), purchasing, erp, fila)
+    politicas = InMemoryPoliticaCompraRepositorio()
+    if motivos_de_destaque is not None:
+        politicas.salvar_nova_versao(PARAMETROS_V1.model_copy(update={"motivos_de_destaque": motivos_de_destaque}))
+    purchasing = Purchasing(FichaSKU(catalog, inventory, sales), inventory, sales, politicas, erp, now=agora)
+    fila = InMemorySugestoesFilaRepositorio()
+    return Cenario(Aprovacao(catalog, purchasing, fila, now=agora), purchasing, erp, fila, politicas)
 
 
 def gerada(cenario: Cenario, sinais: SinaisCorpus | None = None) -> list[SugestaoNaFila]:
@@ -256,6 +284,10 @@ def test_sku_aprovado_sai_da_fila_na_geracao_seguinte_porque_o_pedido_esta_em_tr
 # Destaque e ordem
 
 
+def test_motivos_de_destaque_sao_os_alertas_e_os_sinais() -> None:
+    assert {m.value for m in MotivoDestaque} == {t.value for t in TipoAlerta} | set(get_args(TipoSinal))
+
+
 def test_alerta_de_risco_destaca() -> None:
     cenario = montar()
 
@@ -266,7 +298,7 @@ def test_alerta_de_risco_destaca() -> None:
     assert ruptura.destaque is True
 
 
-def test_pedido_minimo_e_epoca_forte_nao_destacam() -> None:
+def test_pedido_minimo_e_epoca_forte_nao_destacam_na_politica_padrao() -> None:
     cenario = montar()
 
     gerada(cenario)
@@ -279,8 +311,16 @@ def test_pedido_minimo_e_epoca_forte_nao_destacam() -> None:
     assert meio.destaque is False
 
 
-def test_sinal_do_corpus_destaca() -> None:
+def test_sinal_do_corpus_nao_destaca_na_politica_padrao() -> None:
     cenario = montar()
+
+    gerada(cenario, SinaisFixos({MEIO.sku_code: [SINAL_DE_ATRASO]}))
+
+    assert da_fila(cenario, MEIO).destaque is False
+
+
+def test_sinal_do_corpus_destaca_quando_esta_nos_motivos_da_politica() -> None:
+    cenario = montar(motivos_de_destaque=(MotivoDestaque.ATRASO_DO_FORNECEDOR,))
 
     gerada(cenario, SinaisFixos({MEIO.sku_code: [SINAL_DE_ATRASO]}))
 
@@ -288,8 +328,25 @@ def test_sinal_do_corpus_destaca() -> None:
     assert da_fila(cenario, QUASE).destaque is False
 
 
+def test_alerta_destaca_quando_esta_nos_motivos_da_politica() -> None:
+    cenario = montar(motivos_de_destaque=(MotivoDestaque.PERIODO_SAZONAL,))
+
+    fila = gerada(cenario)
+
+    assert all(s.destaque for s in fila)
+
+
+def test_politica_sem_motivos_de_destaque_nao_destaca_nada() -> None:
+    cenario = montar(motivos_de_destaque=())
+
+    fila = gerada(cenario, SinaisFixos({MEIO.sku_code: [SINAL_DE_ATRASO]}))
+
+    assert not any(s.destaque for s in fila)
+    assert [s.sku_code for s in fila] == [RUPTURA.sku_code, QUASE.sku_code, MEIO.sku_code]
+
+
 def test_ordem_da_fila_destaque_primeiro_e_depois_a_mais_urgente() -> None:
-    cenario = montar()
+    cenario = montar(motivos_de_destaque=(MotivoDestaque.RUPTURA_ANTES_DA_CHEGADA, MotivoDestaque.ATRASO_DO_FORNECEDOR))
 
     fila = gerada(cenario, SinaisFixos({MEIO.sku_code: [SINAL_DE_ATRASO]}))
 
@@ -351,6 +408,84 @@ def test_aprovar_com_quantidade_editada_recalcula_a_faixa() -> None:
     assert aprovada.faixa == cenario.purchasing.faixa_aprovacao(meio.sugestao.sugestao, 400)
     assert aprovada.faixa.faixa == 2
     assert aprovada.justificativa == "Compra de oportunidade."
+
+
+def test_aprovar_usa_a_versao_da_politica_da_sugestao() -> None:
+    cenario = montar()
+    gerada(cenario)
+    meio = da_fila(cenario, MEIO)
+    cenario.politicas.salvar_nova_versao(
+        PARAMETROS_V1.model_copy(update={"faixa_1_ate_reais": 100, "faixa_2_ate_reais": 200, "faixa_3_ate_reais": 300})
+    )
+
+    # Com a v2, R$ 3.000,00 seria faixa 4 e desceria para a 3, com justificativa.
+    aprovada = cenario.aprovacao.aprovar(meio.id, "Ana")
+
+    assert aprovada.faixa.faixa == 1
+
+
+def test_faixa_para_outra_quantidade_nao_decide_nada() -> None:
+    cenario = montar()
+    gerada(cenario)
+    meio = da_fila(cenario, MEIO)
+
+    faixa = cenario.aprovacao.faixa_para(meio.id, 400)
+
+    assert faixa == cenario.purchasing.faixa_aprovacao(meio.sugestao.sugestao, 400)
+    assert faixa.exige_justificativa is True
+    assert cenario.aprovacao.carregar(meio.id) == meio
+    assert cenario.erp.itens_pedido_compra == []
+
+
+def test_faixa_para_quantidade_abaixo_do_moq_ou_sugestao_inexistente_falha() -> None:
+    cenario = montar()
+    gerada(cenario)
+
+    with pytest.raises(QuantidadeInvalida):
+        cenario.aprovacao.faixa_para(da_fila(cenario, MEIO).id, 47)
+    with pytest.raises(SugestaoNaoEncontrada):
+        cenario.aprovacao.faixa_para(uuid4(), 100)
+
+
+def test_falha_do_erp_na_aprovacao_deixa_a_sugestao_pendente() -> None:
+    cenario = montar()
+    gerada(cenario)
+    meio = da_fila(cenario, MEIO)
+    cenario.erp.falhar = True
+
+    with pytest.raises(ConnectionError):
+        cenario.aprovacao.aprovar(meio.id, "Ana")
+
+    assert cenario.aprovacao.carregar(meio.id) == meio
+    assert cenario.aprovacao.aprovar(meio.id, "Ana").status == "aprovada"
+    assert len(cenario.erp.itens_pedido_compra) == 1
+
+
+def test_aprovacoes_simultaneas_criam_um_pedido_so() -> None:
+    cenario = montar()
+    gerada(cenario)
+    meio = da_fila(cenario, MEIO)
+    cenario.erp.soltar.clear()
+    erros: list[Exception] = []
+
+    def aprovar(nome: str) -> None:
+        try:
+            cenario.aprovacao.aprovar(meio.id, nome)
+        except SugestaoJaDecidida as e:
+            erros.append(e)
+
+    ana = Thread(target=aprovar, args=("Ana",))
+    ana.start()
+    assert cenario.erp.criando.wait(5)
+    bruno = Thread(target=aprovar, args=("Bruno",))
+    bruno.start()
+    cenario.erp.soltar.set()
+    ana.join(5)
+    bruno.join(5)
+
+    assert len(erros) == 1
+    assert len(cenario.erp.itens_pedido_compra) == 1
+    assert cenario.aprovacao.carregar(meio.id).decidido_por == "Ana"
 
 
 def test_faixa_que_exige_justificativa_sem_justificativa_nao_cria_pedido() -> None:

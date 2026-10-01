@@ -1,4 +1,4 @@
-import { alertas, api, el, mensagem, numero, percentual, reais, sinais } from "./comum.js";
+import { alertas, api, el, mensagem, numero, numeros, percentual, reais, sinais } from "./comum.js";
 
 const INTENCOES = {
   situacao_sku: "Situação do SKU",
@@ -71,7 +71,7 @@ function entendimento(r) {
     ["SKUs", r.identificacao?.skus.length ? r.identificacao.skus.join(", ") : "nenhum"],
     ["Redator", r.redator ?? "sem redator (resposta feita em código)"],
   ];
-  return el("dl", { class: "numeros" }, itens.map(([dt, dd]) => el("div", {}, el("dt", {}, dt), el("dd", {}, dd))));
+  return numeros(itens);
 }
 
 function fichas(lista) {

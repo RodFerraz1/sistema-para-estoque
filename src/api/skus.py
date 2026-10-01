@@ -1,7 +1,8 @@
 """Endpoints HTTP sobre SKU."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse
 
 from src.ai.dependencies import get_sinais_corpus
 from src.ai.sinais import SinaisCorpus
@@ -23,7 +24,7 @@ from src.catalog.dependencies import get_catalog
 from src.catalog.schemas import SKU
 from src.catalog.service import Catalog
 from src.ficha_sku.dependencies import get_ficha_sku
-from src.ficha_sku.service import FichaSKU, SKUSemEstoque
+from src.ficha_sku.service import FichaSKU
 from src.inventory.dependencies import get_inventory
 from src.inventory.service import Inventory
 from src.politica_compra.dependencies import get_politica_compra_repositorio
@@ -36,9 +37,11 @@ from src.sales.service import Sales
 router = APIRouter(prefix="/skus", tags=["skus"])
 
 
-def _sku_sem_estoque(e: SKUSemEstoque) -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+def sku_sem_estoque(request: Request, erro: Exception) -> JSONResponse:
+    """Handler de `SKUSemEstoque`: o ERP tem o SKU sem a linha de estoque, um defeito
+    dos dados e não do pedido."""
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"detail": str(erro)}
     )
 
 
@@ -83,10 +86,7 @@ def analise_sku(
     sku_code: str,
     ficha_sku: FichaSKU = Depends(get_ficha_sku),
 ) -> AnaliseSKUResponse:
-    try:
-        ficha = ficha_sku.completa(sku_code)
-    except SKUSemEstoque as e:
-        raise _sku_sem_estoque(e) from e
+    ficha = ficha_sku.completa(sku_code)
     if ficha is None:
         raise _sku_nao_encontrado(sku_code)
     return ficha_to_response(ficha)
@@ -97,10 +97,7 @@ def sugestao_compra(
     sku_code: str,
     purchasing: Purchasing = Depends(get_purchasing),
 ) -> SugestaoPedidoResponse:
-    try:
-        sugestao = purchasing.sugerir_pedido(sku_code)
-    except SKUSemEstoque as e:
-        raise _sku_sem_estoque(e) from e
+    sugestao = purchasing.sugerir_pedido(sku_code)
     if sugestao is None:
         raise _sku_nao_encontrado(sku_code)
     return sugestao_to_response(sugestao)
@@ -116,10 +113,7 @@ def sinais_da_sugestao_compra(
     """Sinais do corpus sobre o fornecedor e o produto da sugestão. Lista vazia quando a
     sugestão não tem fornecedor; 503 sem o Jev."""
     sku = _sku_ou_404(catalog, sku_code)
-    try:
-        sugestao = purchasing.sugerir_pedido(sku_code)
-    except SKUSemEstoque as e:
-        raise _sku_sem_estoque(e) from e
+    sugestao = purchasing.sugerir_pedido(sku_code)
     if sugestao is None:
         raise _sku_nao_encontrado(sku_code)
     return [sinal_to_response(s) for s in sinais_corpus.para_sugestao(sugestao, sku)]

@@ -17,6 +17,7 @@ const PERGUNTAS = {
   faixa_1_ate_reais: "faixa 1",
   faixa_2_ate_reais: "faixa 2",
   faixa_3_ate_reais: "faixa 3",
+  motivos_de_destaque: "fila de aprovação",
 };
 
 const formulario = document.getElementById("politica");
@@ -36,6 +37,9 @@ function preencher(politica) {
   for (const caixa of formulario.querySelectorAll('input[name="meses_quentes"]')) {
     caixa.checked = p.meses_quentes.includes(Number(caixa.value));
   }
+  for (const caixa of formulario.querySelectorAll('input[name="motivos_de_destaque"]')) {
+    caixa.checked = p.motivos_de_destaque.includes(caixa.value);
+  }
   versao.textContent = `Versão ativa: ${politica.versao}, criada em ${dataHora(politica.criada_em)}.`;
 }
 
@@ -44,6 +48,7 @@ function parametros() {
   for (const campo of NUMEROS) p[campo] = Number(formulario.elements[campo].value);
   for (const campo of OPCOES) p[campo] = formulario.elements[campo].value;
   p.meses_quentes = [...formulario.querySelectorAll('input[name="meses_quentes"]:checked')].map((c) => Number(c.value));
+  p.motivos_de_destaque = [...formulario.querySelectorAll('input[name="motivos_de_destaque"]:checked')].map((c) => c.value);
   return p;
 }
 
@@ -78,7 +83,7 @@ formulario.addEventListener("submit", async (evento) => {
       ),
     );
   } catch (e) {
-    resultado.replaceChildren(e.detalhes ? erros(e) : mensagem("erro", e.message));
+    resultado.replaceChildren(e.status > 0 ? erros(e) : mensagem("erro", e.message));
   } finally {
     botao.disabled = false;
   }

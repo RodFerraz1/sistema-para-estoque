@@ -18,6 +18,7 @@ APROVADORES: dict[int, str] = {
 }
 
 FAIXA_MINIMA_FORNECEDOR_SEM_PEDIDO = 3
+FAIXA_MINIMA_COM_JUSTIFICATIVA = 2
 
 
 def _faixa_pelo_valor(valor_centavos: int, parametros: ParametrosPolitica) -> int:
@@ -60,6 +61,6 @@ def faixa_aprovacao(
     return FaixaAprovacao(
         faixa=faixa,
         aprovadores=APROVADORES[faixa],
-        exige_justificativa=faixa >= 2,
+        exige_justificativa=faixa >= FAIXA_MINIMA_COM_JUSTIFICATIVA,
         ajustes=ajustes,
     )

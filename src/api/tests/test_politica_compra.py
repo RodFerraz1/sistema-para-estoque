@@ -44,6 +44,7 @@ def _parametros(**overrides: Any) -> dict[str, Any]:
         "faixa_1_ate_reais": 20_000,
         "faixa_2_ate_reais": 80_000,
         "faixa_3_ate_reais": 200_000,
+        "motivos_de_destaque": ["ruptura_antes_da_chegada", "encalhe"],
     }
     return base | overrides
 
@@ -69,6 +70,7 @@ def test_get_devolve_a_politica_ativa(client: TestClient) -> None:
             "faixa_1_ate_reais": 15_000,
             "faixa_2_ate_reais": 60_000,
             "faixa_3_ate_reais": 150_000,
+            "motivos_de_destaque": ["ruptura_antes_da_chegada", "viola_teto"],
         },
     }
 

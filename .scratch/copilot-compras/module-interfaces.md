@@ -9,29 +9,34 @@ Toda função pública recebe e retorna **DTOs do próprio módulo**, não SQLAl
 ## Dependência entre módulos
 
 ```
-       ai
-        │ depende de
-        ▼
-  purchasing ─────┐
-        │         │
-        ▼         ▼
-  sales    inventory
-        │         │
-        └────┬────┘
-             ▼
-         catalog
-             │
-             ▼
-        erp_adapter
-             │
-             ▼
-      (ERP fake DB)
+          api
+           │
+           ▼
+       aprovacao ─────────────┐
+        │     │               │
+        ▼     ▼               │
+       ai ─► purchasing ──────┼──────┐
+              │      │        │      │ pedidos de compra
+              ▼      ▼        │      │
+           sales  inventory   │      │
+              │      │        │      │
+              └──┬───┘        │      │
+                 ▼            │      │
+              catalog ◄───────┘      │
+                 │                   │
+                 ▼                   │
+            erp_adapter ◄────────────┘
+                 │
+                 ▼
+           (ERP fake DB)
 ```
 
 - `ai` orquestra e chama outros módulos como tools do LLM, **respeitando divisão por risco** (ver seção abaixo).
+- `aprovacao` guarda a fila de aprovação e registra a decisão humana. Depende de `ai` (sinais do corpus na geração), `catalog` (SKUs ativos) e `purchasing` (sugestão, faixa, versão da política da sugestão e `submeter_pedido`). Nada depende dele além da `api`.
 - `purchasing` é o único que sabe compor sugestões formais de compra - combina dados dos outros de forma determinística.
+- `purchasing -> erp_adapter`: só para pedido de compra (`fornecedor_tem_pedido`, para a faixa, e `criar_pedido_compra`, a única escrita do Copilot no ERP). Pedido de compra não tem módulo de leitura próprio, e criar um só para repassar duas chamadas seria um módulo raso. O DTO da escrita (`ItemNovoPedido`) fica em `erp_adapter/schemas.py`, então a aresta tem um sentido só e não há ciclo.
 - `catalog`, `inventory`, `sales` são "leitores" do ERP com lógica de domínio própria (não são só query wrappers).
-- `erp_adapter` é a única camada que fala com o banco do ERP fake.
+- `erp_adapter` é a única camada que fala com o banco do ERP fake. Importa os DTOs de domínio de `catalog`, `inventory` e `sales` para devolvê-los prontos, mas nunca de `purchasing` nem de módulos acima.
 
 Sem ciclos. Se surgir vontade de fazer `catalog` chamar `sales`, é sinal de que a fronteira está errada.
 
@@ -54,8 +59,8 @@ Se o LLM alucinar em leitura, o pior é resposta ruim - nada muda no mundo.
 - `purchasing.validar_contra_politica`: LLM pode chamar.
 
 **Ações irreversíveis (LLM NÃO chama - humano aprova fora do fluxo LLM)**:
-- `purchasing.submeter_pedido`: cria pedido no ERP. Só é acionado por endpoint HTTP que exige aprovação humana explícita.
-- `purchasing.registrar_decisao_humana`: só via UI de aprovação.
+- `purchasing.submeter_pedido`: cria pedido no ERP. Só `aprovacao.aprovar` chama, e só o endpoint `POST /sugestoes/{id}/aprovar` chama esse.
+- `aprovacao.aprovar` e `aprovacao.rejeitar`: decisão humana, só via endpoints da fila (a UI de aprovação).
 
 Essa divisão é o que impede alucinação de virar prejuízo real.
 
@@ -74,7 +79,7 @@ class ERPAdapter(Protocol):
     def get_estoque_atual(self, sku_id: UUID) -> int: ...
     def list_movimentacoes(self, sku_id: UUID, desde: date) -> list[MovimentacaoRaw]: ...
     def list_vendas(self, sku_id: UUID, desde: date) -> list[VendaRaw]: ...
-    def criar_pedido_compra(self, dados: NovoPedidoCompraRaw) -> UUID: ...
+    def criar_pedido_compra(self, fornecedor_id: UUID, itens: list[ItemNovoPedido], data_prevista_entrega: date, observacao: str) -> UUID: ...
     def get_pedido_compra(self, pedido_id: UUID) -> PedidoCompraRaw: ...
     def list_pedidos_compra(self, filtros: FiltrosPedido) -> list[PedidoCompraRaw]: ...
 ```
@@ -132,15 +137,30 @@ Orquestra sugestão de compra. Único que sabe compor a decisão.
 
 ```python
 class Purchasing:
-    def sugerir_pedido(self, sku_id: UUID, contexto: ContextoCompra) -> SugestaoPedido: ...
-    def validar_contra_politica(self, sugestao: SugestaoPedido) -> ResultadoValidacao: ...
-    def registrar_decisao_humana(self, sugestao_id: UUID, decisao: DecisaoHumana) -> None: ...
-    def submeter_pedido(self, sugestao_id: UUID) -> UUID:  # cria pedido de compra no ERP
-        ...
-    def list_sugestoes(self, filtros: FiltrosSugestao) -> list[SugestaoPedido]: ...
+    def sugerir_pedido(self, sku_code: str) -> SugestaoPedido | None: ...
+    def politica_da(self, sugestao: SugestaoPedido) -> PoliticaCompra: ...  # versão com que foi calculada
+    def faixa_aprovacao(self, sugestao: SugestaoPedido, quantidade: int | None = None) -> FaixaAprovacao: ...
+    def submeter_pedido(self, sugestao: SugestaoPedido, quantidade: int, aprovado_por: str, referencia: str) -> UUID:
+        ...  # cria pedido de compra no ERP; só a aprovação humana chama
 ```
 
-`SugestaoPedido` é rica: SKU, quantidade sugerida, fornecedor sugerido, justificativa em texto, alertas de política (violação de teto de estoque, etc), cobertura projetada pós-compra.
+`SugestaoPedido` é rica: SKU, quantidade sugerida, fornecedor sugerido, memória de cálculo, alertas de política (violação de teto de estoque, etc) e a versão da política usada. A fila e a decisão humana ficam no `aprovacao`.
+
+### `aprovacao`
+
+Fila de aprovação das sugestões de pedido e a decisão do comprador chefe. Guarda a fila em `copilot.sugestoes_fila`, atrás do port `SugestoesFilaRepositorio`.
+
+```python
+class Aprovacao:
+    def gerar_fila(self, sinais: SinaisCorpus) -> ResultadoGeracao: ...  # substitui todas as pendentes
+    def listar(self, status: StatusSugestao = "pendente") -> list[SugestaoNaFila]: ...
+    def carregar(self, id: UUID) -> SugestaoNaFila | None: ...
+    def faixa_para(self, id: UUID, quantidade: int) -> FaixaAprovacao: ...
+    def aprovar(self, id: UUID, aprovado_por: str, quantidade: int | None = None, justificativa: str | None = None) -> SugestaoNaFila: ...
+    def rejeitar(self, id: UUID, rejeitado_por: str, motivo: str) -> SugestaoNaFila: ...
+```
+
+Depende de `ai`, `catalog` e `purchasing`. O destaque usa os motivos de destaque da versão da política da sugestão, e a aprovação reserva a linha da fila antes de chamar o ERP.
 
 ### `ai`
 

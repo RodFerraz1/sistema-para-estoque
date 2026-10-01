@@ -1,4 +1,4 @@
-import { alertas, api, dataHora, el, guardarNome, lerNome, mensagem, numero, reais, sinais } from "./comum.js";
+import { alertas, api, dataHora, el, guardarNome, lerNome, mensagem, numero, numeros, reais, sinais } from "./comum.js";
 
 const STATUS = {
   pendente: { singular: "pendente", plural: "pendentes", vazio: 'Nenhuma sugestão pendente. Use "Gerar sugestões" para montar a fila.' },
@@ -18,17 +18,16 @@ function cobertura(meses) {
   return meses < 0 ? `${texto} (acaba antes da chegada)` : texto;
 }
 
-function numeros(s) {
+function resumo(s) {
   const { sugestao } = s.sugestao;
   const { fornecedor, calculo } = sugestao;
-  const itens = [
+  return numeros([
     ["Fornecedor", fornecedor.fornecedor_nome],
     ["Quantidade sugerida", `${numero(sugestao.quantidade)} un. (MOQ ${numero(fornecedor.moq_unidades)})`],
     ["Valor estimado", reais(sugestao.valor_estimado_centavos)],
     ["Cobertura na chegada sem a compra", cobertura(s.cobertura_na_chegada_sem_compra_meses)],
     ["Lead time", `${calculo.lead_time_dias} dias (${calculo.lead_time_origem})`],
-  ];
-  return el("dl", { class: "numeros" }, itens.map(([dt, dd]) => el("div", {}, el("dt", {}, dt), el("dd", {}, dd))));
+  ]);
 }
 
 function faixa(f) {
@@ -40,20 +39,19 @@ function faixa(f) {
 }
 
 function memoriaDeCalculo(calculo) {
-  const itens = [
-    ["Giro mensal", `${numero(calculo.giro_mensal, 1)} un.`],
-    ["Disponível", `${numero(calculo.disponivel)} un.`],
-    ["Em trânsito", `${numero(calculo.em_transito)} un.`],
-    ["Posição", `${numero(calculo.posicao)} un.`],
-    ["Estoque na chegada", `${numero(calculo.estoque_na_chegada, 1)} un.`],
-    ["Quantidade necessária", `${numero(calculo.qtd_necessaria)} un.`],
-    ["Cobertura na chegada com a compra", `${numero(calculo.cobertura_na_chegada_meses, 1)} meses`],
-  ];
   return el(
     "details",
     {},
     el("summary", {}, "Memória de cálculo"),
-    el("dl", { class: "numeros" }, itens.map(([dt, dd]) => el("div", {}, el("dt", {}, dt), el("dd", {}, dd)))),
+    numeros([
+      ["Giro mensal", `${numero(calculo.giro_mensal, 1)} un.`],
+      ["Disponível", `${numero(calculo.disponivel)} un.`],
+      ["Em trânsito", `${numero(calculo.em_transito)} un.`],
+      ["Posição", `${numero(calculo.posicao)} un.`],
+      ["Estoque na chegada", `${numero(calculo.estoque_na_chegada, 1)} un.`],
+      ["Quantidade necessária", `${numero(calculo.qtd_necessaria)} un.`],
+      ["Cobertura na chegada com a compra", `${numero(calculo.cobertura_na_chegada_meses, 1)} meses`],
+    ]),
   );
 }
 
@@ -81,6 +79,11 @@ function campo(rotulo, controle, ajuda) {
   return el("div", { class: "campo" }, el("label", { for: controle.id }, rotulo), controle, ajuda ? el("p", { class: "suave" }, ajuda) : null);
 }
 
+function textoDaFaixa(f) {
+  const exige = f.exige_justificativa ? "obrigatória" : "opcional";
+  return [`Faixa ${f.faixa} (${f.aprovadores}): justificativa ${exige}.`, ...f.ajustes.map((a) => ` ${a}`)];
+}
+
 function formularioAprovar(s, aoDecidir) {
   const { sugestao } = s.sugestao;
   const nome = el("input", { id: `nome-a-${s.id}`, required: true, maxlength: 200, value: lerNome() });
@@ -93,16 +96,34 @@ function formularioAprovar(s, aoDecidir) {
     value: sugestao.quantidade,
   });
   const justificativa = el("textarea", { id: `just-${s.id}`, maxlength: 2000, required: s.faixa.exige_justificativa });
-  const ajudaJustificativa = s.faixa.exige_justificativa
-    ? `Obrigatória na faixa ${s.faixa.faixa}.`
-    : "Opcional na faixa 1. Mudar a quantidade recalcula a faixa, e ela pode passar a exigir justificativa.";
+  const ajudaJustificativa = el("p", { class: "suave", "aria-live": "polite" }, textoDaFaixa(s.faixa));
+  let consultada = { quantidade: sugestao.quantidade, faixa: s.faixa };
+
+  async function faixaDaQuantidade() {
+    const n = Number(quantidade.value);
+    if (n !== consultada.quantidade) {
+      consultada = { quantidade: n, faixa: await api("GET", `/sugestoes/${s.id}/faixa?quantidade=${n}`) };
+      justificativa.required = consultada.faixa.exige_justificativa;
+      ajudaJustificativa.replaceChildren(...textoDaFaixa(consultada.faixa));
+    }
+    return consultada.faixa;
+  }
+
+  quantidade.addEventListener("change", async () => {
+    try {
+      await faixaDaQuantidade();
+    } catch (e) {
+      ajudaJustificativa.replaceChildren(e.message);
+    }
+  });
+
   const enviar = el("button", { type: "submit", class: "primario" }, "Confirmar aprovação");
   const formulario = el(
     "form",
     { class: "formulario" },
     campo("Seu nome", nome),
-    campo("Quantidade", quantidade, `Sugerida: ${numero(sugestao.quantidade)} un.`),
-    campo("Justificativa", justificativa, ajudaJustificativa),
+    campo("Quantidade", quantidade, `Sugerida: ${numero(sugestao.quantidade)} un. Mudar a quantidade recalcula a faixa.`),
+    el("div", { class: "campo" }, el("label", { for: justificativa.id }, "Justificativa"), justificativa, ajudaJustificativa),
     el("div", { class: "acoes" }, enviar),
   );
   formulario.addEventListener("submit", async (evento) => {
@@ -110,7 +131,14 @@ function formularioAprovar(s, aoDecidir) {
     guardarNome(nome.value.trim());
     const corpo = { aprovado_por: nome.value, quantidade: Number(quantidade.value) };
     if (justificativa.value.trim()) corpo.justificativa = justificativa.value;
-    await aoDecidir(enviar, () => api("POST", `/sugestoes/${s.id}/aprovar`, corpo));
+    await aoDecidir(enviar, async () => {
+      const faixa = await faixaDaQuantidade();
+      if (faixa.exige_justificativa && !corpo.justificativa) {
+        justificativa.focus();
+        throw new Error(`Com ${numero(corpo.quantidade)} un. o pedido fica na faixa ${faixa.faixa} e exige justificativa.`);
+      }
+      return api("POST", `/sugestoes/${s.id}/aprovar`, corpo);
+    });
   });
   return formulario;
 }
@@ -176,7 +204,7 @@ function card(s) {
       el("div", {}, el("h3", {}, s.produto_nome), el("code", {}, s.sku_code)),
       el("div", {}, s.destaque ? el("span", { class: "selo destaque" }, "Em destaque") : null, " ", el("span", { class: "selo" }, `Faixa ${s.faixa.faixa}`)),
     ),
-    numeros(s),
+    resumo(s),
     faixa(s.faixa),
     alertas(sugestao.alertas),
     sinais(s.sugestao.sinais),

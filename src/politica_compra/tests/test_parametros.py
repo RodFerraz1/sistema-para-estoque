@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from src.politica_compra.schemas import (
     CriterioFornecedor,
     LeadTimeBase,
+    MotivoDestaque,
     ParametrosPolitica,
     SazonalidadeModo,
 )
@@ -29,6 +30,7 @@ def _v1(**overrides: Any) -> dict[str, Any]:
         "faixa_1_ate_reais": 15_000,
         "faixa_2_ate_reais": 60_000,
         "faixa_3_ate_reais": 150_000,
+        "motivos_de_destaque": ["ruptura_antes_da_chegada", "viola_teto"],
     }
     return base | overrides
 
@@ -46,6 +48,7 @@ def test_parametros_v1_validos() -> None:
         60_000,
         150_000,
     )
+    assert p.motivos_de_destaque == (MotivoDestaque.RUPTURA_ANTES_DA_CHEGADA, MotivoDestaque.VIOLA_TETO)
 
 
 def test_parametros_sao_imutaveis() -> None:
@@ -76,6 +79,8 @@ def test_parametros_sao_imutaveis() -> None:
         ("faixa_1 < faixa_2", {"faixa_1_ate_reais": 60_000}),
         ("faixa_2 < faixa_3", {"faixa_2_ate_reais": 150_000}),
         ("faixas em ordem", {"faixa_1_ate_reais": 150_000, "faixa_3_ate_reais": 15_000}),
+        ("motivos_de_destaque sem repetição", {"motivos_de_destaque": ["viola_teto", "viola_teto"]}),
+        ("motivos_de_destaque fechado", {"motivos_de_destaque": ["estoque_alto"]}),
         ("meses_quentes >= 1", {"meses_quentes": [0, 5]}),
         ("meses_quentes <= 12", {"meses_quentes": [5, 13]}),
         ("lead_time_base fechado", {"lead_time_base": "media"}),
@@ -97,6 +102,10 @@ def test_campo_obrigatorio_ausente_e_rejeitado() -> None:
 
     with pytest.raises(ValidationError):
         ParametrosPolitica.model_validate(dados)
+
+
+def test_sem_motivo_de_destaque_e_aceito() -> None:
+    assert ParametrosPolitica.model_validate(_v1(motivos_de_destaque=[])).motivos_de_destaque == ()
 
 
 def test_piso_reposicao_mais_ciclo_igual_ao_teto_e_aceito() -> None:

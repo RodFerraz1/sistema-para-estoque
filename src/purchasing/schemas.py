@@ -80,16 +80,6 @@ class SugestaoPedido(BaseModel):
     politica_versao: int
 
 
-class ItemNovoPedido(BaseModel):
-    """Item de um pedido de compra que o Copilot cria no ERP."""
-
-    model_config = ConfigDict(frozen=True)
-
-    sku_code: str
-    quantidade: int = Field(gt=0)
-    preco_unitario_centavos: int = Field(ge=0)
-
-
 class FaixaAprovacao(BaseModel):
     """Faixa de `politicas/aprovacao-compras.md` de um pedido de compra.
 

@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.main import UI_DIR, app
+from src.politica_compra.schemas import MotivoDestaque
 
 PAGINAS = ["index.html", "chat.html", "politica.html"]
 TIPOS = {".html": "text/html", ".css": "text/css", ".js": "text/javascript"}
@@ -98,3 +99,11 @@ def test_rota_inexistente_nao_passa_na_conferencia() -> None:
     assert not _existe_rota("POST", "/sugestoes/${s.id}/cancelar")
     assert not _existe_rota("DELETE", "/politica-compra")
     assert _existe_rota("POST", "/sugestoes/${s.id}/aprovar")
+
+
+def test_onboarding_tem_uma_opcao_por_motivo_de_destaque() -> None:
+    html = (UI_DIR / "politica.html").read_text()
+
+    opcoes = set(re.findall(r'name="motivos_de_destaque" value="([^"]+)"', html))
+
+    assert opcoes == {m.value for m in MotivoDestaque}

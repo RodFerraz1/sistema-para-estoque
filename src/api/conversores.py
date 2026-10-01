@@ -1,10 +1,11 @@
-"""Conversores de DTOs de domínio para DTOs HTTP, usados por mais de um router."""
+"""Conversores de DTOs de domínio para DTOs HTTP, usados por mais de um router ou endpoint."""
 from __future__ import annotations
 
 from src.ai.schemas import SinaisDoSKU, SinalCorpus, SugestaoComSinais, TrechoClassificado, VerificacaoCitacao
 from src.api.schemas import (
     AnaliseSKUResponse,
     AvaliacaoTrechoResponse,
+    FaixaAprovacaoResponse,
     FornecedorResponse,
     GiroResponse,
     SinaisDoSKUResponse,
@@ -16,7 +17,7 @@ from src.api.schemas import (
 )
 from src.catalog.schemas import FornecedorParaSKU
 from src.ficha_sku.schemas import Ficha
-from src.purchasing.schemas import SugestaoPedido
+from src.purchasing.schemas import FaixaAprovacao, SugestaoPedido
 
 
 def fornecedor_to_response(f: FornecedorParaSKU) -> FornecedorResponse:
@@ -61,6 +62,15 @@ def sugestao_to_response(sugestao: SugestaoPedido) -> SugestaoPedidoResponse:
         calculo=sugestao.calculo,
         alertas=sugestao.alertas,
         politica_versao=sugestao.politica_versao,
+    )
+
+
+def faixa_aprovacao_to_response(faixa: FaixaAprovacao) -> FaixaAprovacaoResponse:
+    return FaixaAprovacaoResponse(
+        faixa=faixa.faixa,
+        aprovadores=faixa.aprovadores,
+        exige_justificativa=faixa.exige_justificativa,
+        ajustes=faixa.ajustes,
     )
 
 

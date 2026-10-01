@@ -1,10 +1,11 @@
 """Implementação em memória da fila de aprovação, para testes."""
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from threading import Lock
 from uuid import UUID
 
-from src.aprovacao.repositorio import CAMPOS_DA_DECISAO, SugestoesFila
+from src.aprovacao.repositorio import CAMPOS_DA_DECISAO, SugestoesFilaRepositorio
 from src.aprovacao.schemas import StatusSugestao, SugestaoNaFila
 
 
@@ -21,17 +22,21 @@ def _ordem_das_decididas(s: SugestaoNaFila) -> tuple[bool, float, float, str]:
     )
 
 
-class InMemorySugestoesFila(SugestoesFila):
+class InMemorySugestoesFilaRepositorio(SugestoesFilaRepositorio):
+    """Uma trava para a fila inteira faz o papel do `SELECT ... FOR UPDATE` do Postgres."""
+
     def __init__(self) -> None:
         self._sugestoes: dict[UUID, SugestaoNaFila] = {}
+        self._trava = Lock()
 
     def substituir_pendentes(self, novas: Sequence[SugestaoNaFila]) -> int:
-        pendentes = [s for s in self._sugestoes.values() if s.status == "pendente"]
-        for s in pendentes:
-            self._sugestoes[s.id] = s.model_copy(update={"status": "substituida"})
-        for s in novas:
-            self._sugestoes[s.id] = s
-        return len(pendentes)
+        with self._trava:
+            pendentes = [s for s in self._sugestoes.values() if s.status == "pendente"]
+            for s in pendentes:
+                self._sugestoes[s.id] = s.model_copy(update={"status": "substituida"})
+            for s in novas:
+                self._sugestoes[s.id] = s
+            return len(pendentes)
 
     def listar(self, status: StatusSugestao) -> list[SugestaoNaFila]:
         com_status = [s for s in self._sugestoes.values() if s.status == status]
@@ -41,11 +46,14 @@ class InMemorySugestoesFila(SugestoesFila):
     def carregar(self, id: UUID) -> SugestaoNaFila | None:
         return self._sugestoes.get(id)
 
-    def registrar_decisao(self, decidida: SugestaoNaFila) -> bool:
-        atual = self._sugestoes.get(decidida.id)
-        if atual is None or atual.status != "pendente":
-            return False
-        self._sugestoes[decidida.id] = atual.model_copy(
-            update={campo: getattr(decidida, campo) for campo in CAMPOS_DA_DECISAO}
-        )
-        return True
+    def decidir(
+        self, id: UUID, decisao: Callable[[SugestaoNaFila], SugestaoNaFila]
+    ) -> SugestaoNaFila | None:
+        with self._trava:
+            atual = self._sugestoes.get(id)
+            if atual is None:
+                return None
+            decidida = decisao(atual)
+            gravada = atual.model_copy(update={campo: getattr(decidida, campo) for campo in CAMPOS_DA_DECISAO})
+            self._sugestoes[id] = gravada
+            return gravada

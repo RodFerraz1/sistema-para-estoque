@@ -4,9 +4,10 @@ O fluxo (gerar, aprovar, pedido no ERP, em trânsito descontado, rejeitar) roda 
 Jev trocado por um modelo fora do ar, para não ter custo: as sugestões entram sem
 sinais. O teste `externo` gera a fila com o Jev real e confere os sinais.
 
-Gerar a fila substitui as pendentes que já estavam no banco local, e os testes só
-olham as sugestões que eles mesmos geraram. O pedido criado pela aprovação é apagado
-do ERP no fim, para não mudar o em trânsito dos outros smokes.
+Gerar a fila substitui as pendentes que já estavam no banco local. No fim, a fixture
+`fila_do_smoke` apaga as linhas que o smoke gerou e os pedidos que ele criou no ERP (para
+não mudar o em trânsito dos outros smokes) e devolve as pendentes substituídas para
+`pendente`. Nada que o smoke não criou é apagado.
 """
 from __future__ import annotations
 
@@ -38,18 +39,40 @@ def jev_fora_do_ar() -> Iterator[None]:
 
 
 @pytest.fixture
-def pedidos_criados() -> Iterator[list[UUID]]:
-    ids: list[UUID] = []
-    yield ids
+def fila_do_smoke() -> Iterator[set[UUID]]:
+    """Ids das linhas da fila que o smoke gerou; o teardown limpa o que elas criaram."""
+    with get_engine().connect() as conn:
+        pendentes_antes = conn.execute(
+            text("SELECT id FROM copilot.sugestoes_fila WHERE status = 'pendente'")
+        ).scalars().all()
+    geradas: set[UUID] = set()
+    yield geradas
     with get_engine().begin() as conn:
-        conn.execute(text("DELETE FROM erp.pedidos_compra WHERE id = ANY(:ids)"), {"ids": ids})
+        conn.execute(
+            text(
+                """
+                DELETE FROM erp.pedidos_compra WHERE id IN (
+                    SELECT pedido_compra_id FROM copilot.sugestoes_fila WHERE id = ANY(:geradas)
+                )
+                """
+            ),
+            {"geradas": list(geradas)},
+        )
+        conn.execute(text("DELETE FROM copilot.sugestoes_fila WHERE id = ANY(:geradas)"), {"geradas": list(geradas)})
+        conn.execute(
+            text("UPDATE copilot.sugestoes_fila SET status = 'pendente' WHERE id = ANY(:ids) AND status = 'substituida'"),
+            {"ids": pendentes_antes},
+        )
 
 
-def _gerar(client: TestClient) -> tuple[ResultadoGeracaoResponse, list[SugestaoNaFilaResponse]]:
+def _gerar(
+    client: TestClient, geradas: set[UUID]
+) -> tuple[ResultadoGeracaoResponse, list[SugestaoNaFilaResponse]]:
     response = client.post("/sugestoes/gerar")
     assert response.status_code == 200
     resultado = ResultadoGeracaoResponse.model_validate(response.json())
     pendentes = [SugestaoNaFilaResponse.model_validate(s) for s in client.get("/sugestoes").json()]
+    geradas.update(p.id for p in pendentes)
     return resultado, pendentes
 
 
@@ -60,16 +83,17 @@ def _sugestao_atual(client: TestClient, sku_code: str) -> SugestaoPedidoResponse
 
 
 @pytest.mark.usefixtures("jev_fora_do_ar")
-def test_gerar_aprovar_e_rejeitar_contra_o_seed(client: TestClient, pedidos_criados: list[UUID]) -> None:
+def test_gerar_aprovar_e_rejeitar_contra_o_seed(client: TestClient, fila_do_smoke: set[UUID]) -> None:
     with get_engine().connect() as conn:
         skus_ativos = conn.execute(text("SELECT count(*) FROM erp.skus WHERE ativo")).scalar_one()
 
-    resultado, pendentes = _gerar(client)
+    resultado, pendentes = _gerar(client, fila_do_smoke)
 
     assert resultado.skus_avaliados == skus_ativos
     assert resultado.sinais_indisponiveis
     assert resultado.geradas == len(pendentes) >= 2
     assert all(p.sugestao.sinais is None for p in pendentes)
+    assert 0 < sum(p.destaque for p in pendentes) < len(pendentes)
 
     primeira, outra = pendentes[0], pendentes[1]
     sugerida = primeira.sugestao.sugestao
@@ -86,7 +110,6 @@ def test_gerar_aprovar_e_rejeitar_contra_o_seed(client: TestClient, pedidos_cria
     assert response.status_code == 200
     aprovada = SugestaoNaFilaResponse.model_validate(response.json())
     assert aprovada.pedido_compra_id is not None
-    pedidos_criados.append(aprovada.pedido_compra_id)
     assert aprovada.status == "aprovada"
     assert aprovada.quantidade_aprovada == sugerida.quantidade
 
@@ -132,11 +155,11 @@ def test_gerar_aprovar_e_rejeitar_contra_o_seed(client: TestClient, pedidos_cria
 
 
 @pytest.mark.externo
-def test_gerar_com_o_jev_real_traz_os_sinais_do_corpus(client: TestClient) -> None:
-    resultado, pendentes = _gerar(client)
+def test_gerar_com_o_jev_real_traz_os_sinais_do_corpus(client: TestClient, fila_do_smoke: set[UUID]) -> None:
+    resultado, pendentes = _gerar(client, fila_do_smoke)
 
     assert not resultado.sinais_indisponiveis
     assert all(p.sugestao.sinais is not None for p in pendentes)
+    assert 0 < sum(p.destaque for p in pendentes) < len(pendentes)
     katrina = next(p for p in pendentes if p.sku_code == SKU_DA_KATRINA)
-    assert katrina.destaque
     assert "atraso_do_fornecedor" in {s.tipo for s in katrina.sugestao.sinais or []}

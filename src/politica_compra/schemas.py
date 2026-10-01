@@ -30,6 +30,21 @@ class SazonalidadeModo(StrEnum):
     ALERTAR = "alertar"
 
 
+class MotivoDestaque(StrEnum):
+    """Alertas do `purchasing` e sinais do corpus que o comprador pode escolher para pôr
+    uma sugestão em destaque na fila de aprovação. Os valores são os de `TipoAlerta` e
+    de `TipoSinal`, que ficam em módulos acima deste."""
+
+    RUPTURA_ANTES_DA_CHEGADA = "ruptura_antes_da_chegada"
+    VIOLA_TETO = "viola_teto"
+    LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO = "lead_time_observado_acima_do_contratado"
+    ABAIXO_PEDIDO_MINIMO = "abaixo_pedido_minimo"
+    PERIODO_SAZONAL = "periodo_sazonal"
+    ATRASO_DO_FORNECEDOR = "atraso_do_fornecedor"
+    DEMANDA_SAZONAL = "demanda_sazonal"
+    ENCALHE = "encalhe"
+
+
 Mes = Annotated[int, Field(ge=1, le=12)]
 
 
@@ -49,6 +64,7 @@ class ParametrosPolitica(BaseModel):
     faixa_1_ate_reais: int = Field(gt=0)
     faixa_2_ate_reais: int
     faixa_3_ate_reais: int
+    motivos_de_destaque: tuple[MotivoDestaque, ...]
 
     @model_validator(mode="after")
     def _regras_entre_campos(self) -> Self:
@@ -61,6 +77,8 @@ class ParametrosPolitica(BaseModel):
             )
         if len(set(self.meses_quentes)) != len(self.meses_quentes):
             raise ValueError("meses_quentes não pode ter mês repetido")
+        if len(set(self.motivos_de_destaque)) != len(self.motivos_de_destaque):
+            raise ValueError("motivos_de_destaque não pode ter motivo repetido")
         if not self.faixa_1_ate_reais < self.faixa_2_ate_reais < self.faixa_3_ate_reais:
             raise ValueError(
                 "os limites das faixas precisam crescer: "
@@ -83,6 +101,7 @@ PARAMETROS_V1 = ParametrosPolitica(
     faixa_1_ate_reais=15_000,
     faixa_2_ate_reais=60_000,
     faixa_3_ate_reais=150_000,
+    motivos_de_destaque=(MotivoDestaque.RUPTURA_ANTES_DA_CHEGADA, MotivoDestaque.VIOLA_TETO),
 )
 
 

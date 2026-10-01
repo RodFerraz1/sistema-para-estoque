@@ -9,8 +9,8 @@ from typing import Protocol
 from uuid import UUID
 
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
+from src.erp_adapter.schemas import ItemNovoPedido
 from src.inventory.schemas import Estoque, ItemEmTransito, Movimentacao
-from src.purchasing.schemas import ItemNovoPedido
 from src.sales.schemas import Venda
 
 

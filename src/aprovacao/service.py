@@ -3,30 +3,24 @@
 Gera as sugestões de todos os SKUs ativos, guarda na fila as que têm compra, com os
 sinais do corpus e a faixa de aprovação, e registra a decisão do comprador chefe.
 Aprovar é o único caminho até `purchasing.submeter_pedido` (`module-interfaces.md`).
-Os alertas de risco e os sinais só ordenam a fila, nunca aprovam.
+Os motivos de destaque, escolhidos pelo comprador na política de compra, só ordenam
+a fila, nunca aprovam.
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from src.ai.decisao import DecisaoIndisponivel
 from src.ai.schemas import SinaisDasSugestoes, SinalCorpus, SugestaoComSinais
 from src.ai.sinais import SinaisCorpus
-from src.aprovacao.repositorio import SugestoesFila
+from src.aprovacao.repositorio import SugestoesFilaRepositorio
 from src.aprovacao.schemas import ResultadoGeracao, StatusSugestao, SugestaoNaFila
 from src.catalog.schemas import SKU
 from src.catalog.service import Catalog
-from src.purchasing.schemas import FaixaAprovacao, SugestaoPedido, TipoAlerta
+from src.purchasing.schemas import FaixaAprovacao, SugestaoPedido
 from src.purchasing.service import Purchasing
-
-ALERTAS_DE_DESTAQUE = frozenset(
-    {
-        TipoAlerta.RUPTURA_ANTES_DA_CHEGADA,
-        TipoAlerta.VIOLA_TETO,
-        TipoAlerta.LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO,
-    }
-)
 
 
 class SugestaoNaoEncontrada(LookupError):
@@ -57,8 +51,15 @@ def _obrigatorio(valor: str, campo: str) -> str:
     return valor
 
 
-def _destaque(sugestao: SugestaoPedido, sinais: list[SinalCorpus] | None) -> bool:
-    return bool(sinais) or any(a.tipo in ALERTAS_DE_DESTAQUE for a in sugestao.alertas)
+def _destaque(sugestao: SugestaoPedido, sinais: list[SinalCorpus] | None, motivos: Iterable[str]) -> bool:
+    """Se a sugestão tem algum alerta ou sinal entre os motivos de destaque da política."""
+    ocorridos = {a.tipo.value for a in sugestao.alertas} | {s.tipo for s in sinais or []}
+    return not ocorridos.isdisjoint(motivos)
+
+
+def _conferir_pendente(sugestao: SugestaoNaFila) -> None:
+    if sugestao.status != "pendente":
+        raise SugestaoJaDecidida(sugestao.id, sugestao.status)
 
 
 class Aprovacao:
@@ -66,7 +67,7 @@ class Aprovacao:
         self,
         catalog: Catalog,
         purchasing: Purchasing,
-        fila: SugestoesFila,
+        fila: SugestoesFilaRepositorio,
         *,
         now: datetime | None = None,
     ) -> None:
@@ -116,7 +117,9 @@ class Aprovacao:
             id=uuid4(),
             criado_em=agora,
             status="pendente",
-            destaque=_destaque(sugestao, sinais),
+            destaque=_destaque(
+                sugestao, sinais, self._purchasing.politica_da(sugestao).parametros.motivos_de_destaque
+            ),
             sku=sku,
             sugestao=SugestaoComSinais(sugestao=sugestao, sinais=sinais),
             faixa=self._purchasing.faixa_aprovacao(sugestao),
@@ -129,22 +132,20 @@ class Aprovacao:
     def carregar(self, id: UUID) -> SugestaoNaFila | None:
         return self._fila.carregar(id)
 
-    def _pendente(self, id: UUID) -> SugestaoNaFila:
-        sugestao = self._fila.carregar(id)
-        if sugestao is None:
+    def faixa_para(self, id: UUID, quantidade: int) -> FaixaAprovacao:
+        """Faixa que a aprovação teria com esta quantidade, para o comprador saber antes de
+        aprovar se ela exige justificativa. Lança `SugestaoNaoEncontrada` e
+        `QuantidadeInvalida`."""
+        na_fila = self._fila.carregar(id)
+        if na_fila is None:
             raise SugestaoNaoEncontrada(id)
-        if sugestao.status != "pendente":
-            raise SugestaoJaDecidida(id, sugestao.status)
-        return sugestao
+        return self._purchasing.faixa_aprovacao(na_fila.sugestao.sugestao, quantidade)
 
-    def _registrar(self, decidida: SugestaoNaFila) -> SugestaoNaFila:
-        """Outra decisão pode ter chegado entre a leitura e a gravação."""
-        if self._fila.registrar_decisao(decidida):
-            return decidida
-        atual = self._fila.carregar(decidida.id)
-        if atual is None:
-            raise SugestaoNaoEncontrada(decidida.id)
-        raise SugestaoJaDecidida(decidida.id, atual.status)
+    def _decidir(self, id: UUID, decisao: Callable[[SugestaoNaFila], SugestaoNaFila]) -> SugestaoNaFila:
+        decidida = self._fila.decidir(id, decisao)
+        if decidida is None:
+            raise SugestaoNaoEncontrada(id)
+        return decidida
 
     def aprovar(
         self,
@@ -153,44 +154,54 @@ class Aprovacao:
         quantidade: int | None = None,
         justificativa: str | None = None,
     ) -> SugestaoNaFila:
-        """Cria o pedido de compra no ERP com a quantidade sugerida ou a editada. A faixa
-        é recalculada com essa quantidade e a política em vigor. Lança
-        `SugestaoNaoEncontrada`, `SugestaoJaDecidida`, `QuantidadeInvalida` (zero ou
-        abaixo do MOQ), `JustificativaObrigatoria` e `ValueError` sem `aprovado_por`."""
-        na_fila = self._pendente(id)
+        """Cria o pedido de compra no ERP com a quantidade sugerida ou a editada, com a
+        sugestão reservada na fila: uma segunda aprovação simultânea espera e recebe
+        `SugestaoJaDecidida` sem criar pedido, e uma falha do ERP solta a reserva. A
+        faixa é recalculada com essa quantidade e a versão da política da sugestão.
+        Lança `SugestaoNaoEncontrada`, `SugestaoJaDecidida`, `QuantidadeInvalida` (zero
+        ou abaixo do MOQ), `JustificativaObrigatoria` e `ValueError` sem `aprovado_por`."""
         aprovado_por = _obrigatorio(aprovado_por, "aprovado_por")
-        sugestao = na_fila.sugestao.sugestao
-        quantidade = sugestao.quantidade if quantidade is None else quantidade
-        faixa = self._purchasing.faixa_aprovacao(sugestao, quantidade)
         justificativa = (justificativa or "").strip() or None
-        if faixa.exige_justificativa and justificativa is None:
-            raise JustificativaObrigatoria(faixa)
-        pedido_compra_id = self._purchasing.submeter_pedido(sugestao, quantidade, aprovado_por, str(id))
-        return self._registrar(
-            na_fila.model_copy(
+
+        def aprovada(na_fila: SugestaoNaFila) -> SugestaoNaFila:
+            _conferir_pendente(na_fila)
+            sugestao = na_fila.sugestao.sugestao
+            quantidade_aprovada = sugestao.quantidade if quantidade is None else quantidade
+            faixa = self._purchasing.faixa_aprovacao(sugestao, quantidade_aprovada)
+            if faixa.exige_justificativa and justificativa is None:
+                raise JustificativaObrigatoria(faixa)
+            pedido_compra_id = self._purchasing.submeter_pedido(
+                sugestao, quantidade_aprovada, aprovado_por, str(id)
+            )
+            return na_fila.model_copy(
                 update={
                     "status": "aprovada",
                     "faixa": faixa,
                     "decidido_em": self._agora(),
                     "decidido_por": aprovado_por,
-                    "quantidade_aprovada": quantidade,
+                    "quantidade_aprovada": quantidade_aprovada,
                     "justificativa": justificativa,
                     "pedido_compra_id": pedido_compra_id,
                 }
             )
-        )
+
+        return self._decidir(id, aprovada)
 
     def rejeitar(self, id: UUID, rejeitado_por: str, motivo: str) -> SugestaoNaFila:
         """Lança `SugestaoNaoEncontrada`, `SugestaoJaDecidida` e `ValueError` sem
         `rejeitado_por` ou sem `motivo`."""
-        na_fila = self._pendente(id)
-        return self._registrar(
-            na_fila.model_copy(
+        rejeitado_por = _obrigatorio(rejeitado_por, "rejeitado_por")
+        motivo = _obrigatorio(motivo, "motivo")
+
+        def rejeitada(na_fila: SugestaoNaFila) -> SugestaoNaFila:
+            _conferir_pendente(na_fila)
+            return na_fila.model_copy(
                 update={
                     "status": "rejeitada",
                     "decidido_em": self._agora(),
-                    "decidido_por": _obrigatorio(rejeitado_por, "rejeitado_por"),
-                    "motivo_rejeicao": _obrigatorio(motivo, "motivo"),
+                    "decidido_por": rejeitado_por,
+                    "motivo_rejeicao": motivo,
                 }
             )
-        )
+
+        return self._decidir(id, rejeitada)

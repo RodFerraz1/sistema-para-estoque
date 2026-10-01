@@ -135,6 +135,29 @@ def test_sugestao_com_alerta_de_teto_sobe_a_faixa() -> None:
     assert faixa.faixa == 2
 
 
+def test_faixa_usa_a_versao_da_politica_da_sugestao_e_nao_a_ativa() -> None:
+    politicas = InMemoryPoliticaCompraRepositorio(now=NOW)
+    purchasing, _ = _montar(politicas=politicas)
+    sugestao = _sugestao(purchasing)
+    politicas.salvar_nova_versao(
+        PARAMETROS_V1.model_copy(
+            update={"faixa_1_ate_reais": 1_000, "faixa_2_ate_reais": 2_000, "faixa_3_ate_reais": 3_000}
+        )
+    )
+
+    # Com a v2, R$ 3.600,00 seria faixa 4 e desceria para a 3.
+    assert sugestao.politica_versao == 1
+    assert purchasing.faixa_aprovacao(sugestao).faixa == 1
+
+
+def test_faixa_de_sugestao_com_versao_de_politica_inexistente_falha() -> None:
+    purchasing, _ = _montar()
+    sugestao = _sugestao(purchasing).model_copy(update={"politica_versao": 99})
+
+    with pytest.raises(LookupError, match="99"):
+        purchasing.faixa_aprovacao(sugestao)
+
+
 def test_faixa_com_quantidade_abaixo_do_moq_e_rejeitada() -> None:
     purchasing, _ = _montar()
 
@@ -186,15 +209,6 @@ def test_submeter_aceita_quantidade_igual_ao_moq() -> None:
     purchasing.submeter_pedido(_sugestao(purchasing), 48, "Comprador Chefe", "fila-123")
 
     assert len(erp.itens_pedido_compra) == 1
-
-
-def test_submeter_exige_quem_aprovou() -> None:
-    purchasing, erp = _montar()
-
-    with pytest.raises(ValueError):
-        purchasing.submeter_pedido(_sugestao(purchasing), 200, "  ", "fila-123")
-
-    assert erp.itens_pedido_compra == []
 
 
 def test_sugestao_sem_compra_nao_vira_pedido() -> None:

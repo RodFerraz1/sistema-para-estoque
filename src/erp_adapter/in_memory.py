@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict
 
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.port import ERPAdapter
+from src.erp_adapter.schemas import ItemNovoPedido
 from src.inventory.schemas import (
     STATUS_EM_TRANSITO,
     Estoque,
@@ -27,7 +28,6 @@ from src.inventory.schemas import (
     Movimentacao,
     StatusEmTransito,
 )
-from src.purchasing.schemas import ItemNovoPedido
 from src.sales.schemas import Venda
 
 

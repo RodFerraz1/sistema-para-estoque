@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.ai.dependencies import get_sinais_corpus
 from src.ai.sinais import SinaisCorpus
-from src.api.conversores import sugestao_com_sinais_to_response
+from src.api.conversores import faixa_aprovacao_to_response, sugestao_com_sinais_to_response
 from src.api.schemas import (
     AprovarSugestaoRequest,
     FaixaAprovacaoResponse,
@@ -24,7 +24,6 @@ from src.aprovacao.service import (
     SugestaoJaDecidida,
     SugestaoNaoEncontrada,
 )
-from src.ficha_sku.service import SKUSemEstoque
 from src.purchasing.service import QuantidadeInvalida
 
 router = APIRouter(prefix="/sugestoes", tags=["aprovacao"])
@@ -40,12 +39,7 @@ def _to_response(s: SugestaoNaFila) -> SugestaoNaFilaResponse:
         produto_nome=s.sku.produto_nome,
         cobertura_na_chegada_sem_compra_meses=s.cobertura_na_chegada_sem_compra_meses,
         sugestao=sugestao_com_sinais_to_response(s.sugestao),
-        faixa=FaixaAprovacaoResponse(
-            faixa=s.faixa.faixa,
-            aprovadores=s.faixa.aprovadores,
-            exige_justificativa=s.faixa.exige_justificativa,
-            ajustes=s.faixa.ajustes,
-        ),
+        faixa=faixa_aprovacao_to_response(s.faixa),
         decidido_em=s.decidido_em,
         decidido_por=s.decidido_por,
         quantidade_aprovada=s.quantidade_aprovada,
@@ -76,10 +70,7 @@ def gerar(
     """Sugestão para cada SKU ativo; as com compra substituem as pendentes da fila. Com o
     Jev fora do ar, entram sem sinais e `sinais_indisponiveis` vem verdadeiro. Leva de
     30 a 60 s com o seed."""
-    try:
-        resultado = aprovacao.gerar_fila(sinais)
-    except SKUSemEstoque as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)) from e
+    resultado = aprovacao.gerar_fila(sinais)
     return ResultadoGeracaoResponse(
         geradas=resultado.geradas,
         substituidas=resultado.substituidas,
@@ -104,6 +95,21 @@ def carregar(id: UUID, aprovacao: Aprovacao = Depends(get_aprovacao)) -> Sugesta
     if sugestao is None:
         raise _http(SugestaoNaoEncontrada(id))
     return _to_response(sugestao)
+
+
+@router.get("/{id}/faixa", response_model=FaixaAprovacaoResponse)
+def faixa(
+    id: UUID,
+    quantidade: int = Query(),
+    aprovacao: Aprovacao = Depends(get_aprovacao),
+) -> FaixaAprovacaoResponse:
+    """Faixa de aprovação da sugestão com esta quantidade, com a versão da política da
+    sugestão, sem decidir nada. 404 sem a sugestão, 422 com quantidade zero ou abaixo do
+    MOQ."""
+    try:
+        return faixa_aprovacao_to_response(aprovacao.faixa_para(id, quantidade))
+    except _ERROS_DA_DECISAO as e:
+        raise _http(e) from e
 
 
 @router.post("/{id}/aprovar", response_model=SugestaoNaFilaResponse)

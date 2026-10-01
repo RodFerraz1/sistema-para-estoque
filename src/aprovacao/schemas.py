@@ -18,7 +18,7 @@ class SugestaoNaFila(BaseModel):
     """Sugestão de pedido guardada na fila de aprovação, com os sinais do corpus e a
     faixa de aprovação. Só entra na fila sugestão com compra (quantidade, fornecedor
     e cálculo). Na aprovação, `faixa` passa a ser a recalculada com a
-    quantidade aprovada e a política em vigor. Os campos de decisão ficam nulos
+    quantidade aprovada e a versão da política da sugestão. Os campos de decisão ficam nulos
     enquanto a sugestão está pendente ou quando foi substituída."""
 
     model_config = ConfigDict(frozen=True)

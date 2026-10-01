@@ -7,7 +7,7 @@ sem decisão, pela criação mais recente).
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Protocol
 from uuid import UUID
 
@@ -25,7 +25,7 @@ CAMPOS_DA_DECISAO = (
 )
 
 
-class SugestoesFila(Protocol):
+class SugestoesFilaRepositorio(Protocol):
     def substituir_pendentes(self, novas: Sequence[SugestaoNaFila]) -> int:
         """Numa transação, marca como `substituida` todas as pendentes e grava as
         `novas`. Devolve quantas pendentes foram substituídas."""
@@ -35,7 +35,12 @@ class SugestoesFila(Protocol):
 
     def carregar(self, id: UUID) -> SugestaoNaFila | None: ...
 
-    def registrar_decisao(self, decidida: SugestaoNaFila) -> bool:
-        """Grava o status, a faixa e os campos de decisão de `decidida` se a sugestão
-        ainda está pendente. `False` quando ela não existe ou já saiu da fila."""
+    def decidir(
+        self, id: UUID, decisao: Callable[[SugestaoNaFila], SugestaoNaFila]
+    ) -> SugestaoNaFila | None:
+        """Reserva a sugestão, chama `decisao` com ela e grava os campos de decisão
+        (`CAMPOS_DA_DECISAO`) do que `decisao` devolver. Enquanto a reserva dura, outra
+        decisão ou substituição da mesma sugestão espera e depois a vê já decidida.
+        Se `decisao` lança, nada é gravado, a reserva é solta e a exceção propaga.
+        `None`, sem chamar `decisao`, quando a sugestão não existe."""
         ...

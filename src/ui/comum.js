@@ -46,6 +46,10 @@ export function el(tag, atributos = {}, ...filhos) {
   return elemento;
 }
 
+export function numeros(itens) {
+  return el("dl", { class: "numeros" }, itens.map(([dt, dd]) => el("div", {}, el("dt", {}, dt), el("dd", {}, dd))));
+}
+
 export function mensagem(tipo, texto) {
   return el("div", { class: `mensagem ${tipo}`, role: tipo === "erro" ? "alert" : "status" }, texto);
 }

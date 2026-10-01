@@ -292,4 +292,4 @@ class AprovarSugestaoRequest(BaseModel):
 
 class RejeitarSugestaoRequest(BaseModel):
     rejeitado_por: Nome
-    motivo: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+    motivo: Annotated[TextoLivre, StringConstraints(min_length=1)]

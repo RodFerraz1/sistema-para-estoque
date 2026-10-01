@@ -5,14 +5,14 @@
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from uuid import UUID
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Engine, Row
 
-from src.aprovacao.repositorio import CAMPOS_DA_DECISAO, SugestoesFila
+from src.aprovacao.repositorio import CAMPOS_DA_DECISAO, SugestoesFilaRepositorio
 from src.aprovacao.schemas import StatusSugestao, SugestaoNaFila
 
 _COLUNAS = (
@@ -47,7 +47,7 @@ _SUBSTITUIR = text("UPDATE copilot.sugestoes_fila SET status = 'substituida' WHE
 _DECIDIR = text(
     "UPDATE copilot.sugestoes_fila SET "
     + ", ".join(f"{c} = :{c}" for c in CAMPOS_DA_DECISAO)
-    + " WHERE id = :id AND status = 'pendente'"
+    + " WHERE id = :id"
 ).bindparams(bindparam("faixa", type_=JSONB))
 
 
@@ -66,7 +66,7 @@ def _sugestao(row: Row) -> SugestaoNaFila:
     return SugestaoNaFila.model_validate({**campos, **campos.pop("dados")})
 
 
-class PostgresSugestoesFila(SugestoesFila):
+class PostgresSugestoesFilaRepositorio(SugestoesFilaRepositorio):
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
 
@@ -88,7 +88,17 @@ class PostgresSugestoesFila(SugestoesFila):
             row = conn.execute(text(f"{_SELECT} WHERE id = :id"), {"id": id}).one_or_none()
         return _sugestao(row) if row is not None else None
 
-    def registrar_decisao(self, decidida: SugestaoNaFila) -> bool:
+    def decidir(
+        self, id: UUID, decisao: Callable[[SugestaoNaFila], SugestaoNaFila]
+    ) -> SugestaoNaFila | None:
+        """A reserva é o `FOR UPDATE` da linha, até o fim da transação: se o processo cai
+        no meio, a transação volta e a sugestão continua pendente."""
         with self._engine.begin() as conn:
-            linhas = conn.execute(_DECIDIR, _linha(decidida)).rowcount
-        return linhas == 1
+            row = conn.execute(text(f"{_SELECT} WHERE id = :id FOR UPDATE"), {"id": id}).one_or_none()
+            if row is None:
+                return None
+            atual = _sugestao(row)
+            decidida = decisao(atual)
+            gravada = atual.model_copy(update={c: getattr(decidida, c) for c in CAMPOS_DA_DECISAO})
+            conn.execute(_DECIDIR, _linha(gravada))
+        return gravada

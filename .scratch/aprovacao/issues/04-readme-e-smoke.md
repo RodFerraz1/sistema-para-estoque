@@ -28,3 +28,9 @@ Fecha o M7: smoke do fluxo completo (gerar, aprovar, pedido no ERP, em trânsito
 - **Faixa no seed**: na geração com o Jev real de hoje, uma das 31 (`TDMR-VERM-160270-08`, Aurora, R$ 1.384,20) viola o teto e subiu para a faixa 2, com justificativa obrigatória; as outras 30 ficaram na faixa 1. Registrei no README.
 - **Roadmap**: M7 concluído em 2026-09-30, com os desvios (UI sem framework, um pedido por sugestão, destaque pelos alertas e sinais e não pela confiança, pedido órfão).
 - **Testes**: `uv run pytest -q -m "not externo"` com 713 passando (eram 712); `-m externo` com 11 e `-m externo_llm` com 2 passando. Fora do escopo e sem mexer: screenshots, diagrama mermaid e `docs/demo.md` (M8).
+
+**2026-09-30 (revisão):** ajustes da revisão de código do M7:
+
+- **Smoke sem efeito nos dados do dev**: a fixture `fila_do_smoke` guarda os ids das pendentes antes do teste e os ids que o smoke gera; no teardown apaga os pedidos do ERP dessas linhas, as linhas geradas e devolve para `pendente` as que ele substituiu. Nada fica apontando para pedido inexistente, e nada que o smoke não criou é apagado. Conferido: o conteúdo de `copilot.sugestoes_fila` é o mesmo antes e depois do smoke. Os dois testes da geração conferem que o destaque separa (`0 < destacadas < geradas`); o `externo` não exige mais destaque no `TBC-BEGE-70140-01`, que só tem o sinal de atraso.
+- **Dados do dev**: uma rodada da suíte antes do ajuste do smoke substituiu as 29 pendentes do banco local; apaguei as 31 linhas que aquela rodada gerou (o pedido já tinha sido apagado pelo teardown antigo) e voltei as 29 para `pendente`.
+- **README**: ordem com os motivos de destaque e os números, faixa pela versão da política da sugestão, reserva na aprovação, endpoint da faixa, onboarding, limites conhecidos (sai o pedido órfão, entra a janela entre ERP e fila), port renomeado e `ItemNovoPedido` no `erp_adapter`. Roadmap e `module-interfaces.md` atualizados.

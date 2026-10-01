@@ -16,6 +16,7 @@ from uuid import UUID
 
 from src.catalog.schemas import FornecedorParaSKU
 from src.erp_adapter.port import ERPAdapter
+from src.erp_adapter.schemas import ItemNovoPedido
 from src.ficha_sku.service import FichaSKU
 from src.inventory.service import Inventory
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
@@ -31,7 +32,6 @@ from src.purchasing.faixa import faixa_aprovacao
 from src.purchasing.schemas import (
     Alerta,
     FaixaAprovacao,
-    ItemNovoPedido,
     LeadTimeOrigem,
     MemoriaCalculo,
     MotivoSemCompra,
@@ -390,10 +390,19 @@ class Purchasing:
             politica_versao=politica.versao,
         )
 
+    def politica_da(self, sugestao: SugestaoPedido) -> PoliticaCompra:
+        """Versão da política com que a sugestão foi calculada. As versões são
+        append-only; `LookupError` se ela sumiu do repositório."""
+        politica = self._politicas.versao(sugestao.politica_versao)
+        if politica is None:
+            raise LookupError(f"A versão {sugestao.politica_versao} da política de compra não existe.")
+        return politica
+
     def faixa_aprovacao(
         self, sugestao: SugestaoPedido, quantidade: int | None = None
     ) -> FaixaAprovacao:
-        """Faixa do pedido com a quantidade sugerida ou a editada, com a política ativa.
+        """Faixa do pedido com a quantidade sugerida ou a editada, com a versão da
+        política da sugestão, como o resto do cálculo.
 
         Com a quantidade editada, o valor é recalculado e a violação de teto
         também: vale o alerta da sugestão ou a cobertura na chegada com a
@@ -402,7 +411,7 @@ class Purchasing:
         """
         quantidade = sugestao.quantidade if quantidade is None else quantidade
         fornecedor, calculo = _validar_compra(sugestao, quantidade)
-        parametros = self._politicas.ativa().parametros
+        parametros = self.politica_da(sugestao).parametros
         cobertura_na_chegada = (calculo.estoque_na_chegada + quantidade) / calculo.giro_mensal
         viola_teto = cobertura_na_chegada > parametros.teto_meses or any(
             a.tipo == TipoAlerta.VIOLA_TETO for a in sugestao.alertas
@@ -420,12 +429,9 @@ class Purchasing:
     ) -> UUID:
         """Cria no ERP o pedido de compra `aprovado` de um item, com a data
         prevista de hoje mais o lead time da sugestão. Só a aprovação humana
-        chama. Lança `SugestaoSemCompra`, `QuantidadeInvalida` e `ValueError`
-        sem `aprovado_por`."""
+        chama, e ela valida `aprovado_por`. Lança `SugestaoSemCompra` e
+        `QuantidadeInvalida`."""
         fornecedor, calculo = _validar_compra(sugestao, quantidade)
-        aprovado_por = aprovado_por.strip()
-        if not aprovado_por:
-            raise ValueError("aprovado_por não pode ser vazio")
         return self._erp.criar_pedido_compra(
             fornecedor.fornecedor_id,
             [

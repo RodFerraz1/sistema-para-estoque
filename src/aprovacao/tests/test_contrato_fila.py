@@ -1,6 +1,6 @@
-"""Contrato do `SugestoesFila`.
+"""Contrato do `SugestoesFilaRepositorio`.
 
-Roda contra `InMemorySugestoesFila` e `PostgresSugestoesFila`. O Postgres requer
+Roda contra `InMemorySugestoesFilaRepositorioRepositorio` e `PostgresSugestoesFilaRepositorioRepositorio`. O Postgres requer
 `docker compose up` + `alembic upgrade head` e é pulado sem banco. Como
 `substituir_pendentes` e `listar` olham a tabela inteira, a fixture guarda as
 linhas existentes numa tabela temporária, esvazia a tabela e devolve as linhas no
@@ -8,17 +8,18 @@ teardown.
 """
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
+from threading import Event, Thread
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
 
 from src.ai.schemas import SinalCorpus, SugestaoComSinais
-from src.aprovacao.in_memory import InMemorySugestoesFila
-from src.aprovacao.postgres import PostgresSugestoesFila
-from src.aprovacao.repositorio import SugestoesFila
+from src.aprovacao.in_memory import InMemorySugestoesFilaRepositorio
+from src.aprovacao.postgres import PostgresSugestoesFilaRepositorio
+from src.aprovacao.repositorio import SugestoesFilaRepositorio
 from src.aprovacao.schemas import SugestaoNaFila
 from src.db.engine import get_engine
 from src.purchasing.schemas import (
@@ -52,13 +53,13 @@ _sem_banco = pytest.mark.skipif(
 
 
 @pytest.fixture
-def postgres() -> Iterator[PostgresSugestoesFila]:
+def postgres() -> Iterator[PostgresSugestoesFilaRepositorio]:
     with get_engine().connect() as conn:
         conn.execute(text("CREATE TEMP TABLE backup_fila AS SELECT * FROM copilot.sugestoes_fila"))
         conn.execute(text("DELETE FROM copilot.sugestoes_fila"))
         conn.commit()
         try:
-            yield PostgresSugestoesFila(get_engine())
+            yield PostgresSugestoesFilaRepositorio(get_engine())
         finally:
             conn.execute(text("DELETE FROM copilot.sugestoes_fila"))
             conn.execute(text("INSERT INTO copilot.sugestoes_fila SELECT * FROM backup_fila"))
@@ -67,9 +68,9 @@ def postgres() -> Iterator[PostgresSugestoesFila]:
 
 
 @pytest.fixture(params=["memoria", pytest.param("postgres", marks=_sem_banco)])
-def fila(request: pytest.FixtureRequest) -> SugestoesFila:
+def fila(request: pytest.FixtureRequest) -> SugestoesFilaRepositorio:
     if request.param == "memoria":
-        return InMemorySugestoesFila()
+        return InMemorySugestoesFilaRepositorio()
     return request.getfixturevalue("postgres")
 
 
@@ -148,7 +149,7 @@ def rejeitada(s: SugestaoNaFila, minutos: int = 10) -> SugestaoNaFila:
     )
 
 
-def test_gravar_e_carregar_devolve_a_sugestao_inteira(fila: SugestoesFila) -> None:
+def test_gravar_e_carregar_devolve_a_sugestao_inteira(fila: SugestoesFilaRepositorio) -> None:
     sinal = SinalCorpus(
         tipo="atraso_do_fornecedor",
         mensagem="Os documentos relatam atraso de entrega da Boa Vista Têxtil.",
@@ -162,7 +163,7 @@ def test_gravar_e_carregar_devolve_a_sugestao_inteira(fila: SugestoesFila) -> No
     assert fila.carregar(gravada.id) == gravada
 
 
-def test_sinais_nao_calculados_voltam_nulos(fila: SugestoesFila) -> None:
+def test_sinais_nao_calculados_voltam_nulos(fila: SugestoesFilaRepositorio) -> None:
     gravada = na_fila(sinais=None)
     fila.substituir_pendentes([gravada])
 
@@ -172,11 +173,11 @@ def test_sinais_nao_calculados_voltam_nulos(fila: SugestoesFila) -> None:
     assert carregada.sugestao.sinais is None
 
 
-def test_carregar_inexistente_devolve_nulo(fila: SugestoesFila) -> None:
+def test_carregar_inexistente_devolve_nulo(fila: SugestoesFilaRepositorio) -> None:
     assert fila.carregar(uuid4()) is None
 
 
-def test_substituir_marca_todas_as_pendentes_e_grava_as_novas(fila: SugestoesFila) -> None:
+def test_substituir_marca_todas_as_pendentes_e_grava_as_novas(fila: SugestoesFilaRepositorio) -> None:
     antigas = [na_fila("A"), na_fila("B")]
     fila.substituir_pendentes(antigas)
     novas = [na_fila("A"), na_fila("C")]
@@ -187,7 +188,7 @@ def test_substituir_marca_todas_as_pendentes_e_grava_as_novas(fila: SugestoesFil
     assert {s.id for s in fila.listar("substituida")} == {s.id for s in antigas}
 
 
-def test_substituir_sem_novas_esvazia_a_fila(fila: SugestoesFila) -> None:
+def test_substituir_sem_novas_esvazia_a_fila(fila: SugestoesFilaRepositorio) -> None:
     fila.substituir_pendentes([na_fila("A")])
 
     assert fila.substituir_pendentes([]) == 1
@@ -195,17 +196,17 @@ def test_substituir_sem_novas_esvazia_a_fila(fila: SugestoesFila) -> None:
     assert fila.listar("pendente") == []
 
 
-def test_substituir_nao_mexe_nas_decididas(fila: SugestoesFila) -> None:
+def test_substituir_nao_mexe_nas_decididas(fila: SugestoesFilaRepositorio) -> None:
     decidida = na_fila("A")
     fila.substituir_pendentes([decidida, na_fila("B")])
-    fila.registrar_decisao(aprovada(decidida))
+    fila.decidir(decidida.id, aprovada)
 
     assert fila.substituir_pendentes([na_fila("A")]) == 1
 
     assert fila.carregar(decidida.id) == aprovada(decidida)
 
 
-def test_pendentes_em_ordem_destaque_primeiro_e_depois_a_mais_urgente(fila: SugestoesFila) -> None:
+def test_pendentes_em_ordem_destaque_primeiro_e_depois_a_mais_urgente(fila: SugestoesFilaRepositorio) -> None:
     folgada = na_fila("A", disponivel=180)
     urgente = na_fila("B", disponivel=110)
     destacada_folgada = na_fila("C", disponivel=190, destaque=True)
@@ -220,7 +221,7 @@ def test_pendentes_em_ordem_destaque_primeiro_e_depois_a_mais_urgente(fila: Suge
     ]
 
 
-def test_empate_na_fila_desempata_pelo_sku_code(fila: SugestoesFila) -> None:
+def test_empate_na_fila_desempata_pelo_sku_code(fila: SugestoesFilaRepositorio) -> None:
     segundo = na_fila("TBC-BRAN-70140-01")
     primeiro = na_fila("TBC-BEGE-70140-01")
     fila.substituir_pendentes([segundo, primeiro])
@@ -228,50 +229,111 @@ def test_empate_na_fila_desempata_pelo_sku_code(fila: SugestoesFila) -> None:
     assert [s.sku_code for s in fila.listar("pendente")] == ["TBC-BEGE-70140-01", "TBC-BRAN-70140-01"]
 
 
-def test_registrar_decisao_de_aprovacao_grava_a_faixa_e_os_campos_da_decisao(fila: SugestoesFila) -> None:
+def test_decidir_aprovacao_grava_a_faixa_e_os_campos_da_decisao(fila: SugestoesFilaRepositorio) -> None:
     pendente = na_fila()
     fila.substituir_pendentes([pendente])
 
-    assert fila.registrar_decisao(aprovada(pendente)) is True
+    assert fila.decidir(pendente.id, aprovada) == aprovada(pendente)
 
     assert fila.carregar(pendente.id) == aprovada(pendente)
     assert fila.listar("pendente") == []
     assert fila.listar("aprovada") == [aprovada(pendente)]
 
 
-def test_registrar_decisao_de_rejeicao(fila: SugestoesFila) -> None:
+def test_decidir_rejeicao(fila: SugestoesFilaRepositorio) -> None:
     pendente = na_fila()
     fila.substituir_pendentes([pendente])
 
-    assert fila.registrar_decisao(rejeitada(pendente)) is True
+    fila.decidir(pendente.id, rejeitada)
 
     assert fila.listar("rejeitada") == [rejeitada(pendente)]
 
 
-def test_registrar_decisao_so_vale_para_pendente(fila: SugestoesFila) -> None:
+def test_decidir_passa_a_sugestao_como_esta_gravada(fila: SugestoesFilaRepositorio) -> None:
     pendente = na_fila()
     fila.substituir_pendentes([pendente])
-    fila.registrar_decisao(rejeitada(pendente))
+    fila.decidir(pendente.id, rejeitada)
+    vistas: list[SugestaoNaFila] = []
 
-    assert fila.registrar_decisao(aprovada(pendente)) is False
+    fila.decidir(pendente.id, lambda s: vistas.append(s) or s)
+
+    assert vistas == [rejeitada(pendente)]
+
+
+def test_decidir_so_grava_os_campos_da_decisao(fila: SugestoesFilaRepositorio) -> None:
+    pendente = na_fila()
+    fila.substituir_pendentes([pendente])
+
+    fila.decidir(pendente.id, lambda s: rejeitada(s).model_copy(update={"destaque": True}))
 
     assert fila.carregar(pendente.id) == rejeitada(pendente)
 
 
-def test_registrar_decisao_de_inexistente_devolve_falso(fila: SugestoesFila) -> None:
-    assert fila.registrar_decisao(aprovada(na_fila())) is False
+def test_decisao_que_falha_nao_grava_nada_e_solta_a_reserva(fila: SugestoesFilaRepositorio) -> None:
+    pendente = na_fila()
+    fila.substituir_pendentes([pendente])
+
+    def falha(s: SugestaoNaFila) -> SugestaoNaFila:
+        raise RuntimeError("ERP fora do ar")
+
+    with pytest.raises(RuntimeError, match="ERP fora do ar"):
+        fila.decidir(pendente.id, falha)
+
+    assert fila.carregar(pendente.id) == pendente
+    assert fila.decidir(pendente.id, aprovada) == aprovada(pendente)
 
 
-def test_decididas_da_decisao_mais_recente_para_a_mais_antiga(fila: SugestoesFila) -> None:
+def test_decidir_inexistente_devolve_nulo_sem_chamar_a_decisao(fila: SugestoesFilaRepositorio) -> None:
+    chamadas: list[SugestaoNaFila] = []
+
+    assert fila.decidir(uuid4(), lambda s: chamadas.append(s) or s) is None
+
+    assert chamadas == []
+
+
+def test_decisao_simultanea_espera_a_primeira_e_ve_a_sugestao_decidida(fila: SugestoesFilaRepositorio) -> None:
+    pendente = na_fila()
+    fila.substituir_pendentes([pendente])
+    primeira_dentro, soltar_primeira = Event(), Event()
+    vistas_pela_segunda: list[str] = []
+
+    def primeira(s: SugestaoNaFila) -> SugestaoNaFila:
+        primeira_dentro.set()
+        assert soltar_primeira.wait(5)
+        return aprovada(s)
+
+    def segunda(s: SugestaoNaFila) -> SugestaoNaFila:
+        vistas_pela_segunda.append(s.status)
+        return s
+
+    def em_paralelo(decisao: Callable[[SugestaoNaFila], SugestaoNaFila]) -> Thread:
+        thread = Thread(target=fila.decidir, args=(pendente.id, decisao))
+        thread.start()
+        return thread
+
+    a = em_paralelo(primeira)
+    assert primeira_dentro.wait(5)
+    b = em_paralelo(segunda)
+    b.join(0.3)
+    assert vistas_pela_segunda == []
+    soltar_primeira.set()
+    a.join(5)
+    b.join(5)
+
+    assert vistas_pela_segunda == ["aprovada"]
+    assert fila.carregar(pendente.id) == aprovada(pendente)
+
+
+def test_decididas_da_decisao_mais_recente_para_a_mais_antiga(fila: SugestoesFilaRepositorio) -> None:
     antiga, recente, meio = na_fila("A"), na_fila("B"), na_fila("C")
     fila.substituir_pendentes([antiga, recente, meio])
     for s, minutos in ((antiga, 10), (recente, 30), (meio, 20)):
-        fila.registrar_decisao(rejeitada(s, minutos))
+        fila.decidir(s.id, lambda atual, minutos=minutos: rejeitada(atual, minutos))
 
     assert [s.id for s in fila.listar("rejeitada")] == [recente.id, meio.id, antiga.id]
 
 
-def test_substituidas_da_criacao_mais_recente_para_a_mais_antiga(fila: SugestoesFila) -> None:
+def test_substituidas_da_criacao_mais_recente_para_a_mais_antiga(fila: SugestoesFilaRepositorio) -> None:
     antiga, recente = na_fila("A", minutos=0), na_fila("B", minutos=5)
     fila.substituir_pendentes([antiga, recente])
     fila.substituir_pendentes([])

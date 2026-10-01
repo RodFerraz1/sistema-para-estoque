@@ -104,6 +104,20 @@
         </div>
       </div>
 
+      <h2>Fila de aprovação</h2>
+      <fieldset class="card pergunta opcoes">
+        <legend><strong>O que faz uma sugestão de compra ir para o topo da fila, para você olhar primeiro?</strong></legend>
+        <p class="suave">As marcadas ganham destaque; as outras seguem pela urgência (quem acaba antes vem primeiro). O destaque só muda a ordem, nunca aprova nada. Marcar muitas faz quase tudo ficar em destaque.</p>
+        <label><input type="checkbox" name="motivos_de_destaque" value="ruptura_antes_da_chegada"> O estoque acaba antes da compra chegar</label>
+        <label><input type="checkbox" name="motivos_de_destaque" value="viola_teto"> A compra deixa o estoque acima do máximo (pergunta 1)</label>
+        <label><input type="checkbox" name="motivos_de_destaque" value="lead_time_observado_acima_do_contratado"> O fornecedor tem entregado depois do prazo que promete</label>
+        <label><input type="checkbox" name="motivos_de_destaque" value="abaixo_pedido_minimo"> O pedido fica abaixo do pedido mínimo do fornecedor</label>
+        <label><input type="checkbox" name="motivos_de_destaque" value="periodo_sazonal"> A compra chega numa data forte (pergunta 2)</label>
+        <label><input type="checkbox" name="motivos_de_destaque" value="atraso_do_fornecedor"> Os documentos falam de atraso desse fornecedor</label>
+        <label><input type="checkbox" name="motivos_de_destaque" value="demanda_sazonal"> Os documentos falam de venda forte desse produto em alguma época</label>
+        <label><input type="checkbox" name="motivos_de_destaque" value="encalhe"> Os documentos falam de encalhe desse produto numa compra anterior</label>
+      </fieldset>
+
       <div class="acoes">
         <button id="salvar" type="submit" class="primario">Salvar nova versão</button>
       </div>
