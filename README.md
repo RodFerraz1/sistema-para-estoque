@@ -2,7 +2,7 @@
 
 Assistente de decisão de compras para um atacadista de cama, mesa e banho. A ideia final é usar LLM com RAG e tool use sobre dados de um ERP simulado para sugerir o que comprar, quanto, de quem e quando - sempre com humano aprovando. Vocabulário, decisões e restrições de domínio vivem em [`CONTEXT.md`](CONTEXT.md).
 
-> **Sistema em construção.** Esta fatia cobre M0-M6 do [roadmap](.scratch/copilot-compras/roadmap.md): fundação técnica, ERP fake com seed, primeira leitura útil de SKU (giro, cobertura, sazonalidade, fornecedores), sugestão de pedido determinística com política de compra configurável, busca no corpus de documentos com o filtro do Jev (`/rag/busca`), o chat (`/chat`), em que o Jev entende a pergunta, o código roteia e busca os dados e um LLM só redige a resposta, com cada decisão registrada, e os sinais do corpus na sugestão (atraso do fornecedor, venda por época, encalhe) com as citações da resposta conferidas pelo Jev. Ainda não há aprovação de pedido (M7). Próximos passos: ver `.scratch/copilot-compras/roadmap.md`.
+> **Sistema em construção.** Esta fatia cobre M0-M7 do [roadmap](.scratch/copilot-compras/roadmap.md): fundação técnica, ERP fake com seed, primeira leitura útil de SKU (giro, cobertura, sazonalidade, fornecedores), sugestão de pedido determinística com política de compra configurável, busca no corpus de documentos com o filtro do Jev (`/rag/busca`), o chat (`/chat`), em que o Jev entende a pergunta, o código roteia e busca os dados e um LLM só redige a resposta, com cada decisão registrada, os sinais do corpus na sugestão (atraso do fornecedor, venda por época, encalhe) com as citações da resposta conferidas pelo Jev e a aprovação humana: a fila de sugestões de todos os SKUs, a faixa de aprovação de cada pedido, o pedido aprovado gravado no ERP fake e uma UI mínima (fila, chat e onboarding da política) em `/ui/`. Próximos passos (M8: redator, limiares, apresentação): ver `.scratch/copilot-compras/roadmap.md`.
 
 ## Pré-requisitos
 
@@ -26,7 +26,7 @@ uv run python -m scripts.seed
 uv run python -m scripts.ingerir_corpus
 ```
 
-A ingestão baixa o modelo de embedding para `.cache/fastembed` na primeira vez. A `/rag/busca` e o `/chat` também precisam da `JEV_KEY` (chave da API da TypeSafe) no `.env`: copie o `.env.example` e preencha. Sem a chave, só esses dois respondem 503. A `GROQ_API_KEY` é opcional: sem ela, o chat responde com os dados que reuniu, sem redação.
+A ingestão baixa o modelo de embedding para `.cache/fastembed` na primeira vez. Os endpoints que usam o Jev (`/rag/busca`, `/chat`, `/skus/{sku_code}/sugestao-compra/sinais` e `POST /sugestoes/gerar`) também precisam da `JEV_KEY` (chave da API da TypeSafe) no `.env`: copie o `.env.example` e preencha. Sem a chave, só esses respondem 503. A `GROQ_API_KEY` é opcional: sem ela, o chat responde com os dados que reuniu, sem redação.
 
 O app fica em `http://localhost:8000`. Confirme com:
 
@@ -35,6 +35,21 @@ curl http://localhost:8000/health
 # {"status":"ok","db":"ok"}
 ```
 
+A UI fica em `http://localhost:8000/ui/` (a raiz redireciona para lá). Fora do Docker, suba só o banco (`docker compose up -d db`) e rode o app com `uv run uvicorn src.main:app`.
+
+### Resetar o ambiente local
+
+O seed (`uv run python -m scripts.seed`) apaga e recria só o schema `erp`, inclusive os pedidos aprovados pela fila. As tabelas do Copilot (schema `copilot`) não são tocadas por ele e acumulam o que o uso e os smokes gravam: sugestões da fila (gerar de novo marca as pendentes como `substituida`), registros de decisão do chat e versões da política. Para voltar ao estado inicial:
+
+```bash
+uv run python -m scripts.seed
+docker compose exec db psql -U copilot -d copilot -c "
+  TRUNCATE copilot.sugestoes_fila, copilot.registros_decisao;
+  DELETE FROM copilot.politicas_compra WHERE versao > 1;"
+```
+
+A fila e os registros de decisão ficam vazios e a política volta à v1 (a da migration). Os trechos do corpus não precisam de reset: a ingestão é idempotente.
+
 ## Variáveis de ambiente
 
 Todas têm padrão, menos a `JEV_KEY` e a `GROQ_API_KEY`, e podem vir do `.env` na raiz (veja o `.env.example`). No `docker compose`, o app recebe o `DATABASE_URL` do próprio compose e só a `JEV_KEY` e a `GROQ_API_KEY` do `.env`; as outras ficam no padrão dentro do container.
@@ -42,7 +57,7 @@ Todas têm padrão, menos a `JEV_KEY` e a `GROQ_API_KEY`, e podem vir do `.env` 
 | Variável | Padrão | Para quê |
 | -------- | ------ | -------- |
 | `DATABASE_URL` | `postgresql+psycopg://copilot:copilot@localhost:5432/copilot` | Conexão com o Postgres. |
-| `JEV_KEY` | vazio | Chave da API da TypeSafe. Sem ela, `/rag/busca` e `/chat` respondem 503 e os testes `externo` são pulados. |
+| `JEV_KEY` | vazio | Chave da API da TypeSafe. Sem ela, os endpoints que usam o Jev respondem 503 e os testes `externo` são pulados. |
 | `JEV_MODEL` | `jev-1.13.0` | Versão fixa do Jev. Os limiares da busca e do chat foram calibrados nela. |
 | `GROQ_API_KEY` | vazio | Chave da Groq, o LLM que redige as respostas do chat. Sem ela, o chat usa o redator sem LLM e os testes `externo_llm` são pulados. |
 | `GROQ_MODEL` | `openai/gpt-oss-120b` | Modelo da Groq usado como redator. |
@@ -70,7 +85,8 @@ uv run pytest -m "not smoke and not externo and not externo_llm"
 uv run pytest -m "not externo and not externo_llm"
 
 # Só smoke end-to-end (requer docker compose up; aplica migrations, seed e ingestão
-# do corpus sozinho, o que apaga e recria os dados do schema erp no banco local)
+# do corpus sozinho, o que apaga e recria os dados do schema erp no banco local,
+# e gera a fila de aprovação, o que substitui as pendentes que estavam lá)
 uv run pytest tests/smoke/
 
 # Todos os testes marcados como smoke, incluindo tests/test_seed_smoke.py
@@ -94,10 +110,16 @@ uv run pytest
 | `GET` | `/skus/{sku_code}/sazonalidade` | Multiplicadores mês-a-mês (1 = neutro). |
 | `GET` | `/skus/{sku_code}/fornecedores` | Preço, MOQ e lead time por fornecedor. |
 | `GET` | `/politica-compra` | Política de compra ativa (`versao`, `criada_em`, `parametros`). |
-| `PUT` | `/politica-compra` | Recebe os parâmetros completos, valida e grava uma versão nova (201, ou 422 se inválida). |
+| `PUT` | `/politica-compra` | Recebe os parâmetros completos, inclusive os limites das faixas de aprovação, valida e grava uma versão nova (201, ou 422 se inválida). |
 | `GET` | `/rag/busca?q=...&k=30` | Trechos do corpus mais parecidos com a pergunta, classificados pelo filtro do Jev, e os conflitos entre eles. |
 | `POST` | `/chat` | Responde em texto a pergunta do comprador chefe, com o entendimento do Jev, a faixa de confiança, a ação, os dados que foram ao redator (sugestões com os sinais do corpus) e a verificação das citações. |
 | `GET` | `/chat/registros?limite=20` | Registros de decisão do chat, do mais recente para o mais antigo (`limite` de 1 a 100). |
+| `POST` | `/sugestoes/gerar` | Gera a sugestão de todos os SKUs ativos e põe na fila as que têm compra, com os sinais do corpus e a faixa de aprovação, no lugar das pendentes anteriores. Leva uns 40 s com o seed; 503 sem `JEV_KEY`. |
+| `GET` | `/sugestoes?status=pendente` | Fila de aprovação. `status`: `pendente` (padrão, na ordem da fila), `aprovada`, `rejeitada` ou `substituida`. |
+| `GET` | `/sugestoes/{id}` | Uma sugestão da fila (404 se não existe). |
+| `POST` | `/sugestoes/{id}/aprovar` | Aprova (`aprovado_por`, `quantidade` e `justificativa` opcionais) e cria o pedido de compra `aprovado` no ERP. 409 se já foi decidida, 422 abaixo do MOQ ou sem a justificativa que a faixa exige. |
+| `POST` | `/sugestoes/{id}/rejeitar` | Rejeita (`rejeitado_por`, `motivo`). 409 se já foi decidida. |
+| `GET` | `/ui/` | UI mínima: fila de aprovação, chat e onboarding da política. `/` redireciona para cá. |
 
 `sku_code` é o código legível do SKU (ex.: `CB-AZUL-CASAL-05`), não o UUID.
 
@@ -205,7 +227,7 @@ A sugestão é calculada na hora e não é gravada. Quando não há o que compra
 
 O mecanismo da sugestão (contar o que está em trânsito, descontar o consumo durante o lead time, respeitar o MOQ, nunca esconder violação de teto) é fixo no código. Os parâmetros de estratégia (teto, pisos, ciclo de compra, qual lead time usar, critério de fornecedor, sazonalidade, regra de SKU novo) são do comprador chefe e ficam na política de compra, versionada em `copilot.politicas_compra`. Cada `PUT /politica-compra` cria uma versão nova, e a ativa é a de maior `versao`. A v1 nasce na migration com os valores da política v3 do corpus.
 
-A justificativa está em [`docs/adr/0003-politica-de-compra-configuravel.md`](docs/adr/0003-politica-de-compra-configuravel.md). Os parâmetros sem base na política v3 são chutes até o comprador responder [`.scratch/sugestao-compra/perguntas-comprador.md`](.scratch/sugestao-compra/perguntas-comprador.md). As respostas viram um `PUT /politica-compra`, sem mudança de código.
+A justificativa está em [`docs/adr/0003-politica-de-compra-configuravel.md`](docs/adr/0003-politica-de-compra-configuravel.md). Os parâmetros sem base na política v3 são chutes até o comprador responder [`.scratch/sugestao-compra/perguntas-comprador.md`](.scratch/sugestao-compra/perguntas-comprador.md). As respostas viram um `PUT /politica-compra`, sem mudança de código; a página de política da UI (`/ui/politica.html`) faz essas perguntas na linguagem do comprador, cada uma preenchida com o valor ativo, e grava a versão nova.
 
 ### Busca no corpus: `GET /rag/busca`
 
@@ -539,6 +561,88 @@ O resultado do M5 está no comentário de [`.scratch/chat/issues/05-readme-e-smo
 - **Poucos SKUs identificados pelo nome.** Quando o Jev escolhe o produto com confiança abaixo de 0,60, ou não acha o produto (a toalha de rosto 45x70 não existe no catálogo), a pergunta de situação pede o código do SKU e a de sugestão de compra responde só com o corpus e a política, sem quantidade. Na rodada, 3 das 5 perguntas de situação pediram o código e 4 das 5 de sugestão ficaram sem SKU.
 - **Hífen não separável.** O redator escreve os códigos de SKU com U+2011 no lugar do hífen, então procurar o código do SKU no texto da resposta falha.
 
+### Fila de aprovação: `/sugestoes`
+
+É o fim do fluxo: o Copilot sugere, o comprador chefe aprova e o pedido aparece no ERP fake. O módulo `aprovacao` guarda a fila em `copilot.sugestoes_fila` (migration [`0007_sugestoes_fila`](alembic/versions/0007_sugestoes_fila.py)).
+
+1. **Gerar** (`POST /sugestoes/gerar`, ação explícita do comprador, não roda a cada listagem): calcula a sugestão de cada SKU ativo, fica com as que têm compra, calcula os sinais do corpus uma vez por par (fornecedor, produto) e a faixa de aprovação de cada uma. As novas entram no lugar de todas as pendentes anteriores, que viram `substituida`; as decididas não mudam. Com o seed, são 80 SKUs, umas 30 sugestões e uns 40 s, quase todos nos sinais (uns 800 requests do Jev, menos de US$ 0,02). Com o Jev fora do ar, as sugestões entram sem sinais (`sinais` nulo) e a resposta traz `sinais_indisponiveis: true`; sem `JEV_KEY`, a resposta é 503, como nos outros endpoints do Jev.
+2. **Ordem** (`GET /sugestoes`): primeiro as em destaque, depois a mais urgente, que é a de menor cobertura na chegada sem contar a compra (`cobertura_na_chegada_sem_compra_meses`, negativa quando o estoque acaba antes da compra chegar). Destaca a sugestão com alerta de ruptura antes da chegada, de violação do teto ou de lead time observado acima do contratado (`ALERTAS_DE_DESTAQUE` em `src/aprovacao/service.py`), ou com algum sinal do corpus. O destaque e os sinais só ordenam, nunca aprovam.
+3. **Aprovar** (`POST /sugestoes/{id}/aprovar`): com a quantidade sugerida ou outra (`quantidade`, maior que zero e no mínimo o MOQ). A faixa é recalculada com essa quantidade e a política em vigor, e da faixa 2 em diante a `justificativa` é obrigatória (422 sem ela). O `purchasing.submeter_pedido` cria em `erp.pedidos_compra` um pedido `aprovado` de um item, com entrega prevista para hoje mais o lead time da sugestão e a observação "Criado pelo Copilot a partir da sugestão <id>, aprovado por <nome>.". A partir daí o pedido conta como em trânsito, e a próxima sugestão do SKU já o desconta. É o único caminho da API que escreve no ERP.
+4. **Rejeitar** (`POST /sugestoes/{id}/rejeitar`): exige o nome e o motivo, que ficam gravados.
+
+Decidir uma sugestão que não está mais pendente dá 409. O nome de quem decide é informado, não verificado: não há autenticação.
+
+**Faixa de aprovação** (`src/purchasing/faixa.py`, de [`politicas/aprovacao-compras.md`](corpus/politicas/aprovacao-compras.md)): a faixa base sai do valor dos itens, com os limites `faixa_1_ate_reais`, `faixa_2_ate_reais` e `faixa_3_ate_reais` da política de compra (15.000, 60.000 e 150.000 na v1, inclusivos; acima é a faixa 4; migration [`0006_faixas_aprovacao`](alembic/versions/0006_faixas_aprovacao.py)). As exceções do documento são mecanismo: sem violação do teto, é reposição regular e desce uma faixa; com violação, sobe uma; fornecedor sem pedido anterior no ERP vai no mínimo para a faixa 3. `aprovadores` diz quem precisa aprovar, e `ajustes` traz uma frase por exceção que mudou a faixa. O documento avalia o valor com impostos e frete, que o ERP fake não tem.
+
+Exemplo real de um item de `GET /sugestoes` (Jev real, banco do seed, 14º da fila), com `calculo`, os campos de decisão (todos nulos) e o `fornecedor` cortados (o `fornecedor` é o mesmo de `/sugestao-compra`):
+
+```json
+{
+  "id": "e2a045c6-5eba-4ce6-8363-99b1fa2a46ff",
+  "criado_em": "2026-10-01T00:25:09.946221Z",
+  "status": "pendente",
+  "destaque": true,
+  "sku_code": "TBC-BEGE-70140-01",
+  "produto_nome": "Toalha Banho Conforto",
+  "cobertura_na_chegada_sem_compra_meses": 0.32105263157894726,
+  "sugestao": {
+    "sugestao": {
+      "sku_code": "TBC-BEGE-70140-01",
+      "quantidade": 213,
+      "motivo": null,
+      "valor_estimado_centavos": 363378,
+      "alertas": [
+        {
+          "tipo": "abaixo_pedido_minimo",
+          "mensagem": "O pedido de R$ 3.633,78 fica abaixo do pedido mínimo de R$ 12.000,00 do fornecedor Katrina Têxtil. Junte com outros SKUs dele."
+        },
+        {
+          "tipo": "periodo_sazonal",
+          "mensagem": "A compra chega em época forte (novembro e dezembro). Pela R2, dá pra comprar até 2,0 meses de estoque a mais, com registro em ata."
+        }
+      ],
+      "politica_versao": 395
+    },
+    "sinais": [
+      {
+        "tipo": "atraso_do_fornecedor",
+        "mensagem": "Os documentos relatam atraso de entrega da Katrina Têxtil.",
+        "trechos": [
+          "fornecedores/katrina-textil.md#lead-time",
+          "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento"
+        ],
+        "probabilidade": 0.96
+      }
+    ]
+  },
+  "faixa": {
+    "faixa": 1,
+    "aprovadores": "comprador chefe",
+    "exige_justificativa": false,
+    "ajustes": []
+  }
+}
+```
+
+Aqui o destaque vem só do sinal de atraso, e a faixa base (R$ 3.633,78) já é a 1, então a reposição regular não tem o que descer e `ajustes` fica vazio. Na mesma geração, a única sugestão fora da faixa 1 foi uma toalha de mesa da Aurora que viola o teto: subiu da faixa 1 para a 2 e exige justificativa.
+
+### UI: `/ui/`
+
+HTML, CSS e JS puros em `src/ui/`, sem build e sem framework, servidos pelo próprio FastAPI e falando só com a API. Três páginas com um menu comum:
+
+- **Fila** (`/ui/index.html`): o botão "Gerar sugestões" (com o aviso de que leva perto de 1 min) e um card por pendente, na ordem da fila, com o produto, o fornecedor, a quantidade e o MOQ, o valor, a cobertura na chegada, a faixa com os aprovadores e os ajustes, os alertas, os sinais com os ids dos trechos e a memória de cálculo recolhida. Aprovar abre no card um formulário com o nome, a quantidade (preenchida com a sugerida) e a justificativa; rejeitar pede o nome e o motivo. Depois da aprovação, o card mostra o id do pedido criado no ERP. Um filtro mostra as aprovadas e as rejeitadas.
+- **Chat** (`/ui/chat.html`): a resposta em texto, com as citações não confirmadas destacadas, e o que o Copilot entendeu (intenção, confiança, faixa, ação, SKUs), as sugestões com os alertas e os sinais, as citações com o veredito e os trechos usados.
+- **Política** (`/ui/politica.html`): o onboarding da [ADR-0003](docs/adr/0003-politica-de-compra-configuravel.md). As perguntas 1 a 9 de [`perguntas-comprador.md`](.scratch/sugestao-compra/perguntas-comprador.md) na linguagem do comprador e uma para os limites das faixas de aprovação, cada uma preenchida com o valor ativo. Salvar grava uma versão nova da política (ou mostra o erro de validação com o número da pergunta); a fila só muda quando é gerada de novo. As perguntas 10 a 14 aparecem só para leitura, como "como o sistema entende o ERP".
+
+O nome de quem decide fica no `localStorage` do navegador só por conveniência. `tests/test_ui.py` confere que as páginas e os assets respondem e que todo endpoint chamado pelos `.js` existe na OpenAPI do app.
+
+### Limites conhecidos da aprovação
+
+- **Destaque quase universal no seed.** O lead time observado acima do contratado e os sinais do corpus destacam quase tudo: na geração do exemplo acima, 30 das 31 sugestões. A ordem por urgência ainda ajuda; se o destaque perder o sentido para o comprador, o próximo passo é tirar o lead time da lista ou exigir dois motivos.
+- **Quase tudo na faixa 1.** As sugestões do seed ficam bem abaixo de R$ 15.000 e só um fornecedor sem pedido anterior, uma violação do teto ou uma quantidade editada para cima (triplicar a sugerida, por exemplo) pedem justificativa.
+- **Pedido órfão na aprovação concorrente.** O ERP e a fila são sistemas separados (no MVP, schemas do mesmo Postgres, gravados em transações distintas). Se duas aprovações da mesma sugestão correrem juntas, a segunda recebe 409, mas o pedido dela já pode ter sido criado no ERP (com o id da sugestão na observação). Aceito para o MVP, que tem um comprador e nenhuma autenticação.
+- **Um pedido por sugestão.** Cada aprovação vira um pedido de um item; juntar os SKUs do mesmo fornecedor num pedido, para chegar ao pedido mínimo, é pós-MVP. A faixa também não coleta as aprovações dos outros papéis: só diz quem precisa aprovar.
+
 A documentação interativa (OpenAPI) fica em `http://localhost:8000/docs`.
 
 ## Estrutura de módulos
@@ -553,9 +657,11 @@ src/
 ├── sales/            giro médio, histórico de vendas, sazonalidade
 ├── ficha_sku/        compõe a ficha completa de um SKU (usada por /analise)
 ├── politica_compra/  política de compra versionada (schema copilot)
-├── purchasing/       sugestão de pedido (quanto, de quem, memória de cálculo, alertas)
+├── purchasing/       sugestão de pedido (quanto, de quem, memória de cálculo, alertas), faixa de aprovação e submissão do pedido aprovado ao ERP
 ├── ai/               corpus, ingestão no pgvector, busca com o filtro do Jev, sinais do corpus, verificação de citações, chat (entendimento, identificação dos SKUs, roteamento, contexto, redator, registro de decisão)
+├── aprovacao/        fila de aprovação (geração, ordem, decisão humana) em copilot.sugestoes_fila
 ├── api/              camada HTTP (FastAPI routers, DTOs de resposta)
+├── ui/               UI estática servida em /ui (HTML, CSS e JS puros, sem build)
 ├── db/               config, engine, health-check
 └── main.py           bootstrap FastAPI
 
@@ -569,51 +675,61 @@ tests/                fakes.py + testes cross-módulo + tests/smoke/ end-to-end
 Grafo de dependência (setas: "depende de"):
 
 ```
-                      +-----+
-                      | api |
-                      +-----+
-                         |
-          +--------------+--------------------------------+
-          |              v                                v
-          |       +------------+                        +----+     +----------------+
-          |       | purchasing |<-----------------------| ai |---->| Jev (TypeSafe) |
-          |       +------------+                        +----+     +----------------+
-          |              |                                | |      +----------------+
-          |              |                                | +----->| Groq (redator) |
-          |              |                                |        +----------------+
-          +--------------+-----------------+              |
-          v                                v              |
-    +-----------+                  +-----------------+    |
-    | ficha_sku |                  | politica_compra |    |
-    +-----------+                  +-----------------+    |
-          |                                |              |
-     +----+--------+-------------+         |              |
-     v             v             v         |              |
-+---------+  +-----------+  +-------+      |              |
-| catalog |  | inventory |->| sales |      |              |
-+---------+  +-----------+  +-------+      |              |
-     |             |             |         |              |
-     +-------------+-------------+         |              |
-                   v                       |              |
-            +-------------+                |              |
-            | erp_adapter |                |              |
-            +-------------+                |              |
-                   |                       |              |
-                   v                       v              v
-        +-----------------------------------------------------+
-        |           Postgres (schemas erp e copilot)          |
-        +-----------------------------------------------------+
+                        +-----+
+                        | api |
+                        +-----+
+                           |
+        +------------------+------------------------------------+
+        |                  v                                    |
+        |            +-----------+                              |
+        |            | aprovacao |------------------------------+
+        |            +-----------+                              |
+        |                  |                                    v
+        |                  v                                  +----+     +----------------+
+        |           +------------+                            | ai |---->| Jev (TypeSafe) |
+        |           | purchasing |<---------------------------|    |     +----------------+
+        |           +------------+                            |    |---->| Groq (redator) |
+        |             |       |                               +----+     +----------------+
+        |             |       |                                 |
+        |             |       +-------+------------+            |
+        |             |               |            v            |
+        |             |               |   +-----------------+   |
+        |             |               |   | politica_compra |   |
+        +-------------+               |   +-----------------+   |
+        v                             |            |            |
+  +-----------+                       |            |            |
+  | ficha_sku |                       |            |            |
+  +-----------+                       |            |            |
+        |                             |            |            |
+     +--+----------+------------+     |            |            |
+     v             v            v     |            |            |
++---------+  +-----------+  +-------+ |            |            |
+| catalog |  | inventory |->| sales | |            |            |
++---------+  +-----------+  +-------+ |            |            |
+     |             |            |     |            |            |
+     +-------------+------------+     |            |            |
+                   v                  |            |            |
+            +-------------+           |            |            |
+            | erp_adapter |<----------+            |            |
+            +-------------+                        |            |
+                   |                               |            |
+                   |                               |            |
+                   v                               v            v
+        +-------------------------------------------------------------+
+        |               Postgres (schemas erp e copilot)              |
+        +-------------------------------------------------------------+
 ```
 
-O grafo mostra só as arestas principais. As chamadas diretas de `api` e `purchasing` para os módulos de baixo estão na lista:
+O grafo mostra só as arestas principais. As chamadas diretas de `api`, `aprovacao`, `ai` e `purchasing` para os módulos de baixo estão na lista:
 
-- `api` depende de `purchasing` (para `/sugestao-compra`), `ficha_sku` (para `/analise`), `politica_compra` (para `/politica-compra` e o piso padrão de `/abaixo-do-piso`) e `ai` (para `/rag/busca`, `/sugestao-compra/sinais` e `/chat`), e chama `catalog`, `inventory`, `sales` direto nos endpoints de leitura simples.
-- `purchasing` depende de `ficha_sku`, `inventory`, `sales` e `politica_compra`, e importa o DTO `FornecedorParaSKU` de `catalog.schemas`. Nunca fala com o `erp_adapter` direto.
+- `api` depende de `aprovacao` (para `/sugestoes`), `purchasing` (para `/sugestao-compra`), `ficha_sku` (para `/analise`), `politica_compra` (para `/politica-compra` e o piso padrão de `/abaixo-do-piso`) e `ai` (para `/rag/busca`, `/sugestao-compra/sinais`, `/chat` e os sinais da geração da fila), e chama `catalog`, `inventory`, `sales` direto nos endpoints de leitura simples. A UI (`src/ui/`) não é módulo de domínio: são arquivos estáticos que o `main.py` serve e que só falam com a API por HTTP.
+- `aprovacao` depende de `catalog` (SKUs ativos), `purchasing` (`sugerir_pedido`, `faixa_aprovacao` e `submeter_pedido`) e `ai` (`SinaisCorpus`, recebido na chamada de `gerar_fila`), e fala direto com `copilot.sugestoes_fila`, atrás do port `SugestoesFila`. Nada depende dele além da `api`.
+- `purchasing` depende de `ficha_sku`, `inventory`, `sales` e `politica_compra`, e importa o DTO `FornecedorParaSKU` de `catalog.schemas`. Do `erp_adapter`, só usa os pedidos de compra, que não têm módulo de leitura próprio: `fornecedor_tem_pedido` (para a faixa) e `criar_pedido_compra`, a única escrita do Copilot no ERP, chamada só por `submeter_pedido`, que por sua vez só a aprovação humana chama.
 - `politica_compra` fala direto com o schema `copilot` do Postgres. Não passa pelo `erp_adapter`, porque a política é dado do Copilot, não do ERP.
 - `ai` fala direto com `copilot.trechos_corpus` (pgvector), atrás do port `TrechosRepositorio`, com `copilot.registros_decisao`, atrás do port `RegistrosDecisao`, com a API da TypeSafe, atrás do port `DecisionModel`, e com a Groq, atrás do port `Redator`. No chat, só lê dos outros módulos: `catalog` (lista de SKUs), `ficha_sku` (ficha completa), `purchasing` (só `sugerir_pedido`) e `politica_compra` (política ativa). Nada no `ai` escreve no ERP.
 - `ficha_sku` depende de `catalog`, `inventory`, `sales` e não fala com o `erp_adapter` direto.
 - `inventory` depende de `sales` (cobertura precisa de giro).
-- `catalog`, `inventory`, `sales` dependem de `erp_adapter`.
+- `catalog`, `inventory`, `sales` e `purchasing` dependem de `erp_adapter`.
 - `erp_adapter` importa só os DTOs de domínio (`catalog.schemas`, `inventory.schemas`, `sales.schemas`) para devolvê-los prontos. Os serviços desses módulos ele não chama.
 - Nenhum outro caminho é permitido: `catalog` não chama `inventory`, `sales` não chama `catalog`, etc.
 

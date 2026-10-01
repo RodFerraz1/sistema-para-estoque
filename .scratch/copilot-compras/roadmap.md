@@ -98,6 +98,8 @@ Spec: `.scratch/rag-jev/spec.md`. Decisões base: ADR-0002 (Jev decide) e ADR-00
 
 **Saída visível**: workflow end-to-end. Copilot sugere, você aprova, aparece no ERP.
 
+**Concluído em 2026-09-30.** A UI é HTML, CSS e JS puros servidos pelo FastAPI em `/ui/`, e cada sugestão aprovada vira um pedido de um item, então a faixa é calculada sobre esse pedido. O destaque vem dos alertas de risco do `purchasing` (ruptura, teto, lead time observado) e dos sinais do corpus, não de uma confiança do Jev, e no seed marca 30 de 31 sugestões. Duas aprovações simultâneas da mesma sugestão podem deixar um pedido órfão no ERP (`.scratch/aprovacao/spec.md` e `.scratch/aprovacao/issues/04-readme-e-smoke.md`).
+
 ## M8 - Refinamentos e apresentabilidade
 
 - Trocar o redator Groq por Claude/GPT no deploy final (chave em env var).
