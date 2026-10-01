@@ -58,5 +58,113 @@
     "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#verdela-home",
     "conflitam": false,
     "motivo": "Reajuste anual em março acima da inflação por câmbio; a revisão registra +9,4% em março por câmbio."
+  },
+  {
+    "trecho_a": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+    "trecho_b": "reunioes/2024-11-natal-king-size.md#contexto",
+    "conflitam": false,
+    "motivo": "A nota trata do mínimo semestral, da cláusula 3 e do teto de reajuste; o contexto da reunião trata do estoque do king em novembro e do pico de dezembro. Fatos diferentes."
+  },
+  {
+    "trecho_a": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+    "trecho_b": "reunioes/2024-11-natal-king-size.md#o-que-ficou-pendente",
+    "conflitam": false,
+    "motivo": "A pendência só registra que é preciso discutir com a Katrina o alongamento do lead time, sem período nem número; não afirma nada incompatível com a cláusula cumprida em setembro-outubro."
+  },
+  {
+    "trecho_a": "contratos/contrato-katrina-2025.md#clausulas-comerciais/1-precos",
+    "trecho_b": "fornecedores/katrina-textil.md#riscos-conhecidos",
+    "conflitam": false,
+    "motivo": "O contrato fixa os preços do semestre e o reajuste de agosto; a ficha diz que os reajustes vieram acima do IPCA. Os dois podem ser verdade ao mesmo tempo."
+  },
+  {
+    "trecho_a": "fornecedores/katrina-textil.md#riscos-conhecidos",
+    "trecho_b": "contratos/contrato-katrina-2025.md#clausulas-comerciais/4-reajuste",
+    "conflitam": false,
+    "motivo": "A fórmula do reajuste mistura IPCA e algodão com teto de 8%, o que permite reajuste acima do IPCA, como a ficha relata. Se complementam."
+  },
+  {
+    "trecho_a": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
+    "trecho_b": "fornecedores/verdela-home.md#condicoes-comerciais-padrao",
+    "conflitam": false,
+    "motivo": "A retrospectiva conta a compra e o encalhe do Veraneio; a ficha da Verdela traz prazo de pagamento, pedido mínimo, descontos de campanha, frete e reajuste. Fatos diferentes."
+  },
+  {
+    "trecho_a": "reunioes/2024-07-erro-jogo-veraneio.md#sequencia-dos-fatos",
+    "trecho_b": "politicas/estoque-e-giro.md#regras/r3-colecao-nova-sem-historico",
+    "conflitam": false,
+    "motivo": "A compra de 4 meses do Veraneio é de 2023 e a regra de coleção nova (teto de 1 mês) é a política escrita depois do erro. Uma compra anterior à regra não é fato incompatível com ela."
+  },
+  {
+    "trecho_a": "fornecedores/malha-fina-textil.md#uso-estrategico",
+    "trecho_b": "mercado/tendencia-cama-mesa-banho-2026.md#recomendacao-analitica",
+    "conflitam": false,
+    "motivo": "A ficha diz para que a Malha Fina serve; o relatório de mercado recomenda reforçar premium e rever as linhas de malha. Recomendação e uso estratégico não são fatos incompatíveis."
+  },
+  {
+    "trecho_a": "mercado/tendencia-cama-mesa-banho-2026.md#recomendacao-analitica",
+    "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#malha-fina",
+    "conflitam": false,
+    "motivo": "O relatório recomenda o mix de 2026; a revisão registra o status, a qualidade e os pedidos da Malha Fina no trimestre. Fatos diferentes."
+  },
+  {
+    "trecho_a": "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento",
+    "trecho_b": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+    "conflitam": true,
+    "motivo": "A revisão diz que o prazo real acima do contratado da Katrina já é o padrão, não a exceção; a nota interna diz que a antecedência de 45 dias é rigorosamente cumprida em setembro-outubro."
+  },
+  {
+    "trecho_a": "contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato",
+    "trecho_b": "fornecedores/katrina-textil.md#lead-time",
+    "conflitam": true,
+    "motivo": "A nota interna diz que os 45 dias são rigorosamente cumpridos em setembro-outubro; a ficha diz que o observado fica em 55-65 dias contra os 45 prometidos."
+  },
+  {
+    "trecho_a": "fornecedores/katrina-textil.md#lead-time",
+    "trecho_b": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+    "conflitam": false,
+    "motivo": "Os dois dizem que o lead time real da Katrina passa dos 45 prometidos: 55-65 dias na média e 68 dias em outubro-novembro. Concordam."
+  },
+  {
+    "trecho_a": "fornecedores/katrina-textil.md#sazonalidade-e-capacidade",
+    "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+    "conflitam": false,
+    "motivo": "A ficha descreve a queda de capacidade em janeiro e a fila de setembro-outubro; a revisão registra o lead time de 62 dias e a justificativa da Katrina pelas férias de janeiro. Se complementam."
+  },
+  {
+    "trecho_a": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+    "trecho_b": "reunioes/2025-q1-revisao-fornecedores.md#katrina-textil",
+    "conflitam": false,
+    "motivo": "Os dois dizem que o lead time real da Katrina passa dos 45 dias (68 em outubro-novembro de 2024, 62 em Q1/2025); o faturamento abaixo do ritmo é do segundo semestre de 2024 e o dentro do ritmo é de Q1/2025."
+  },
+  {
+    "trecho_a": "reunioes/2024-11-natal-king-size.md#riscos-aceitos",
+    "trecho_b": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+    "conflitam": false,
+    "motivo": "A ata aceita violar a política vigente em novembro de 2024; a R2 é a exceção sazonal que nasceu desse caso. Regra e exceção registrada não são fatos incompatíveis."
+  },
+  {
+    "trecho_a": "reunioes/2024-11-natal-king-size.md#o-que-ficou-pendente",
+    "trecho_b": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+    "conflitam": false,
+    "motivo": "A pendência diz que a política precisa admitir exceções sazonais formais; a R2 diz que a exceção existe informalmente e ainda não foi ratificada. Concordam."
+  },
+  {
+    "trecho_a": "reunioes/2024-11-natal-king-size.md#decisao",
+    "trecho_b": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+    "conflitam": false,
+    "motivo": "A decisão é uma exceção à política de 3 meses; a R2 é a regra que nasceu desse caso. Uma decisão de exceção e a regra posterior não são fatos incompatíveis."
+  },
+  {
+    "trecho_a": "reunioes/2024-11-natal-king-size.md#justificativa-da-excecao-a-politica",
+    "trecho_b": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+    "conflitam": false,
+    "motivo": "A ata justifica a exceção do king size; a R2 descreve a exceção sazonal que nasceu desse caso. Fatos diferentes."
+  },
+  {
+    "trecho_a": "reunioes/2024-11-natal-king-size.md#resultado-registrado-em-janeiro-2025",
+    "trecho_b": "politicas/estoque-e-giro.md#regras/r2-excecao-sazonal",
+    "conflitam": false,
+    "motivo": "O resultado registra a venda e o estoque depois da exceção; a R2 descreve a regra de exceção sazonal. Fatos diferentes."
   }
 ]

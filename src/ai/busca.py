@@ -23,7 +23,10 @@ MAX_TRECHOS_CONFLITO = 6
 
 @dataclass(frozen=True)
 class Limiares:
-    """Calibrados no spike com o jev-1.13.0 e as perguntas em PT (`.scratch/rag-jev/spike-resultado.md`)."""
+    """Calibrados no spike com o jev-1.13.0 e as perguntas em PT (`.scratch/rag-jev/spike-resultado.md`),
+    menos o `conflito`, que saiu da regra de calibração do M8 (`mais_acertos`, 24/28) com a
+    pergunta de critérios estruturados, medida por `scripts/avaliar_conflitos.py` em
+    `evals/pares_conflito.json` (`.scratch/refinamentos/issues/05-conflito-entre-trechos.md`)."""
 
     injecao: float
     contradiz_premissa: float
@@ -33,7 +36,7 @@ class Limiares:
 
 
 LIMIARES = Limiares(
-    injecao=0.50, contradiz_premissa=0.85, relevante=0.55, evidencia=0.15, conflito=0.10
+    injecao=0.50, contradiz_premissa=0.85, relevante=0.55, evidencia=0.15, conflito=0.40
 )
 
 _ORDEM_DAS_CLASSIFICACOES: dict[Classificacao, int] = {"aceito": 0, "conflitante": 1, "descartado": 2}

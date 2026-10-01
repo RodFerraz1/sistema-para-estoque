@@ -1,7 +1,10 @@
 """Adapter do `DecisionModel` com o Jev (TypeSafe, System One).
 
 As perguntas de trecho são as da rodada 2 do spike, em PT, com que os
-`LIMIARES` da busca foram calibrados. A de intenção partiu do spike e ganhou
+`LIMIARES` da busca foram calibrados. A de conflito ganhou critérios estruturados
+no M8 (o que é e o que não é conflito, com exemplos que não repetem os pares
+rotulados), medidos por `scripts/avaliar_conflitos.py` em `evals/pares_conflito.json`,
+com que o `LIMIARES.conflito` foi recalibrado. A de intenção partiu do spike e ganhou
 critérios estruturados no M8 (o que cada opção cobre, o que é da vizinha e
 exemplos), medidos por `scripts/avaliar_entendimento.py` em `evals/casos.json` e
 `evals/intencoes.json`, com que as faixas do chat foram revistas; os exemplos não
@@ -134,10 +137,33 @@ PERGUNTAS_INJECAO: dict[str, Question] = {
 
 PERGUNTAS_CONFLITO: dict[str, Question] = {
     "conflitam": Noul(
-        instructions="O `trecho_a` e o `trecho_b` afirmam coisas incompatíveis sobre o mesmo fato?",
+        instructions="O `trecho_a` e o `trecho_b` afirmam coisas incompatíveis sobre o mesmo fato, de modo que os dois não podem ser verdade ao mesmo tempo?",
         criteria={
-            "true": "Os dois trechos afirmam sobre o mesmo fato coisas que não podem ser verdade ao mesmo tempo, como prazos, valores, regras ou resultados diferentes para a mesma coisa.",
-            "false": "Os trechos concordam, se complementam ou falam de fatos diferentes. Discordar de opinião ou de recomendação não é conflito.",
+            "true": {
+                "cobre": "Os dois trechos afirmam fatos sobre a mesma coisa (o mesmo fornecedor, produto ou regra, no mesmo período) que não podem ser verdade ao mesmo tempo.",
+                "casos": [
+                    "Um trecho diz o que foi contratado ou prometido por um fornecedor e o outro diz que, na prática, esse mesmo fornecedor fez diferente.",
+                    "Um trecho diz que o fornecedor cumpre um prazo ou uma condição e o outro diz que ele não cumpre, no mesmo período.",
+                    "Os dois trechos dão valores ou resultados diferentes para a mesma medida da mesma coisa.",
+                ],
+                "exemplos": [
+                    "O contrato da Aurora Home Center garante entrega em 30 dias, e a ata de uma reunião registra que os pedidos dela chegaram em 50 dias.",
+                    "Uma ficha diz que a Riva Têxtil nunca atrasou, e um relatório conta dois pedidos entregues fora do prazo pela Riva Têxtil.",
+                ],
+            },
+            "false": {
+                "cobre": "Os trechos concordam, se complementam ou falam de fatos diferentes.",
+                "casos": [
+                    "Opinião, recomendação, plano, decisão ou análise de um trecho contra os fatos do outro: discordar de uma opinião ou de uma recomendação não é conflito.",
+                    "Uma regra e o registro de uma exceção ou de uma decisão que a contrariou: a exceção não torna a regra falsa.",
+                    "Fatos diferentes sobre o mesmo fornecedor ou produto, como preço num trecho e prazo no outro, ou períodos diferentes.",
+                    "Os dois trechos registram a mesma diferença entre o prometido e o observado, mesmo com números um pouco diferentes.",
+                ],
+                "exemplos": [
+                    "Um relatório recomenda reduzir a compra de toalha de rosto, e a ficha do fornecedor diz que ela é o produto de maior giro dele.",
+                    "Uma ficha diz que o prazo prometido é de 30 dias e o observado fica perto de 40, e a ata de outra reunião diz que as entregas levaram uns 40 dias contra os 30 combinados.",
+                ],
+            },
         },
     )
 }

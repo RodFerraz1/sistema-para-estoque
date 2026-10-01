@@ -29,6 +29,7 @@ RAIZ = Path(__file__).resolve().parents[3]
 EVALS = RAIZ / "evals"
 SPIKE_R2 = EVALS / "resultados" / "spike-2026-09-30-r2.json"
 ENTENDIMENTO_M8 = EVALS / "resultados" / "entendimento-2026-10-01-depois.json"
+CONFLITOS_M8 = EVALS / "resultados" / "conflitos-2026-10-01-depois.json"
 
 
 class ClienteFalso:
@@ -206,23 +207,29 @@ def test_cada_trecho_vai_com_a_pergunta_e_depois_sozinho_para_a_injecao() -> Non
     ]
 
 
-def test_perguntas_sao_as_calibradas_no_spike_em_pt() -> None:
+def test_perguntas_de_trecho_sao_as_calibradas_no_spike_em_pt() -> None:
     cliente = ClienteFalso()
     calibradas = json.loads(SPIKE_R2.read_text(encoding="utf-8"))["perguntas"]
 
-    jev = JevDecisionModel(cliente)
-    jev.avaliar_trechos("lead time da Katrina", [make_trecho("a.md#s", "Texto.")])
-    jev.avaliar_conflitos([(make_trecho("a.md#s", "Texto."), make_trecho("b.md#s", "Outro texto."))])
+    JevDecisionModel(cliente).avaliar_trechos("lead time da Katrina", [make_trecho("a.md#s", "Texto.")])
 
     enviadas = [
         {nome: p.model_dump() for nome, p in perguntas.items() if isinstance(p, Noul)}
         for _, perguntas in cliente.pedidos
     ]
-    assert enviadas == [
-        calibradas["relevancia"]["pt"],
-        calibradas["injecao"]["pt"],
-        calibradas["conflito"]["pt"],
-    ]
+    assert enviadas == [calibradas["relevancia"]["pt"], calibradas["injecao"]["pt"]]
+
+
+def test_conflito_e_a_medida_na_calibracao_do_m8() -> None:
+    cliente = ClienteFalso()
+    medida = json.loads(CONFLITOS_M8.read_text(encoding="utf-8"))["perguntas"]
+
+    JevDecisionModel(cliente).avaliar_conflitos(
+        [(make_trecho("a.md#s", "Texto."), make_trecho("b.md#s", "Outro texto."))]
+    )
+
+    [(_, perguntas)] = cliente.pedidos
+    assert {nome: p.model_dump() for nome, p in perguntas.items()} == medida
 
 
 def test_cada_resposta_vira_o_campo_de_mesmo_nome_na_ordem_dos_trechos() -> None:
@@ -499,12 +506,25 @@ def test_jev_real_aceita_o_lead_time_da_katrina_e_pega_a_injecao(jev_real: JevDe
 def test_jev_real_sinaliza_o_conflito_do_lead_time_da_katrina(jev_real: JevDecisionModel) -> None:
     por_id = {t.id: t for t in ler_corpus(RAIZ / "corpus")}
     nota_interna = por_id["contratos/contrato-katrina-2025.md#notas-internas-nao-fazem-parte-do-contrato"]
-    revisao_q1 = por_id["reunioes/2025-q1-revisao-fornecedores.md#katrina-textil"]
+    ficha = por_id["fornecedores/katrina-textil.md#lead-time"]
 
-    [avaliacao] = jev_real.avaliar_conflitos([(nota_interna, revisao_q1)])
+    [avaliacao] = jev_real.avaliar_conflitos([(nota_interna, ficha)])
 
     assert avaliacao.modelo == "jev-1.13.0"
     assert avaliacao.conflitam > LIMIARES.conflito
+
+
+@pytest.mark.externo
+def test_jev_real_nao_sinaliza_conflito_quando_os_dois_registram_o_mesmo_atraso(
+    jev_real: JevDecisionModel,
+) -> None:
+    por_id = {t.id: t for t in ler_corpus(RAIZ / "corpus")}
+    ficha = por_id["fornecedores/katrina-textil.md#lead-time"]
+    revisao_q1 = por_id["reunioes/2025-q1-revisao-fornecedores.md#katrina-textil"]
+
+    [avaliacao] = jev_real.avaliar_conflitos([(ficha, revisao_q1)])
+
+    assert avaliacao.conflitam <= LIMIARES.conflito
 
 
 @pytest.mark.externo

@@ -68,12 +68,15 @@ def test_casos_cobrem_intencoes_e_premissas_falsas() -> None:
             assert caso["premissa_falsa"] in caso["trechos_relevantes"]
 
 
-def test_pares_de_conflito_tem_5_com_e_5_sem_conflito_entre_documentos_diferentes() -> None:
+def test_pares_de_conflito_tem_ao_menos_5_de_cada_rotulo_entre_documentos_diferentes() -> None:
     pares = carregar("pares_conflito.json")
 
-    assert Counter(par["conflitam"] for par in pares) == {True: 5, False: 5}
+    assert min(Counter(par["conflitam"] for par in pares).values()) >= 5
+    assert set(Counter(par["conflitam"] for par in pares)) == {True, False}
+    assert len({frozenset((par["trecho_a"], par["trecho_b"])) for par in pares}) == len(pares)
     for par in pares:
-        assert par["trecho_a"].split("#")[0] != par["trecho_b"].split("#")[0]
+        assert par["motivo"], par
+        assert par["trecho_a"].split("#")[0] != par["trecho_b"].split("#")[0], par
 
 
 def test_casos_de_sinais_citam_produto_e_fornecedor_do_seed_com_os_tres_rotulos() -> None:
