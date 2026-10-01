@@ -1,6 +1,6 @@
 """Testes do `GroqRedator` com `httpx2.MockTransport` no lugar da API.
 
-O teste com o marcador `externo_llm` chama a Groq real e é pulado sem `GROQ_API_KEY`.
+O teste com o marcador `externo_llm("groq")` chama a Groq real e é pulado sem `GROQ_API_KEY`.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import httpx2
 import pytest
 
 from src.ai.groq import GroqRedator
-from src.ai.redator import INSTRUCOES_REDATOR, RedatorIndisponivel
+from src.ai.redator import INSTRUCOES_REDATOR, RedatorIndisponivel, mensagem_do_usuario
 from src.db.config import get_settings
 
 BASE_URL = "https://groq.test/openai/v1"
@@ -51,9 +51,7 @@ def test_chama_chat_completions_no_formato_da_openai_sem_tools() -> None:
     assert "tools" not in corpo
     [system, user] = corpo["messages"]
     assert system == {"role": "system", "content": INSTRUCOES_REDATOR}
-    assert user["role"] == "user"
-    assert CONTEXTO in user["content"]
-    assert "Como tá a toalha bege?" in user["content"]
+    assert user == {"role": "user", "content": mensagem_do_usuario("Como tá a toalha bege?", CONTEXTO)}
 
 
 def test_timeout_do_pedido_e_de_30_segundos() -> None:
@@ -116,7 +114,7 @@ def test_resposta_fora_do_formato_vira_redator_indisponivel(corpo: bytes) -> Non
         redator.redigir("Pergunta", CONTEXTO)
 
 
-@pytest.mark.externo_llm
+@pytest.mark.externo_llm("groq")
 def test_groq_real_redige_com_o_numero_do_contexto() -> None:
     settings = get_settings()
     assert settings.groq_api_key, "o marcador externo_llm pula sem GROQ_API_KEY"

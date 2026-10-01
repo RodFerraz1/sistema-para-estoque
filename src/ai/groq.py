@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import httpx2
 
-from src.ai.redator import INSTRUCOES_REDATOR, Redator, RedatorIndisponivel
+from src.ai.redator import INSTRUCOES_REDATOR, Redator, RedatorIndisponivel, mensagem_do_usuario
 
 TEMPERATURA = 0.2
 MAX_TOKENS = 2048
@@ -51,10 +51,7 @@ class GroqRedator(Redator):
             "model": self._modelo,
             "messages": [
                 {"role": "system", "content": INSTRUCOES_REDATOR},
-                {
-                    "role": "user",
-                    "content": f"# Contexto\n\n{contexto}\n\n# Pergunta do comprador chefe\n\n{pergunta}",
-                },
+                {"role": "user", "content": mensagem_do_usuario(pergunta, contexto)},
             ],
             "temperature": TEMPERATURA,
             "max_tokens": MAX_TOKENS,

@@ -13,12 +13,15 @@ from src.api.rag import decisao_indisponivel
 from src.api.rag import router as rag_router
 from src.api.skus import router as skus_router
 from src.api.skus import sku_sem_estoque
+from src.db.config import get_settings
 from src.ficha_sku.service import SKUSemEstoque
 
 UI_DIR = Path(__file__).parent / "ui"
 
 
 def create_app() -> FastAPI:
+    # Lida na subida para a configuração inválida (REDATOR sem a chave do provedor) impedir o app de subir.
+    get_settings()
     app = FastAPI(title="Copilot de Compras", version="0.1.0")
     app.include_router(health_router)
     app.include_router(skus_router)

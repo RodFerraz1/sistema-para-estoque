@@ -23,6 +23,10 @@ SEM_LLM_CONFIGURADO = "Não há LLM configurado para redigir a resposta."
 LLM_INDISPONIVEL = "O LLM que redige a resposta está indisponível no momento."
 
 
+def mensagem_do_usuario(pergunta: str, contexto: str) -> str:
+    return f"# Contexto\n\n{contexto}\n\n# Pergunta do comprador chefe\n\n{pergunta}"
+
+
 class RedatorIndisponivel(Exception):
     pass
 

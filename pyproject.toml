@@ -16,6 +16,7 @@ dependencies = [
     "fastembed>=0.8.1",
     "pgvector>=0.5.0",
     "httpx2>=2.13.1",
+    "anthropic>=1,<2",
 ]
 
 [dependency-groups]
@@ -39,7 +40,7 @@ addopts = "-ra"
 markers = [
     "smoke: end-to-end tests that require Postgres + seed (docker compose up + alembic upgrade head)",
     "externo: chamam um serviço externo pago (o Jev); pulados sem JEV_KEY",
-    "externo_llm: chamam o LLM redator real (a Groq); pulados sem GROQ_API_KEY",
+    "externo_llm(provedor): chamam o LLM redator real do provedor (\"anthropic\" ou \"groq\"); pulados sem a chave dele (ANTHROPIC_API_KEY ou GROQ_API_KEY)",
 ]
 
 [tool.uv]

@@ -6,6 +6,7 @@ from fastapi import Depends
 
 from src.ai.busca import BuscaContexto
 from src.ai.chat import Copilot
+from src.ai.claude import ClaudeRedator, criar_cliente_claude
 from src.ai.decisao import DecisaoIndisponivel, DecisionModel
 from src.ai.embeddings import Embedder, FastEmbedEmbedder
 from src.ai.groq import GroqRedator
@@ -17,7 +18,7 @@ from src.ai.repositorio import TrechosRepositorio
 from src.ai.sinais import SinaisCorpus
 from src.catalog.dependencies import get_catalog
 from src.catalog.service import Catalog
-from src.db.config import get_settings
+from src.db.config import Settings, get_settings
 from src.db.engine import get_engine
 from src.ficha_sku.dependencies import get_ficha_sku
 from src.ficha_sku.service import FichaSKU
@@ -54,10 +55,30 @@ def _jev(chave: str, modelo: str) -> DecisionModel:
 
 
 def get_redator() -> Redator:
+    """A escolha é só na configuração: a queda do redator escolhido vai para o `RedatorSemLLM`
+    no `Copilot`, sem tentar o próximo provedor."""
     settings = get_settings()
-    if not settings.groq_api_key:
-        return RedatorSemLLM()
-    return _groq(settings.groq_api_key, settings.groq_model, settings.groq_base_url)
+    provedor = _provedor_do_redator(settings)
+    if provedor == "anthropic" and settings.anthropic_api_key:
+        return _claude(settings.anthropic_api_key, settings.anthropic_model)
+    if provedor == "groq" and settings.groq_api_key:
+        return _groq(settings.groq_api_key, settings.groq_model, settings.groq_base_url)
+    return RedatorSemLLM()
+
+
+def _provedor_do_redator(settings: Settings) -> str:
+    if settings.redator != "auto":
+        return settings.redator
+    if settings.anthropic_api_key:
+        return "anthropic"
+    if settings.groq_api_key:
+        return "groq"
+    return "sem_llm"
+
+
+@lru_cache(maxsize=1)
+def _claude(chave: str, modelo: str) -> Redator:
+    return ClaudeRedator(criar_cliente_claude(chave), modelo)
 
 
 @lru_cache(maxsize=1)
