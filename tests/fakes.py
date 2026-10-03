@@ -20,6 +20,7 @@ from src.erp_adapter.in_memory import ItemPedidoCompra, PedidoCompra
 from src.erp_adapter.schemas import StatusPedidoCompra
 from src.inventory.schemas import Estoque, Movimentacao
 from src.sales.schemas import Venda
+from src.usuarios.schemas import Papel, Usuario
 
 
 _NS = uuid.UUID("00000000-0000-0000-0000-000000000fff")
@@ -274,3 +275,21 @@ class RelogioFake:
 
     def avancar(self, **duracao: float) -> None:
         self.agora += timedelta(**duracao)
+
+
+def make_usuario(
+    nome: str = "Pessoa Teste",
+    *,
+    papeis: list[Papel] | None = None,
+    email: str | None = None,
+) -> Usuario:
+    return Usuario(
+        id=uid("usuario", nome),
+        nome=nome,
+        email=email or f"{nome.lower().replace(' ', '.')}@loja.com",
+        senha_hash="$argon2id$falso",
+        papeis=papeis or ["comprador"],
+        ativo=True,
+        criado_em=datetime(2026, 10, 1, tzinfo=UTC),
+        ultimo_acesso_em=None,
+    )

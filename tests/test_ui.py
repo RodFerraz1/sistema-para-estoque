@@ -9,7 +9,13 @@ from fastapi.testclient import TestClient
 from src.main import UI_DIR, app
 from src.politica_compra.schemas import MotivoAlerta
 
-PAGINAS = ["index.html", "sku.html", "aviso.html", "politica.html"]
+PAGINAS = ["index.html", "sku.html", "aviso.html", "politica.html", "login.html"]
+PAPEL_DAS_PAGINAS = {
+    "index.html": "comprador",
+    "sku.html": "comprador",
+    "politica.html": "comprador",
+    "aviso.html": "vendas",
+}
 PAGINAS_DO_COMPRADOR = {"index.html": "painel.js", "sku.html": "sku.js", "politica.html": "politica.js"}
 TIPOS = {".html": "text/html", ".css": "text/css", ".js": "text/javascript"}
 REFERENCIA_NO_HTML = re.compile(r'(?:src|href)="([^"]+)"')
@@ -78,7 +84,7 @@ def test_ui_pede_ao_navegador_para_revalidar_sempre(client: TestClient, arquivo:
 
 def test_assets_referenciados_respondem_com_o_tipo_certo(client: TestClient) -> None:
     assets = _assets()
-    assert {"estilo.css", "comum.js", "painel.js", "sku.js", "aviso.js", "chat.js", "politica.js"} <= assets
+    assert {"estilo.css", "comum.js", "painel.js", "sku.js", "aviso.js", "chat.js", "politica.js", "login.js"} <= assets
 
     for asset in sorted(assets):
         response = client.get(f"/ui/{asset}")
@@ -104,6 +110,8 @@ def test_cada_pagina_chama_a_api() -> None:
     }
     assert ("POST", "/chat") in chamadas["chat.js"]
     assert {("GET", "/politica-compra"), ("PUT", "/politica-compra")} <= set(chamadas["politica.js"])
+    assert chamadas["login.js"] == [("POST", "/login")]
+    assert {("GET", "/eu"), ("POST", "/logout")} <= set(chamadas["comum.js"])
 
 
 def test_endpoints_chamados_pelos_js_existem_no_app() -> None:
@@ -132,10 +140,9 @@ def test_politica_nao_tem_faixa_de_aprovacao() -> None:
     assert "faixa" not in (UI_DIR / "politica.html").read_text() + (UI_DIR / "politica.js").read_text()
 
 
-def test_pagina_de_aviso_nao_tem_navegacao_nem_chat() -> None:
+def test_pagina_de_aviso_nao_tem_chat() -> None:
     html = (UI_DIR / "aviso.html").read_text()
 
-    assert "<nav" not in html
     assert "chat" not in html.lower()
     assert 'name="viewport"' in html
 
@@ -160,13 +167,40 @@ def test_chat_html_saiu(client: TestClient) -> None:
 
 
 @pytest.mark.parametrize(("pagina", "script"), PAGINAS_DO_COMPRADOR.items())
-def test_telas_do_comprador_tem_o_chat_lateral_e_navegacao_painel_e_politica(pagina: str, script: str) -> None:
-    html = (UI_DIR / pagina).read_text()
-
-    assert re.findall(r'<nav>(.*?)</nav>', html, re.S)[0].count("<a ") == 2
-    assert 'href="index.html"' in html and 'href="politica.html"' in html
-    assert 'id="abrir-chat"' in html
+def test_telas_do_comprador_tem_o_chat_lateral(pagina: str, script: str) -> None:
+    assert 'id="abrir-chat"' in (UI_DIR / pagina).read_text()
     assert re.search(r"montarChat\(", (UI_DIR / script).read_text())
+
+
+@pytest.mark.parametrize(("pagina", "papel"), PAPEL_DAS_PAGINAS.items())
+def test_cada_tela_monta_o_cabecalho_do_seu_papel(pagina: str, papel: str) -> None:
+    html = (UI_DIR / pagina).read_text()
+    script = re.findall(r'<script type="module" src="([^"]+)"', html)[0]
+
+    assert re.search(r"<nav[^>]*></nav>", html)
+    assert f'cabecalho("{papel}")' in (UI_DIR / script).read_text()
+
+
+def test_o_menu_so_aponta_para_telas_que_existem() -> None:
+    telas = re.findall(r'\{ papel: "(\w+)", href: "([^"]+)"', (UI_DIR / "comum.js").read_text())
+
+    assert ("comprador", "index.html") == telas[0]
+    assert ("vendas", "aviso.html") in telas
+    assert all((UI_DIR / href).exists() for _, href in telas)
+
+
+def test_api_manda_x_requested_with_e_leva_ao_login_no_401() -> None:
+    comum = (UI_DIR / "comum.js").read_text()
+
+    assert '"X-Requested-With"' in comum
+    assert "resposta.status === 401" in comum and "login.html" in comum and "volta=" in comum
+
+
+def test_pagina_de_login_nao_monta_cabecalho() -> None:
+    html = (UI_DIR / "login.html").read_text()
+
+    assert "<nav" not in html and 'type="password"' in html
+    assert "cabecalho(" not in (UI_DIR / "login.js").read_text()
 
 
 def test_tela_do_sku_passa_o_sku_em_contexto_ao_chat() -> None:

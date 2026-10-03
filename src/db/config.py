@@ -12,6 +12,8 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://copilot:copilot@localhost:5432/copilot",
         alias="DATABASE_URL",
     )
+    # Fora do local, o cookie de sessão sai com `Secure` (só HTTPS).
+    ambiente: Literal["local", "producao"] = Field(default="local", alias="AMBIENTE")
     jev_key: str | None = Field(default=None, alias="JEV_KEY")
     jev_model: str = Field(default="jev-1.13.0", alias="JEV_MODEL")
     redator: Literal["auto", "anthropic", "sem_llm"] = Field(default="auto", alias="REDATOR")

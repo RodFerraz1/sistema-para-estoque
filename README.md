@@ -28,7 +28,12 @@ uv run python -m scripts.seed
 
 # 4. Ingere o corpus em copilot.trechos_corpus (idempotente: só reprocessa documento novo ou alterado)
 uv run python -m scripts.ingerir_corpus
+
+# 5. Cria o primeiro admin (pede a senha no terminal)
+uv run python -m scripts.criar_admin --nome "Seu nome" --email voce@loja.com
 ```
+
+Toda tela e toda rota, menos `/health` e `/login`, exigem login ([ADR-0007](docs/adr/0007-usuarios-sessao-e-papeis.md)). Para testar outro papel localmente, crie a pessoa com `--papeis` (`comprador`, `vendas`, `reposicao`, `admin`, separados por vírgula). Fora do ambiente local, defina `AMBIENTE=producao` para o cookie de sessão sair com `Secure`.
 
 A ingestão baixa o modelo de embedding para `.cache/fastembed` na primeira vez. Os endpoints que usam o Jev (`/rag/busca`, `/chat` e `/skus/{sku_code}/sugestao-compra/sinais`) também precisam da `JEV_KEY` (chave da API da TypeSafe) no `.env`: copie o `.env.example` e preencha. Sem a chave, só esses respondem 503. A chave do redator (`ANTHROPIC_API_KEY`) é opcional: sem ela, o chat responde com os dados que reuniu, sem redação.
 

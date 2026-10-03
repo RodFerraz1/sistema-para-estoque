@@ -18,8 +18,21 @@ function detalhesDoErro(status, corpo) {
   return [{ campo: null, mensagem: `A API respondeu com erro ${status}.` }];
 }
 
+const PAGINA_DE_LOGIN = "login.html";
+let indoParaOLogin = false;
+
+function naPaginaDeLogin() {
+  return location.pathname.endsWith(`/${PAGINA_DE_LOGIN}`);
+}
+
+function irParaOLogin() {
+  if (indoParaOLogin) return;
+  indoParaOLogin = true;
+  location.assign(`${PAGINA_DE_LOGIN}?volta=${encodeURIComponent(location.pathname + location.search)}`);
+}
+
 export async function api(metodo, caminho, corpo) {
-  const opcoes = { method: metodo, headers: { Accept: "application/json" } };
+  const opcoes = { method: metodo, headers: { Accept: "application/json", "X-Requested-With": "fetch" } };
   if (corpo !== undefined) {
     opcoes.headers["Content-Type"] = "application/json";
     opcoes.body = JSON.stringify(corpo);
@@ -30,9 +43,62 @@ export async function api(metodo, caminho, corpo) {
   } catch {
     throw new ErroApi(0, [{ campo: null, mensagem: "Não foi possível falar com o servidor." }]);
   }
+  if (resposta.status === 401 && !naPaginaDeLogin()) {
+    irParaOLogin();
+    return new Promise(() => {});
+  }
   const dados = await resposta.json().catch(() => null);
   if (!resposta.ok) throw new ErroApi(resposta.status, detalhesDoErro(resposta.status, dados));
   return dados;
+}
+
+export const TELAS = [
+  { papel: "comprador", href: "index.html", rotulo: "Painel" },
+  { papel: "comprador", href: "politica.html", rotulo: "Política" },
+  { papel: "vendas", href: "aviso.html", rotulo: "Avisar o comprador" },
+];
+
+export function telaInicial(eu) {
+  return TELAS.find((t) => eu.papeis.includes(t.papel))?.href ?? null;
+}
+
+function paginaAtual() {
+  return location.pathname.split("/").pop() || "index.html";
+}
+
+async function sair() {
+  try {
+    await api("POST", "/logout");
+  } finally {
+    location.assign(PAGINA_DE_LOGIN);
+  }
+}
+
+export async function cabecalho(papelDaTela) {
+  let eu;
+  try {
+    eu = await api("GET", "/eu");
+  } catch {
+    return null;
+  }
+  const inicio = telaInicial(eu);
+  if (papelDaTela && !eu.papeis.includes(papelDaTela) && inicio) {
+    location.replace(inicio);
+    return eu;
+  }
+  const atual = paginaAtual();
+  document.querySelector("header nav").replaceChildren(
+    ...TELAS.filter((t) => eu.papeis.includes(t.papel)).map((t) =>
+      el("a", { href: t.href, "aria-current": t.href === atual ? "page" : null }, t.rotulo),
+    ),
+  );
+  for (const elemento of document.querySelectorAll("[data-papel]")) {
+    elemento.hidden = !eu.papeis.includes(elemento.dataset.papel);
+  }
+  document.querySelector("header .conteudo").append(
+    el("div", { class: "sessao" }, el("span", { class: "sessao-nome" }, eu.nome), el("button", { type: "button", onclick: sair }, "Sair")),
+  );
+  return eu;
 }
 
 export function el(tag, atributos = {}, ...filhos) {

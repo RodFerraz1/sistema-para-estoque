@@ -9,8 +9,9 @@ from src.ai.dependencies import get_busca_contexto
 from src.ai.schemas import ResultadoBusca
 from src.api.conversores import trecho_to_response
 from src.api.schemas import ResultadoBuscaResponse
+from src.usuarios.dependencies import exige_papel
 
-router = APIRouter(prefix="/rag", tags=["rag"])
+router = APIRouter(prefix="/rag", tags=["rag"], dependencies=[Depends(exige_papel("comprador"))])
 
 
 def decisao_indisponivel(request: Request, erro: Exception) -> JSONResponse:

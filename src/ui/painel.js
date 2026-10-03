@@ -2,6 +2,7 @@ import { montarChat } from "./chat.js";
 import {
   TIPOS_DE_AVISO,
   api,
+  cabecalho,
   coberturaEmDias,
   dataHora,
   dias,
@@ -13,6 +14,7 @@ import {
   selosDeMotivo,
 } from "./comum.js";
 
+cabecalho("comprador");
 montarChat();
 
 const carregando = document.getElementById("carregando");

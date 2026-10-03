@@ -3,6 +3,7 @@ import {
   TIPOS_DE_AVISO,
   alertas,
   api,
+  cabecalho,
   coberturaEmDias,
   dataHora,
   dias,
@@ -17,6 +18,8 @@ import {
   resumoDaDecisao,
   sinais,
 } from "./comum.js";
+
+cabecalho("comprador");
 
 const MOTIVOS_SEM_COMPRA = {
   sku_novo: "SKU novo: ainda não tem o histórico mínimo de vendas que a política pede para sugerir sozinho.",

@@ -7,8 +7,11 @@ from src.api.schemas import PoliticaCompraResponse
 from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.politica_compra.schemas import ParametrosPolitica, PoliticaCompra
+from src.usuarios.dependencies import exige_papel
 
-router = APIRouter(prefix="/politica-compra", tags=["politica-compra"])
+router = APIRouter(
+    prefix="/politica-compra", tags=["politica-compra"], dependencies=[Depends(exige_papel("comprador"))]
+)
 
 
 def _to_response(politica: PoliticaCompra) -> PoliticaCompraResponse:

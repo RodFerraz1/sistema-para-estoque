@@ -25,8 +25,9 @@ from src.api.schemas import (
 from src.api.skus import sku_ou_404
 from src.catalog.dependencies import get_catalog
 from src.catalog.service import Catalog
+from src.usuarios.dependencies import exige_papel
 
-router = APIRouter(prefix="/chat", tags=["chat"])
+router = APIRouter(prefix="/chat", tags=["chat"], dependencies=[Depends(exige_papel("comprador"))])
 
 
 def _escolha_to_response(escolha: Escolha[str]) -> EscolhaResponse:

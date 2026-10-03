@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar - Copilot de Compras</title>
+  <link rel="stylesheet" href="estilo.css">
+  <script type="module" src="login.js"></script>
+</head>
+<body class="pagina-login">
+  <main class="login">
+    <strong class="marca">Copilot de Compras</strong>
+    <form id="login-form" class="card" novalidate>
+      <h1>Entrar</h1>
+      <p class="suave">Use o e-mail e a senha que o admin cadastrou para você.</p>
+      <div class="campo">
+        <label for="email">E-mail</label>
+        <input id="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="320" required>
+      </div>
+      <div class="campo">
+        <label for="senha">Senha</label>
+        <input id="senha" type="password" autocomplete="current-password" maxlength="200" required>
+      </div>
+      <button id="entrar" type="submit" class="primario grande">Entrar</button>
+      <div id="resultado"></div>
+    </form>
+    <p class="suave">Esqueceu a senha? Peça ao admin para criar uma nova.</p>
+  </main>
+</body>
+</html>

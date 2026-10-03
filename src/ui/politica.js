@@ -1,5 +1,7 @@
 import { montarChat } from "./chat.js";
-import { api, dataHora, el, mensagem } from "./comum.js";
+import { api, cabecalho, dataHora, el, mensagem } from "./comum.js";
+
+cabecalho("comprador");
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const NUMEROS = ["teto_meses", "extra_sazonal_meses", "piso_alerta_dias", "piso_reposicao_dias", "ciclo_compra_meses", "dias_historico_minimo"];

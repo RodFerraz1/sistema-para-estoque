@@ -37,8 +37,12 @@ from src.purchasing.dependencies import get_purchasing
 from src.purchasing.service import Purchasing
 from src.sales.dependencies import get_sales
 from src.sales.service import Sales
+from src.usuarios.dependencies import exige_papel
 
 router = APIRouter(prefix="/skus", tags=["skus"])
+
+COMPRADOR = [Depends(exige_papel("comprador"))]
+QUEM_BUSCA_SKU = [Depends(exige_papel("comprador", "vendas", "reposicao"))]
 
 
 def sku_sem_estoque(request: Request, erro: Exception) -> JSONResponse:
@@ -63,7 +67,7 @@ def sku_ou_404(catalog: Catalog, sku_code: str) -> SKU:
     return sku
 
 
-@router.get("", response_model=list[SKUResumoResponse])
+@router.get("", response_model=list[SKUResumoResponse], dependencies=QUEM_BUSCA_SKU)
 def buscar_skus(
     busca: str = Query(..., min_length=2, max_length=100),
     catalog: Catalog = Depends(get_catalog),
@@ -76,7 +80,7 @@ def buscar_skus(
     ]
 
 
-@router.get("/abaixo-do-piso", response_model=list[SKUAbaixoDoPisoResponse])
+@router.get("/abaixo-do-piso", response_model=list[SKUAbaixoDoPisoResponse], dependencies=COMPRADOR)
 def abaixo_do_piso(
     dias: int | None = Query(
         None,
@@ -99,7 +103,7 @@ def abaixo_do_piso(
     ]
 
 
-@router.get("/{sku_code}/analise", response_model=AnaliseSKUResponse)
+@router.get("/{sku_code}/analise", response_model=AnaliseSKUResponse, dependencies=COMPRADOR)
 def analise_sku(
     sku_code: str,
     ficha_sku: FichaSKU = Depends(get_ficha_sku),
@@ -110,7 +114,7 @@ def analise_sku(
     return ficha_to_response(ficha)
 
 
-@router.get("/{sku_code}/sugestao-compra", response_model=SugestaoPedidoResponse)
+@router.get("/{sku_code}/sugestao-compra", response_model=SugestaoPedidoResponse, dependencies=COMPRADOR)
 def sugestao_compra(
     sku_code: str,
     purchasing: Purchasing = Depends(get_purchasing),
@@ -121,7 +125,9 @@ def sugestao_compra(
     return sugestao_to_response(sugestao)
 
 
-@router.get("/{sku_code}/sugestao-compra/sinais", response_model=list[SinalCorpusResponse])
+@router.get(
+    "/{sku_code}/sugestao-compra/sinais", response_model=list[SinalCorpusResponse], dependencies=COMPRADOR
+)
 def sinais_da_sugestao_compra(
     sku_code: str,
     catalog: Catalog = Depends(get_catalog),
@@ -137,7 +143,7 @@ def sinais_da_sugestao_compra(
     return [sinal_to_response(s) for s in sinais_corpus.para_sugestao(sugestao, sku)]
 
 
-@router.get("/{sku_code}/vendas", response_model=list[VendaMensalResponse])
+@router.get("/{sku_code}/vendas", response_model=list[VendaMensalResponse], dependencies=COMPRADOR)
 def historico_vendas(
     sku_code: str,
     meses: int = Query(12, ge=1, le=120),
@@ -156,7 +162,7 @@ def historico_vendas(
     ]
 
 
-@router.get("/{sku_code}/sazonalidade", response_model=dict[int, float])
+@router.get("/{sku_code}/sazonalidade", response_model=dict[int, float], dependencies=COMPRADOR)
 def sazonalidade(
     sku_code: str,
     catalog: Catalog = Depends(get_catalog),
@@ -166,7 +172,7 @@ def sazonalidade(
     return sales.sazonalidade(sku_code).multiplicadores
 
 
-@router.get("/{sku_code}/fornecedores", response_model=list[FornecedorResponse])
+@router.get("/{sku_code}/fornecedores", response_model=list[FornecedorResponse], dependencies=COMPRADOR)
 def fornecedores_do_sku(
     sku_code: str,
     catalog: Catalog = Depends(get_catalog),
@@ -175,7 +181,7 @@ def fornecedores_do_sku(
     return [fornecedor_to_response(f) for f in catalog.fornecedores_de(sku_code)]
 
 
-@router.get("/{sku_code}/precos", response_model=PrecosResponse)
+@router.get("/{sku_code}/precos", response_model=PrecosResponse, dependencies=COMPRADOR)
 def precos(sku_code: str, purchasing: Purchasing = Depends(get_purchasing)) -> PrecosResponse:
     """Referências de preço para negociar com o representante: o que o atacadista pagou
     em cada pedido de compra, o preço atual de cada fornecedor e os substitutos (outros

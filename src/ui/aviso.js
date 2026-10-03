@@ -1,4 +1,6 @@
-import { TIPOS_DE_AVISO, api, el, guardarNome, lerNome, mensagem } from "./comum.js";
+import { TIPOS_DE_AVISO, api, cabecalho, el, guardarNome, lerNome, mensagem } from "./comum.js";
+
+cabecalho("vendas");
 
 const CHAVE_DO_NOME = "copilot.vendedora";
 const ESPERA_DA_BUSCA_MS = 300;

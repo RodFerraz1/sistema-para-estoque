@@ -17,6 +17,7 @@ dependencies = [
     "pgvector>=0.5.0",
     "httpx2>=2.13.1",
     "anthropic>=1,<2",
+    "argon2-cffi>=25.1.0",
 ]
 
 [dependency-groups]
@@ -41,6 +42,8 @@ markers = [
     "smoke: end-to-end tests that require Postgres + seed (docker compose up + alembic upgrade head)",
     "externo: chamam um serviço externo pago (o Jev); pulados sem JEV_KEY",
     "externo_llm(provedor): chamam o LLM redator real do provedor (\"anthropic\"); pulados sem a chave dele (ANTHROPIC_API_KEY)",
+    "papeis(*papeis): o usuário fake dos testes HTTP só tem estes papéis (sem o marcador, tem todos)",
+    "login_de_verdade: sem o usuário fake; o teste faz login de verdade",
 ]
 
 [tool.uv]

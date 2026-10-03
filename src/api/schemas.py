@@ -28,6 +28,7 @@ from src.inventory.schemas import Cobertura, Estoque
 from src.painel.schemas import TipoAviso, TipoDecisao
 from src.politica_compra.schemas import MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
+from src.usuarios.schemas import Papel
 
 Nome = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 TextoLivre = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
@@ -382,3 +383,17 @@ class PainelResponse(BaseModel):
     alertas: list[ItemAlertaResponse]
     decididos: list[ItemDecididoResponse]
     skus_com_erro: list[str]
+
+
+class LoginRequest(BaseModel):
+    email: Annotated[str, StringConstraints(max_length=320)]
+    senha: Annotated[str, StringConstraints(max_length=200)]
+
+
+class UsuarioResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    nome: str
+    email: str
+    papeis: list[Papel]

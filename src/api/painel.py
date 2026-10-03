@@ -28,8 +28,11 @@ from src.painel.service import (
     SKUInativo,
     SKUNaoEncontrado,
 )
+from src.usuarios.dependencies import exige_papel
 
 router = APIRouter(tags=["painel"])
+
+COMPRADOR = [Depends(exige_papel("comprador"))]
 
 
 def _dias(meses: float | None) -> float | None:
@@ -66,7 +69,7 @@ def _decidido_to_response(item: ItemDecidido) -> ItemDecididoResponse:
     )
 
 
-@router.get("/painel", response_model=PainelResponse)
+@router.get("/painel", response_model=PainelResponse, dependencies=COMPRADOR)
 def painel(painel: Painel = Depends(get_painel)) -> PainelResponse:
     """Calculado na hora com a política ativa. 503 com o banco fora do ar."""
     resultado = painel.painel()
@@ -77,7 +80,12 @@ def painel(painel: Painel = Depends(get_painel)) -> PainelResponse:
     )
 
 
-@router.post("/avisos", response_model=AvisoResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/avisos",
+    response_model=AvisoResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(exige_papel("vendas"))],
+)
 def registrar_aviso(corpo: RegistrarAvisoRequest, painel: Painel = Depends(get_painel)) -> AvisoResponse:
     """O SKU entra no painel na hora. 404 sem o SKU, 422 com o SKU inativo."""
     try:
@@ -89,7 +97,7 @@ def registrar_aviso(corpo: RegistrarAvisoRequest, painel: Painel = Depends(get_p
     return aviso_to_response(aviso)
 
 
-@router.get("/skus/{sku_code}/avisos", response_model=list[AvisoResponse])
+@router.get("/skus/{sku_code}/avisos", response_model=list[AvisoResponse], dependencies=COMPRADOR)
 def avisos_abertos(
     sku_code: str,
     catalog: Catalog = Depends(get_catalog),
@@ -100,7 +108,9 @@ def avisos_abertos(
     return [aviso_to_response(a) for a in painel.avisos_abertos(sku_code)]
 
 
-@router.get("/skus/{sku_code}/decisoes", response_model=list[DecisaoCompraResponse])
+@router.get(
+    "/skus/{sku_code}/decisoes", response_model=list[DecisaoCompraResponse], dependencies=COMPRADOR
+)
 def decisoes(
     sku_code: str,
     catalog: Catalog = Depends(get_catalog),
@@ -112,7 +122,10 @@ def decisoes(
 
 
 @router.post(
-    "/skus/{sku_code}/decisoes", response_model=DecisaoCompraResponse, status_code=status.HTTP_201_CREATED
+    "/skus/{sku_code}/decisoes",
+    response_model=DecisaoCompraResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=COMPRADOR,
 )
 def registrar_decisao(
     sku_code: str, corpo: RegistrarDecisaoRequest, painel: Painel = Depends(get_painel)
