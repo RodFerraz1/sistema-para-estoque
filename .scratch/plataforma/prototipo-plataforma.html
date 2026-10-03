@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTÓTIPO - Plataforma de estoque (spec 09)</title>
+<style>
+  :root { --acento:#2457d6; --borda:#d7dbe3; --suave:#5f6675; --fundo:#f6f7f9; --nota:#fff7d6; --notaborda:#e8cf6a;
+          --comprador:#2457d6; --vendas:#16884a; --reposicao:#c46a12; --admin:#666; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; color:#1d2230; background:var(--fundo); }
+  h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:16px; margin:16px 0 8px; } h3 { font-size:14px; margin:12px 0 6px; }
+  .topo { background:#1d2230; color:#fff; padding:12px 16px; }
+  .topo small { color:#c7ccd8; }
+  .faixa { background:#ffe3e3; color:#8a1c1c; padding:6px 16px; font-weight:600; font-size:12px; }
+  .bloco { background:#fff; border:1px solid var(--borda); border-radius:8px; padding:12px; margin:12px 16px; }
+  .grade { display:grid; grid-template-columns: minmax(0,1fr) 340px; gap:0; align-items:start; }
+  @media (max-width: 960px) { .grade { grid-template-columns: 1fr; } }
+  button { font:inherit; border:1px solid var(--borda); background:#fff; border-radius:6px; padding:5px 10px; cursor:pointer; }
+  button:hover { border-color:var(--acento); }
+  button.prim { background:var(--acento); color:#fff; border-color:var(--acento); }
+  button:disabled { opacity:.45; cursor:default; }
+  input, select, textarea { font:inherit; padding:4px 6px; border:1px solid var(--borda); border-radius:6px; }
+  .abas { display:flex; gap:6px; flex-wrap:wrap; }
+  .aba { border-radius:6px 6px 0 0; border-bottom:none; }
+  .aba.ativa { background:#1d2230; color:#fff; }
+  .papel { display:flex; flex-wrap:wrap; gap:8px; margin:12px 16px 0; }
+  .papel button { display:flex; gap:6px; align-items:center; padding:8px 12px; border-width:2px; }
+  .papel button.ativa { color:#fff; }
+  .badge { background:#d62424; color:#fff; border-radius:10px; padding:0 7px; font-size:12px; font-weight:700; }
+  .quem { padding:8px 12px; color:#fff; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; align-items:center; }
+  .app { margin:0 16px 16px; border:2px solid; border-radius:10px; background:#fff; }
+  .app .corpo { padding:12px; }
+  .celular { max-width:400px; margin:0 auto; border:8px solid #1d2230; border-radius:22px; padding:10px; min-height:420px; }
+  .telas { display:flex; gap:6px; flex-wrap:wrap; padding:8px 12px; border-bottom:1px solid var(--borda); background:#fafbfc; }
+  .telas button.ativa { background:#1d2230; color:#fff; }
+  .nota { background:var(--nota); border:1px solid var(--notaborda); border-radius:6px; padding:6px 10px; margin:6px 0 10px; font-size:13px; }
+  .nota b { font-weight:700; }
+  .opine { background:#eef4ff; border:1px dashed var(--acento); border-radius:6px; padding:6px 10px; margin:6px 0 10px; font-size:13px; }
+  .grupo { border-left:4px solid var(--borda); padding-left:10px; margin:12px 0; }
+  .item { border:1px solid var(--borda); border-radius:6px; padding:8px; margin:6px 0; display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; align-items:center; }
+  .selo { display:inline-block; font-size:11px; padding:1px 6px; border-radius:10px; background:#eceef3; margin:0 4px 2px 0; }
+  .selo.verm { background:#ffe0e0; color:#8a1c1c; } .selo.verde { background:#dcf5e5; color:#11643a; } .selo.lar { background:#ffe9d1; color:#7a3f05; } .selo.azul { background:#e0e9ff; color:#173a99; }
+  .suave { color:var(--suave); }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { border-bottom:1px solid var(--borda); padding:4px 6px; text-align:left; }
+  th { background:#fafbfc; }
+  .num { text-align:right; }
+  .lado .bloco { margin:12px 16px 12px 0; }
+  @media (max-width: 960px) { .lado .bloco { margin:12px 16px; } }
+  .log li { margin-bottom:4px; }
+  .log li.novo { font-weight:600; }
+  .passos { display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+  .passos button { text-align:left; }
+  .passos button.feito::before { content:"✓ "; color:var(--vendas); }
+  .toast { position:fixed; right:16px; bottom:16px; max-width:360px; background:#1d2230; color:#fff; border-radius:8px; padding:12px; box-shadow:0 6px 24px rgba(0,0,0,.25); z-index:10; }
+  .toast button { margin-top:8px; }
+  .linha { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0; }
+  .barra { height:8px; background:#e6e9ef; border-radius:4px; min-width:80px; }
+  .barra > div { height:8px; background:var(--acento); border-radius:4px; }
+  .grande { font-size:22px; font-weight:700; }
+  .cartoes { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; }
+  .cartao { border:1px solid var(--borda); border-radius:6px; padding:8px; }
+  details summary { cursor:pointer; }
+  .mapa td, .mapa th { vertical-align:top; }
+</style>
+</head>
+<body>
+
+<div class="faixa">PROTÓTIPO DESCARTÁVEL. Dados inventados, tudo em memória (recarregar a página zera). Não é o código do sistema.</div>
+<div class="topo">
+  <h1>Plataforma de estoque: o que cada pessoa faz e vê</h1>
+  <small>Pergunta que este protótipo responde: <b>o fluxo da spec 09 faz sentido para a loja?</b> Quem usa cada tela, o que cada parte faz, e se os alertas aparecem para a pessoa certa na hora certa.
+  Troque de pessoa nos botões coloridos, rode os cenários guiados ou avance os dias no painel da direita.</small>
+</div>
+
+<div class="bloco" id="cenarios"></div>
+<div class="grade">
+  <div>
+    <div class="papel" id="papeis"></div>
+    <div class="app" id="app"></div>
+  </div>
+  <div class="lado" id="lado"></div>
+</div>
+<div id="toast"></div>
+
+<script id="modelo">
+// Módulo puro: regras da spec 09. Sem DOM. A página só chama `Modelo.aplicar` e os seletores.
+const Modelo = (() => {
+  const DIA_ZERO = Date.UTC(2026, 9, 5);
+  const HISTORICO = 42, JANELA_BASE = 28, PRAZO_DECISAO = 7, PRAZO_COBRANCA = 7;
+  const SEMANA = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+  const diaDaSemana = d => ((d % 7) + 7) % 7;
+  const domingo = d => diaDaSemana(d) === 6;
+  function data(d) {
+    const dt = new Date(DIA_ZERO + d * 864e5);
+    return `${SEMANA[diaDaSemana(d)]} ${String(dt.getUTCDate()).padStart(2, '0')}/${String(dt.getUTCMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function ruido(chave) {
+    let h = 2166136261;
+    for (const c of chave) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+    return ((h >>> 0) % 10000) / 10000;
+  }
+  function demanda(sku, media, d) {
+    if (domingo(d)) return 0;
+    const x = media * (0.8 + 0.4 * ruido(sku + ':' + d));
+    const base = Math.floor(x);
+    return base + (ruido(sku + '#' + d) < x - base ? 1 : 0);
+  }
+
+  const USUARIOS = [
+    { id: 'carla', nome: 'Carla', papeis: ['comprador'], ativo: true },
+    { id: 'bia', nome: 'Bia', papeis: ['vendas'], ativo: true },
+    { id: 'rafa', nome: 'Rafa', papeis: ['reposicao'], ativo: true },
+    { id: 'rodrigo', nome: 'Rodrigo', papeis: ['admin'], ativo: true },
+  ];
+  const FORNECEDORES = {
+    katrina: { nome: 'Têxtil Katrina', leadTime: 45 },
+    vale: { nome: 'Fios do Vale', leadTime: 30 },
+    mesa: { nome: 'Mesa Posta', leadTime: 20 },
+  };
+  const PRODUTOS = { tapete: 'Tapete Banheiro', toalha: 'Toalha Banho Conforto', edredom: 'Edredom Duplaface', americano: 'Jogo Americano' };
+  const SKUS = [
+    // código, produto, cor, tamanho, categoria, fornecedor, venda média diária, disponível, setor conhecido
+    ['TAP-MAR', 'tapete', 'marrom', '50x70', 'banho', 'katrina', 10, 400, 'Tapetes'],
+    ['TAP-BEG', 'tapete', 'bege', '50x70', 'banho', 'katrina', 5, 150, 'Tapetes'],
+    ['TAP-CIN', 'tapete', 'cinza', '50x70', 'banho', 'katrina', 4, 120, 'Tapetes'],
+    ['TAP-AZU', 'tapete', 'azul', '50x70', 'banho', 'katrina', 2.5, 60, 'Tapetes'],
+    ['TAP-BRA', 'tapete', 'branco', '50x70', 'banho', 'katrina', 1, 60, 'Tapetes'],
+    ['TBC-BRA', 'toalha', 'branco', '70x140', 'felpudo', 'vale', 8, 130, 'Banho'],
+    ['TBC-BEG', 'toalha', 'bege', '70x140', 'felpudo', 'vale', 6, 140, 'Banho'],
+    ['TBC-CIN', 'toalha', 'cinza', '70x140', 'felpudo', 'vale', 3, 200, 'Banho'],
+    ['EDR-CAS', 'edredom', 'cinza', 'casal', 'cama', 'katrina', 3, 0, 'Cama'],
+    ['EDR-QUE', 'edredom', 'cinza', 'queen', 'cama', 'katrina', 2, 50, 'Cama'],
+    ['JAM-VER', 'americano', 'verde', '35x50', 'mesa', 'mesa', 0.3, 15, null],
+  ];
+
+  function estadoInicial() {
+    const skus = {}, vendas = {}, gondola = {}, setorDoSku = {};
+    for (const [code, produto, cor, tamanho, categoria, fornecedor, media, disponivel, setor] of SKUS) {
+      skus[code] = { code, produto, cor, tamanho, categoria, fornecedor, media, disponivel };
+      vendas[code] = {};
+      for (let d = -HISTORICO; d < 0; d++) vendas[code][d] = demanda(code, media, d);
+      gondola[code] = 1;
+      if (setor) setorDoSku[code] = setor;
+    }
+    for (let d = -4; d < 0; d++) vendas['EDR-CAS'][d] = 0;
+    const e = {
+      hoje: 0, seq: 0,
+      politica: {
+        pisoAlertaDias: 20, pisoReposicaoDias: 30, cicloDias: 60, leadTime: 'ignorar',
+        diasObservados: 2, vendaMinima: 1, limiar: 0.01, diasMix: 28,
+        motivos: { ruptura: true, entrega_atrasada: true, estoque_divergente: true, ruptura_antes_da_chegada: false },
+      },
+      usuarios: structuredClone(USUARIOS),
+      skus, vendas, gondola, setorDoSku,
+      setores: ['Banho', 'Cama', 'Mesa', 'Tapetes', 'Cozinha'],
+      pedidos: [
+        { id: 'P-101', fornecedor: 'vale', previsao: 10, recebido: false, itens: [{ sku: 'TBC-BRA', pendente: 200 }] },
+        { id: 'P-102', fornecedor: 'katrina', previsao: -3, recebido: false, itens: [{ sku: 'EDR-CAS', pendente: 120 }, { sku: 'TAP-BRA', pendente: 30 }] },
+      ],
+      avisos: [], decisoes: [], avisosGondola: [], verificacoes: [], cobrancas: [],
+      capacidades: { tapete: 12 },
+      episodios: [], cursores: { carla: 0, bia: 0, rafa: 0, rodrigo: 0 },
+      log: [],
+    };
+    registrarAviso(e, { sku: 'TBC-BEG', tipo: 'vendendo_muito', por: 'bia', comentario: 'Cliente da Rua 7 quer 100 peças' });
+    varrer(e);
+    e.log = ['Começo: segunda 05/10. Já existem 2 SKUs em ruptura, 1 entrega atrasada e 1 aviso da Bia.'];
+    return e;
+  }
+
+  const rotulo = (e, c) => `${PRODUTOS[e.skus[c].produto]} ${e.skus[c].cor} ${e.skus[c].tamanho}`;
+  const nomeUsuario = (e, id) => (e.usuarios.find(u => u.id === id) || { nome: id }).nome;
+  const emTransito = (e, c) => e.pedidos.filter(p => !p.recebido).flatMap(p => p.itens).filter(i => i.sku === c).reduce((s, i) => s + i.pendente, 0);
+  function coberturaDias(e, c) { const s = e.skus[c]; return s.media > 0 ? s.disponivel / s.media : null; }
+  function emRuptura(e, c) { const cob = coberturaDias(e, c); return cob !== null && cob < e.politica.pisoAlertaDias; }
+  const leadTime = (e, c) => e.politica.leadTime === 'ignorar' ? 0 : FORNECEDORES[e.skus[c].fornecedor].leadTime;
+
+  function sugestao(e, c) {
+    const s = e.skus[c], p = e.politica, m = s.media;
+    const trans = emTransito(e, c), pos = s.disponivel + trans, lt = leadTime(e, c);
+    const naChegada = Math.max(0, pos - m * lt);
+    let qtd = 0;
+    if (m > 0 && naChegada < m * p.pisoReposicaoDias) qtd = Math.ceil(m * (p.pisoReposicaoDias + p.cicloDias) - naChegada);
+    return { qtd, media: m, disponivel: s.disponivel, trans, pos, lt, naChegada, rupturaAntesDaChegada: lt > 0 && pos < m * lt, fornecedor: FORNECEDORES[s.fornecedor].nome };
+  }
+
+  function ultima(lista, filtro) { const l = lista.filter(filtro); return l.length ? l[l.length - 1] : null; }
+  const ultimaDecisao = (e, c) => ultima(e.decisoes, d => d.sku === c);
+  function avisosAbertos(e, c) { const d = ultimaDecisao(e, c); return e.avisos.filter(a => a.sku === c && (!d || a.seq > d.seq)); }
+  function decisaoVigente(e, c) {
+    const d = ultimaDecisao(e, c);
+    if (!d || avisosAbertos(e, c).length || e.hoje - d.dia >= PRAZO_DECISAO) return null;
+    return d;
+  }
+
+  function previsaoEfetiva(e, p) { const cob = ultima(e.cobrancas, x => x.pedido === p.id); return cob && cob.novaPrevisao !== null ? cob.novaPrevisao : p.previsao; }
+  function cobrancaVigente(e, p) {
+    const cob = ultima(e.cobrancas, x => x.pedido === p.id);
+    if (!cob) return null;
+    if (cob.novaPrevisao !== null) return cob.novaPrevisao >= e.hoje ? cob : null;
+    return e.hoje - cob.dia < PRAZO_COBRANCA ? cob : null;
+  }
+  const pedidoAtrasado = (e, p) => !p.recebido && previsaoEfetiva(e, p) < e.hoje;
+  function entregasAtrasadas(e) { return e.pedidos.filter(p => !p.recebido && p.previsao < e.hoje && !cobrancaVigente(e, p) && pedidoAtrasado(e, p)); }
+  const entregasPendentes = (e, c) => e.pedidos.filter(p => !p.recebido && p.itens.some(i => i.sku === c));
+
+  const lojaVendeu = (e, d) => Object.values(e.vendas).some(v => (v[d] || 0) > 0);
+  function diasAbertosAntes(e, ate, n) {
+    const r = [];
+    for (let d = ate - 1; d >= -HISTORICO && r.length < n; d--) if (lojaVendeu(e, d)) r.push(d);
+    return r;
+  }
+  function poissonAcumulada(k, mu) { let termo = Math.exp(-mu), s = termo; for (let i = 1; i <= k; i++) { termo *= mu / i; s += termo; } return s; }
+  function queda(e, c) {
+    const p = e.politica;
+    const janela = diasAbertosAntes(e, e.hoje, p.diasObservados);
+    if (janela.length < p.diasObservados) return null;
+    const base = diasAbertosAntes(e, Math.min(...janela), JANELA_BASE);
+    if (!base.length) return null;
+    const lambda = base.reduce((s, d) => s + (e.vendas[c][d] || 0), 0) / base.length;
+    const obs = janela.reduce((s, d) => s + (e.vendas[c][d] || 0), 0);
+    const prob = poissonAcumulada(obs, lambda * janela.length);
+    return { lambda, obs, janela, prob, ultimoDia: janela[0], ativa: lambda >= p.vendaMinima && prob < p.limiar, perdida: Math.max(0, lambda * janela.length - obs) };
+  }
+  function verificadoRecente(e, c, q) { const v = ultima(e.verificacoes, x => x.sku === c); return v && q && v.dia >= q.ultimoDia; }
+  function avisosGondolaAbertos(e, c) {
+    return e.avisosGondola.filter(a => (!c || a.sku === c) && !e.verificacoes.some(x => x.sku === a.sku && x.seq > a.seq));
+  }
+  function estoqueDivergente(e, c) {
+    const v = ultima(e.verificacoes, x => x.sku === c);
+    if (!v || v.resultado !== 'sem_estoque_no_deposito' || v.disponivelNoErp <= 0) return null;
+    const d = ultimaDecisao(e, c);
+    if (d && d.seq > v.seq) return null;
+    if (e.skus[c].disponivel !== v.disponivelNoErp) return null;
+    return v;
+  }
+
+  function painelComprador(e) {
+    const p = e.politica, grupos = { vendas: [], divergente: [], ruptura: [], antesDaChegada: [], decididos: [] };
+    for (const c of Object.keys(e.skus)) {
+      const vig = decisaoVigente(e, c);
+      if (vig) { grupos.decididos.push({ c, decisao: vig }); continue; }
+      const q = queda(e, c), sug = sugestao(e, c);
+      const info = { c, cob: coberturaDias(e, c), avisos: avisosAbertos(e, c), parouDeVender: !!(q && q.ativa && e.skus[c].disponivel === 0), trans: sug.trans };
+      if (info.avisos.length) grupos.vendas.push(info);
+      else if (p.motivos.estoque_divergente && estoqueDivergente(e, c)) grupos.divergente.push(info);
+      else if (p.motivos.ruptura && emRuptura(e, c)) grupos.ruptura.push(info);
+      else if (p.motivos.ruptura_antes_da_chegada && sug.rupturaAntesDaChegada) grupos.antesDaChegada.push(info);
+    }
+    grupos.ruptura.sort((a, b) => (a.cob ?? 0) - (b.cob ?? 0));
+    const porFornecedor = {};
+    if (p.motivos.entrega_atrasada) for (const ped of entregasAtrasadas(e)) (porFornecedor[ped.fornecedor] ||= []).push(ped);
+    const entregas = Object.entries(porFornecedor).map(([f, peds]) => ({
+      fornecedor: f, pedidos: peds,
+      temRuptura: peds.some(x => x.itens.some(i => emRuptura(e, i.sku))),
+      maiorAtraso: Math.max(...peds.map(x => e.hoje - x.previsao)),
+    })).sort((a, b) => (b.temRuptura - a.temRuptura) || (b.maiorAtraso - a.maiorAtraso));
+    return { ...grupos, entregas };
+  }
+
+  function painelRepositor(e) {
+    const avisos = [], quedas = [];
+    for (const c of Object.keys(e.skus)) {
+      const q = queda(e, c), abertos = avisosGondolaAbertos(e, c);
+      const comQueda = q && q.ativa && e.skus[c].disponivel > 0 && !verificadoRecente(e, c, q);
+      if (abertos.length) avisos.push({ c, avisos: abertos, q: comQueda ? q : null });
+      else if (comQueda) quedas.push({ c, q });
+    }
+    avisos.sort((a, b) => a.avisos[0].seq - b.avisos[0].seq);
+    quedas.sort((a, b) => b.q.perdida - a.q.perdida);
+    return { avisos, quedas };
+  }
+
+  function participacao(e, produto) {
+    const codes = Object.keys(e.skus).filter(c => e.skus[c].produto === produto);
+    const janela = diasAbertosAntes(e, e.hoje, e.politica.diasMix);
+    const vendido = Object.fromEntries(codes.map(c => [c, janela.reduce((s, d) => s + (e.vendas[c][d] || 0), 0)]));
+    const total = codes.reduce((s, c) => s + vendido[c], 0);
+    return codes.map(c => ({ c, vendido: vendido[c], mediaDiaria: janela.length ? vendido[c] / janela.length : 0, part: total ? vendido[c] / total : 1 / codes.length, disp: e.skus[c].disponivel }));
+  }
+  function mix(e, produto, capacidade) {
+    const linhas = participacao(e, produto);
+    if (!capacidade) return linhas.map(l => ({ ...l, qtd: null }));
+    const eleg = linhas.filter(l => l.disp > 0).sort((a, b) => (b.part - a.part) || a.c.localeCompare(b.c));
+    const alloc = Object.fromEntries(linhas.map(l => [l.c, 0]));
+    let resto = capacidade;
+    for (const l of eleg.slice(0, Math.min(resto, eleg.length))) { alloc[l.c] = 1; resto--; }
+    while (resto > 0) {
+      const cand = eleg.filter(l => alloc[l.c] < l.disp);
+      if (!cand.length) break;
+      const soma = cand.reduce((s, l) => s + l.part, 0);
+      const cotas = cand.map(l => { const q = resto * (soma ? l.part / soma : 1 / cand.length); return { l, base: Math.floor(q), frac: q - Math.floor(q) }; });
+      let sobra = resto - cotas.reduce((s, x) => s + x.base, 0);
+      [...cotas].sort((a, b) => (b.frac - a.frac) || a.l.c.localeCompare(b.l.c)).forEach(x => { if (sobra > 0) { x.base++; sobra--; } });
+      let deu = 0;
+      for (const x of cotas) { const add = Math.min(x.base, x.l.disp - alloc[x.l.c]); alloc[x.l.c] += add; deu += add; }
+      resto -= deu;
+      if (deu === 0) break;
+    }
+    return linhas.map(l => ({ ...l, qtd: alloc[l.c] }));
+  }
+
+  function condicoes(e) {
+    const r = [], p = e.politica;
+    for (const c of Object.keys(e.skus)) {
+      if (p.motivos.ruptura && emRuptura(e, c) && !decisaoVigente(e, c))
+        r.push({ chave: 'ruptura:' + c, tipo: 'ruptura', destino: 'comprador', sku: c, texto: `${rotulo(e, c)} entrou em ruptura (segura ${coberturaDias(e, c).toFixed(0)} dias)` });
+      if (p.motivos.estoque_divergente && estoqueDivergente(e, c))
+        r.push({ chave: 'divergente:' + c, tipo: 'estoque_divergente', destino: 'comprador', sku: c, texto: `${rotulo(e, c)}: o repositor não achou no depósito, mas o ERP diz ${e.skus[c].disponivel}` });
+      const q = queda(e, c);
+      if (q && q.ativa && e.skus[c].disponivel > 0 && !verificadoRecente(e, c, q))
+        r.push({ chave: 'queda:' + c, tipo: 'queda_de_venda', destino: 'reposicao', sku: c, texto: `${rotulo(e, c)} parou de vender e tem estoque. Gôndola vazia?` });
+    }
+    if (p.motivos.entrega_atrasada) for (const ped of entregasAtrasadas(e))
+      r.push({ chave: 'entrega:' + ped.id + ':' + previsaoEfetiva(e, ped), tipo: 'entrega_atrasada', destino: 'comprador', pedido: ped.id, texto: `Entrega atrasada: pedido ${ped.id} da ${FORNECEDORES[ped.fornecedor].nome}` });
+    return r;
+  }
+  function varrer(e) {
+    const atuais = condicoes(e), chaves = new Set(atuais.map(a => a.chave));
+    for (const ep of e.episodios) if (ep.condicao && ep.fechado === null && !chaves.has(ep.chave)) ep.fechado = e.hoje;
+    for (const a of atuais) if (!e.episodios.some(ep => ep.chave === a.chave && ep.fechado === null))
+      e.episodios.push({ ...a, condicao: true, aberto: e.hoje, fechado: null, seq: ++e.seq });
+  }
+  function notificar(e, ep) { e.episodios.push({ ...ep, chave: ep.tipo + ':' + (e.seq + 1), condicao: false, aberto: e.hoje, fechado: e.hoje, seq: ++e.seq }); }
+  function paraUsuario(e, ep, uid) {
+    if (ep.destino === 'usuario:' + uid) return true;
+    const u = e.usuarios.find(x => x.id === uid);
+    return !!u && u.papeis.includes(ep.destino);
+  }
+  const notificacoes = (e, uid) => e.episodios.filter(ep => paraUsuario(e, ep, uid)).sort((a, b) => b.seq - a.seq);
+  const naoLidas = (e, uid) => notificacoes(e, uid).filter(ep => ep.seq > e.cursores[uid]);
+
+  function registrarAviso(e, { sku, tipo, por, comentario }) {
+    const a = { id: 'A' + (e.avisos.length + 1), sku, tipo, por, comentario, dia: e.hoje, seq: ++e.seq };
+    e.avisos.push(a);
+    notificar(e, { tipo: 'aviso', destino: 'comprador', sku, texto: `${nomeUsuario(e, por)} avisou: ${rotulo(e, sku)} ${tipo === 'acabou' ? 'acabou' : 'está vendendo muito'}` });
+    return a;
+  }
+
+  function aplicar(estado, acao) {
+    const e = structuredClone(estado);
+    const log = t => e.log.unshift(`${data(e.hoje)}: ${t}`);
+    switch (acao.tipo) {
+      case 'avancarDia': {
+        const vendidos = [];
+        for (const c of Object.keys(e.skus)) {
+          const s = e.skus[c];
+          const quer = Math.round(demanda(c, s.media, e.hoje) * e.gondola[c]);
+          const v = Math.min(s.disponivel, quer);
+          s.disponivel -= v; e.vendas[c][e.hoje] = v;
+          if (c.startsWith('TAP-MAR') || e.gondola[c] < 1) vendidos.push(`${c} vendeu ${v}`);
+        }
+        log(domingo(e.hoje) ? 'Domingo, loja fechada, nenhuma venda.' : `Fim do dia. ${vendidos.join(', ')}`);
+        e.hoje++;
+        break;
+      }
+      case 'mundoGondola': e.gondola[acao.sku] = acao.fator; log(`Mundo real: gôndola de ${acao.sku} agora ${acao.fator === 1 ? 'cheia' : acao.fator === 0 ? 'vazia' : 'pela metade'} (o Copilot não vê isso).`); break;
+      case 'ajusteErp': e.skus[acao.sku].disponivel = acao.disponivel; log(`ERP: disponível de ${acao.sku} agora é ${acao.disponivel}.`); break;
+      case 'chegarPedido': {
+        const p = e.pedidos.find(x => x.id === acao.pedido);
+        p.recebido = true;
+        for (const i of p.itens) e.skus[i.sku].disponivel += i.pendente;
+        log(`Chegou a mercadoria do pedido ${p.id}.`);
+        break;
+      }
+      case 'aviso': registrarAviso(e, { sku: acao.sku, tipo: acao.tipoAviso, por: acao.por, comentario: acao.comentario }); log(`${nomeUsuario(e, acao.por)} avisou a compradora: ${acao.sku} ${acao.tipoAviso === 'acabou' ? 'acabou' : 'vendendo muito'}.`); break;
+      case 'avisoGondola': {
+        e.avisosGondola.push({ id: 'G' + (e.avisosGondola.length + 1), sku: acao.sku, setor: acao.setor, por: acao.por, comentario: acao.comentario, dia: e.hoje, seq: ++e.seq, disponivelNoErp: e.skus[acao.sku].disponivel });
+        e.setorDoSku[acao.sku] = acao.setor;
+        notificar(e, { tipo: 'gondola_vazia', destino: 'reposicao', sku: acao.sku, texto: `${nomeUsuario(e, acao.por)}: gôndola vazia de ${rotulo(e, acao.sku)} no setor ${acao.setor}` });
+        log(`${nomeUsuario(e, acao.por)} avisou o repositor: gôndola vazia de ${acao.sku} (${acao.setor}).`);
+        break;
+      }
+      case 'decisao': {
+        const abertos = avisosAbertos(e, acao.sku);
+        e.decisoes.push({ sku: acao.sku, tipo: acao.decisao, qtd: acao.qtd, motivo: acao.motivo, por: acao.por, dia: e.hoje, seq: ++e.seq, sugerida: sugestao(e, acao.sku).qtd });
+        for (const a of abertos) notificar(e, { tipo: 'decisao_sobre_aviso', destino: 'usuario:' + a.por, sku: acao.sku, texto: `A compradora decidiu sobre o seu aviso de ${rotulo(e, acao.sku)}: ${textoDecisao({ tipo: acao.decisao, qtd: acao.qtd, motivo: acao.motivo })}` });
+        log(`${nomeUsuario(e, acao.por)} registrou a decisão de compra de ${acao.sku}: ${acao.decisao}.`);
+        break;
+      }
+      case 'verificacao': {
+        const abertos = avisosGondolaAbertos(e, acao.sku);
+        e.verificacoes.push({ sku: acao.sku, resultado: acao.resultado, comentario: acao.comentario, por: acao.por, dia: e.hoje, seq: ++e.seq, disponivelNoErp: e.skus[acao.sku].disponivel });
+        if (acao.setor) e.setorDoSku[acao.sku] = acao.setor;
+        if (acao.resultado === 'repus') e.gondola[acao.sku] = 1;
+        for (const a of abertos) notificar(e, { tipo: 'verificacao_sobre_aviso', destino: 'usuario:' + a.por, sku: acao.sku, texto: `O repositor verificou a gôndola de ${rotulo(e, acao.sku)}: ${TEXTO_VERIFICACAO[acao.resultado]}` });
+        log(`${nomeUsuario(e, acao.por)} verificou a gôndola de ${acao.sku}: ${TEXTO_VERIFICACAO[acao.resultado]}.`);
+        break;
+      }
+      case 'cobranca': e.cobrancas.push({ pedido: acao.pedido, novaPrevisao: acao.novaPrevisao, comentario: acao.comentario, por: acao.por, dia: e.hoje, seq: ++e.seq }); log(`Carla cobrou o pedido ${acao.pedido}${acao.novaPrevisao !== null ? `, nova previsão ${data(acao.novaPrevisao)}` : ''}.`); break;
+      case 'capacidade': e.capacidades[acao.produto] = acao.capacidade; log(`Rafa gravou: cabem ${acao.capacidade} peças de ${PRODUTOS[acao.produto]} na gôndola.`); break;
+      case 'politica': e.politica = { ...e.politica, ...acao.mudanca, motivos: { ...e.politica.motivos, ...(acao.mudanca.motivos || {}) } }; log('Carla mudou a política de compra.'); break;
+      case 'marcarVistas': e.cursores[acao.uid] = e.seq; return e;
+      case 'usuarioAtivo': { const u = e.usuarios.find(x => x.id === acao.uid); u.ativo = !u.ativo; log(`Admin ${u.ativo ? 'reativou' : 'desativou'} ${u.nome}.`); break; }
+      case 'novoSetor': if (acao.nome && !e.setores.includes(acao.nome)) { e.setores.push(acao.nome); log(`Admin criou o setor ${acao.nome}.`); } break;
+    }
+    varrer(e);
+    e.log = e.log.slice(0, 30);
+    return e;
+  }
+
+  const TEXTO_VERIFICACAO = { repus: 'repôs a gôndola', estava_na_gondola: 'estava na gôndola (alarme falso)', sem_estoque_no_deposito: 'não tinha no depósito' };
+  function textoDecisao(d) {
+    if (d.tipo === 'vou_comprar') return `vai comprar ${d.qtd} peças`;
+    if (d.tipo === 'negociando') return 'está negociando com o fornecedor';
+    return `não vai comprar agora (${d.motivo})`;
+  }
+
+  return {
+    estadoInicial, aplicar, data, domingo, rotulo, nomeUsuario, FORNECEDORES, PRODUTOS, TEXTO_VERIFICACAO, textoDecisao,
+    coberturaDias, emRuptura, emTransito, sugestao, avisosAbertos, decisaoVigente, previsaoEfetiva, cobrancaVigente,
+    entregasPendentes, queda, painelComprador, painelRepositor, participacao, mix, notificacoes, naoLidas, estoqueDivergente,
+    avisosGondolaAbertos,
+  };
+})();
+if (typeof module !== 'undefined') module.exports = Modelo;
+</script>
+
+<script>
+// Casca da página: renderiza o estado e chama o Modelo. Descartável.
+const M = Modelo;
+let estado = M.estadoInicial();
+let anterior = null;
+const visao = { uid: 'carla', tela: { carla: 'painel', bia: 'buscar', rafa: 'painel', rodrigo: 'usuarios' }, sku: 'TAP-MAR', filtros: {}, busca: '', gondolaSku: null, produtoMix: 'tapete', capDigitada: null, sinoAberto: false, popupVisto: { carla: 0, bia: 0, rafa: 0, rodrigo: 0 } };
+const PAPEIS = {
+  carla: { cor: 'var(--comprador)', papel: 'Compradora chefe', onde: 'no computador da loja', faz: 'decide o que comprar, de quem e quando' },
+  bia: { cor: 'var(--vendas)', papel: 'Vendedora (equipe de vendas)', onde: 'no celular, no balcão', faz: 'atende o cliente, avisa a compradora e o repositor' },
+  rafa: { cor: 'var(--reposicao)', papel: 'Repositor', onde: 'no celular, andando pela loja', faz: 'leva a mercadoria do depósito para a gôndola' },
+  rodrigo: { cor: 'var(--admin)', papel: 'Admin', onde: 'no computador', faz: 'cadastra pessoas e setores' },
+};
+const TELAS = {
+  carla: [['painel', 'Painel de alertas'], ['sku', 'Tela do SKU'], ['estoque', 'Estoque'], ['politica', 'Política de compra']],
+  bia: [['buscar', 'Buscar e avisar'], ['meus', 'Meus avisos']],
+  rafa: [['painel', 'Painel do repositor'], ['gondola', 'Montar gôndola']],
+  rodrigo: [['usuarios', 'Usuários'], ['setores', 'Setores']],
+};
+
+function despachar(acao) { anterior = estado; estado = M.aplicar(estado, acao); render(); }
+function ir(uid, tela, extra = {}) { visao.uid = uid; if (tela) visao.tela[uid] = tela; Object.assign(visao, extra); visao.sinoAberto = false; render(); }
+const esc = s => String(s ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const val = id => document.getElementById(id)?.value ?? '';
+const rot = c => M.rotulo(estado, c);
+const nome = id => M.nomeUsuario(estado, id);
+const dias = n => n === null ? 'sem venda' : `${Math.floor(n)} dias`;
+const nota = (quem, faz, tickets, extra = '') => `<div class="nota"><b>Quem usa:</b> ${quem}. <b>O que faz:</b> ${faz} <span class="suave">(${tickets})</span>${extra ? '<br>' + extra : ''}</div>`;
+const opine = t => `<div class="opine"><b>Para você opinar:</b> ${t}</div>`;
+const selo = (t, c = '') => `<span class="selo ${c}">${t}</span>`;
+function abrirSku(c) { ir('carla', 'sku', { sku: c }); }
+
+function render() {
+  const foco = document.activeElement && document.activeElement.id ? { id: document.activeElement.id, pos: document.activeElement.selectionStart } : null;
+  renderPapeis(); renderApp(); renderLado(); renderCenarios(); renderToast();
+  if (foco) { const el = document.getElementById(foco.id); if (el) { el.focus(); if (foco.pos !== null && el.setSelectionRange) try { el.setSelectionRange(foco.pos, foco.pos); } catch (_) {} } }
+}
+
+function renderPapeis() {
+  document.getElementById('papeis').innerHTML = Object.entries(PAPEIS).map(([uid, p]) => {
+    const n = M.naoLidas(estado, uid).length, ativa = visao.uid === uid;
+    return `<button class="${ativa ? 'ativa' : ''}" style="border-color:${p.cor};${ativa ? 'background:' + p.cor : 'color:' + p.cor}" onclick="ir('${uid}')">${nome(uid)} · ${p.papel}${n ? ` <span class="badge">${n}</span>` : ''}</button>`;
+  }).join('');
+}
+
+function renderApp() {
+  const uid = visao.uid, p = PAPEIS[uid], tela = visao.tela[uid];
+  const n = M.naoLidas(estado, uid).length;
+  const celular = uid === 'bia' || uid === 'rafa';
+  const telas = TELAS[uid].map(([id, t]) => `<button class="${tela === id ? 'ativa' : ''}" onclick="ir('${uid}','${id}')">${t}</button>`).join('');
+  let corpo = '';
+  if (uid === 'carla') corpo = { painel: telaPainelComprador, sku: telaSku, estoque: telaEstoque, politica: telaPolitica }[tela]();
+  if (uid === 'bia') corpo = { buscar: telaBuscar, meus: telaMeusAvisos }[tela]();
+  if (uid === 'rafa') corpo = { painel: telaPainelRepositor, gondola: telaGondola }[tela]();
+  if (uid === 'rodrigo') corpo = { usuarios: telaUsuarios, setores: telaSetores }[tela]();
+  const app = document.getElementById('app');
+  app.style.borderColor = p.cor;
+  app.innerHTML = `
+    <div class="quem" style="background:${p.cor}">
+      <span><b>Você está vendo como ${nome(uid)}</b>, ${p.papel.toLowerCase()}, ${p.onde}. Função: ${p.faz}.</span>
+      <button onclick="visao.sinoAberto=!visao.sinoAberto;render()">🔔 Notificações ${n ? `<span class="badge">${n}</span>` : ''}</button>
+    </div>
+    <div class="telas">${telas}</div>
+    <div class="corpo">${visao.sinoAberto ? telaSino() : ''}${celular ? `<div class="celular">${corpo}</div>` : corpo}</div>`;
+}
+
+function telaSino() {
+  const uid = visao.uid, lista = M.notificacoes(estado, uid), cur = estado.cursores[uid];
+  return `<div class="bloco" style="margin:0 0 12px">
+    ${nota('todas as pessoas logadas', 'mostra o que aconteceu para o seu papel. Cada condição (ruptura, entrega atrasada, parou de vender) notifica uma vez enquanto durar.', 'ticket 10')}
+    <div class="linha"><b>Notificações de ${nome(uid)}</b><button onclick="despachar({tipo:'marcarVistas',uid:'${uid}'})">Marcar tudo como lido</button></div>
+    ${lista.length ? lista.map(ep => `<div class="item"><span>${ep.seq > cur ? selo('nova', 'verm') : ''}${esc(ep.texto)} <span class="suave">(${M.data(ep.aberto)})</span></span>${ep.sku && uid === 'carla' ? `<button onclick="abrirSku('${ep.sku}')">Abrir</button>` : ''}</div>`).join('') : '<p class="suave">Nada por aqui.</p>'}
+  </div>`;
+}
+
+function linhaSku(c, extra = '', acoes = '') {
+  const s = estado.skus[c];
+  return `<div class="item"><span><b>${esc(rot(c))}</b> <span class="suave">${c}</span><br>
+    segura <b>${dias(M.coberturaDias(estado, c))}</b> · disponível ${s.disponivel} · vende ~${s.media}/dia ${extra}</span>
+    <span>${acoes}<button onclick="abrirSku('${c}')">Abrir SKU</button></span></div>`;
+}
+
+function filtrar(c, f) {
+  const s = estado.skus[c], t = (f.busca || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/\s+/).filter(Boolean);
+  const alvo = `${c} ${rot(c)}`.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  return t.every(p => alvo.includes(p)) && (!f.categoria || s.categoria === f.categoria);
+}
+function barraFiltros(prefixo, comMotivo) {
+  const f = visao.filtros[prefixo] ||= {};
+  const cats = [...new Set(Object.values(estado.skus).map(s => s.categoria))];
+  return `<div class="linha">
+    <input id="${prefixo}-busca" placeholder="Buscar código, nome, cor, tamanho" value="${esc(f.busca || '')}" oninput="visao.filtros['${prefixo}'].busca=this.value;render()">
+    <select id="${prefixo}-cat" onchange="visao.filtros['${prefixo}'].categoria=this.value;render()"><option value="">Todas as categorias</option>${cats.map(x => `<option ${f.categoria === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+    ${comMotivo ? `<select onchange="visao.filtros['${prefixo}'].motivo=this.value;render()"><option value="">Todos os motivos</option>${[['vendas', 'Aviso da equipe de vendas'], ['divergente', 'Estoque divergente'], ['ruptura', 'Em ruptura'], ['entregas', 'Entrega atrasada']].map(([v, t]) => `<option value="${v}" ${f.motivo === v ? 'selected' : ''}>${t}</option>`).join('')}</select>` : ''}
+  </div>`;
+}
+
+function telaPainelComprador() {
+  const pc = M.painelComprador(estado), f = visao.filtros.painel || {};
+  const mostra = g => !f.motivo || f.motivo === g;
+  const fil = l => l.filter(i => filtrar(i.c, f));
+  const sel = i => [i.parouDeVender ? selo('parou de vender', 'verm') : '', i.trans ? selo(`compra a caminho: ${i.trans} un.`, 'azul') : '', estado.skus[i.c].disponivel === 0 ? selo('zerado', 'verm') : ''].join('');
+  const grupo = (id, titulo, explica, lista, cor, render) => mostra(id) ? `<div class="grupo" style="border-color:${cor}"><h3>${titulo} (${lista.length})</h3><p class="suave">${explica}</p>${lista.length ? lista.map(render).join('') : '<p class="suave">Nenhum.</p>'}</div>` : '';
+  const ent = mostra('entregas') ? `<div class="grupo" style="border-color:#7a3f05"><h3>Entregas atrasadas, por fornecedor (${pc.entregas.length})</h3>
+    <p class="suave">Pedidos com a data prevista vencida e mercadoria por chegar. Agrupado por fornecedor porque você liga para o fornecedor, não para cada SKU. Ticket 09.</p>
+    ${pc.entregas.length ? pc.entregas.map(g => `<div class="item" style="display:block"><b>${M.FORNECEDORES[g.fornecedor].nome}</b> ${g.temRuptura ? selo('tem SKU em ruptura', 'verm') : ''}
+      ${g.pedidos.map(p => `<div style="margin:6px 0 0 8px">Pedido <b>${p.id}</b>, previsto para ${M.data(p.previsao)}, <b>${estado.hoje - M.previsaoEfetiva(estado, p)} dias de atraso</b>
+        <ul style="margin:4px 0">${p.itens.map(i => `<li>${esc(rot(i.sku))}: faltam ${i.pendente} ${M.emRuptura(estado, i.sku) ? selo('em ruptura', 'verm') : ''}${(M.queda(estado, i.sku) || {}).ativa && estado.skus[i.sku].disponivel === 0 ? selo('parou de vender', 'verm') : ''}</li>`).join('')}</ul>
+        <div class="linha">Nova previsão em <input id="np-${p.id}" type="number" min="0" style="width:60px" placeholder="dias"> dias (opcional) <input id="nc-${p.id}" placeholder="o que o fornecedor disse"><button class="prim" onclick="cobrar('${p.id}')">Cobrei o fornecedor</button></div></div>`).join('')}</div>`).join('') : '<p class="suave">Nenhuma.</p>'}</div>` : '';
+  return `${nota('Carla, compradora chefe', 'é a tela inicial dela. Junta tudo que pede atenção agora, calculado na hora. Nada aparece aqui só porque o tempo passou: precisa de um motivo.', 'tickets 02, 07, 09, 12')}
+    ${barraFiltros('painel', true)}
+    ${grupo('vendas', 'Pedidos da equipe de vendas', 'Avisos das vendedoras sem decisão de compra. Aparecem mesmo quando a conta não vê problema.', fil(pc.vendas), 'var(--vendas)', i => linhaSku(i.c, '<br>' + i.avisos.map(a => selo(`${nome(a.por)}: ${a.tipo === 'acabou' ? 'acabou' : 'vendendo muito'}`, 'verde') + (a.comentario ? `<i>"${esc(a.comentario)}"</i>` : '')).join(' ') + sel(i)))}
+    ${grupo('divergente', 'Estoque divergente', 'O repositor não achou no depósito, mas o ERP diz que tem. Mande contar ou compre. Ticket 12.', fil(pc.divergente), '#8a1c1c', i => { const v = M.estoqueDivergente(estado, i.c); return linhaSku(i.c, `<br>${selo(`${nome(v.por)} verificou em ${M.data(v.dia)}: ERP dizia ${v.disponivelNoErp}`, 'verm')}`); })}
+    ${grupo('ruptura', `Em ruptura (segura menos de ${estado.politica.pisoAlertaDias} dias)`, 'Cobertura em dias = disponível ÷ venda média diária. Não usa o prazo do fornecedor (ADR-0006). Do que acaba antes para o que acaba depois. Ticket 02.', fil(pc.ruptura), 'var(--comprador)', i => linhaSku(i.c, '<br>' + sel(i)))}
+    ${estado.politica.motivos.ruptura_antes_da_chegada ? grupo('antes', 'Vai faltar antes da compra chegar (lead time ligado)', 'Só aparece porque a política está usando o prazo do fornecedor.', fil(pc.antesDaChegada), '#555', i => linhaSku(i.c)) : ''}
+    ${ent}
+    <details><summary>Decididos nos últimos 7 dias (${pc.decididos.length})</summary>${pc.decididos.map(d => linhaSku(d.c, '<br>' + selo(M.textoDecisao(d.decisao), 'azul'))).join('') || '<p class="suave">Nenhum.</p>'}</details>
+    ${opine('a ordem dos grupos está certa? Entrega atrasada deveria vir antes da ruptura? O comprador quer ver os "decididos" ou só some com eles?')}`;
+}
+
+function cobrar(pid) {
+  const n = val('np-' + pid);
+  despachar({ tipo: 'cobranca', pedido: pid, novaPrevisao: n === '' ? null : estado.hoje + Number(n), comentario: val('nc-' + pid), por: 'carla' });
+}
+
+function telaSku() {
+  const c = visao.sku, s = estado.skus[c], sug = M.sugestao(estado, c), q = M.queda(estado, c);
+  const vend = []; for (let d = estado.hoje - 14; d < estado.hoje; d++) vend.push(`<td class="num" title="${M.data(d)}">${M.domingo(d) ? '<span class="suave">-</span>' : (estado.vendas[c][d] ?? 0)}</td>`);
+  const pend = M.entregasPendentes(estado, c);
+  const part = M.participacao(estado, s.produto);
+  const avisos = M.avisosAbertos(estado, c);
+  const verifs = estado.verificacoes.filter(v => v.sku === c);
+  return `${nota('Carla, compradora chefe', 'tudo o que ela precisa para decidir sobre um SKU, num lugar só. Termina na decisão de compra: o pedido de verdade ela lança no ERP depois de negociar.', 'tickets 02, 09, 12, 15')}
+    <div class="linha"><select onchange="visao.sku=this.value;render()">${Object.keys(estado.skus).map(x => `<option value="${x}" ${x === c ? 'selected' : ''}>${x} · ${esc(rot(x))}</option>`).join('')}</select></div>
+    <h2>${esc(rot(c))} <span class="suave">${c}</span></h2>
+    <div class="cartoes">
+      <div class="cartao"><span class="suave">Segura</span><div class="grande">${dias(M.coberturaDias(estado, c))}</div>${M.emRuptura(estado, c) ? selo('em ruptura', 'verm') : selo('ok', 'verde')}</div>
+      <div class="cartao"><span class="suave">Disponível</span><div class="grande">${s.disponivel}</div></div>
+      <div class="cartao"><span class="suave">Venda média diária</span><div class="grande">${s.media}</div></div>
+      <div class="cartao"><span class="suave">A caminho</span><div class="grande">${sug.trans}</div></div>
+    </div>
+    <h3>Vendas dos últimos 14 dias <span class="suave">(- = domingo, loja fechada)</span></h3>
+    <table><tr>${vend.join('')}</tr></table>
+    ${q ? `<p class="suave">Detecção de queda: vendia ~${q.lambda.toFixed(1)}/dia, vendeu ${q.obs} nos últimos ${q.janela.length} dias abertos. Chance de isso ser normal: ${(q.prob * 100).toFixed(q.prob < 0.01 ? 4 : 1)}%. ${q.ativa ? selo('parou de vender', 'verm') : ''}</p>` : ''}
+    <h3>Sugestão de pedido</h3>
+    <div class="item" style="display:block"><b>${sug.qtd ? `Comprar ${sug.qtd} peças da ${sug.fornecedor}` : 'Não precisa comprar agora'}</b>
+      <div class="suave">Memória de cálculo: posição = disponível ${sug.disponivel} + a caminho ${sug.trans} = ${sug.pos}.
+      ${sug.lt ? `Lead time de ${sug.lt} dias: na chegada sobram ${Math.round(sug.naChegada)}.` : '<b>Lead time ignorado</b> (padrão novo): conta a partir da posição de hoje.'}
+      Compra quando a posição fica abaixo de ${estado.politica.pisoReposicaoDias} dias de venda (${s.media * estado.politica.pisoReposicaoDias} peças) e cobre ${estado.politica.pisoReposicaoDias} + ${estado.politica.cicloDias} dias.
+      ${sug.rupturaAntesDaChegada ? selo('vai faltar antes da compra chegar', 'verm') : ''}</div></div>
+    <h3>Entregas pendentes (ticket 09)</h3>
+    ${pend.length ? pend.map(p => { const cob = M.cobrancaVigente(estado, p); return `<div class="item">Pedido ${p.id}: ${p.itens.find(i => i.sku === c).pendente} peças, previsto ${M.data(p.previsao)}${M.previsaoEfetiva(estado, p) !== p.previsao ? `, nova previsão ${M.data(M.previsaoEfetiva(estado, p))}` : ''} ${M.previsaoEfetiva(estado, p) < estado.hoje ? selo('atrasada', 'verm') : ''}${cob ? selo('cobrado em ' + M.data(cob.dia), 'azul') : ''}</div>`; }).join('') : '<p class="suave">Nenhuma.</p>'}
+    <h3>Avisos abertos da equipe de vendas</h3>
+    ${avisos.length ? avisos.map(a => `<div class="item">${nome(a.por)}: ${a.tipo === 'acabou' ? 'acabou' : 'vendendo muito'} ${a.comentario ? `"${esc(a.comentario)}"` : ''} <span class="suave">${M.data(a.dia)}</span></div>`).join('') : '<p class="suave">Nenhum.</p>'}
+    <h3>Verificações de gôndola (ticket 12)</h3>
+    ${verifs.length ? verifs.map(v => `<div class="item">${nome(v.por)} em ${M.data(v.dia)}: ${M.TEXTO_VERIFICACAO[v.resultado]} (ERP dizia ${v.disponivelNoErp})</div>`).join('') : '<p class="suave">Nenhuma.</p>'}
+    <h3>Participação nas vendas do produto (ticket 15)</h3>
+    <p class="suave">Para comprar a grade na proporção do que vende, e não 20 de cada cor.</p>
+    <table><tr><th>SKU</th><th>Participação</th><th class="num">Venda/dia</th></tr>${part.map(l => `<tr ${l.c === c ? 'style="font-weight:700"' : ''}><td>${esc(rot(l.c))}</td><td><div class="linha"><div class="barra" style="width:120px"><div style="width:${Math.round(l.part * 100)}%"></div></div>${Math.round(l.part * 100)}%</div></td><td class="num">${l.mediaDiaria.toFixed(1)}</td></tr>`).join('')}</table>
+    <h3>Decisão de compra</h3>
+    <div class="linha"><select id="dec-tipo"><option value="vou_comprar">Vou comprar</option><option value="negociando">Negociando</option><option value="nao_comprar_agora">Não comprar agora</option></select>
+      <input id="dec-qtd" type="number" value="${sug.qtd || ''}" placeholder="quantidade" style="width:100px"><input id="dec-motivo" placeholder="motivo (obrigatório se não for comprar)">
+      <button class="prim" onclick="decidir('${c}')">Registrar decisão</button></div>
+    <p class="suave">A decisão fecha os avisos das vendedoras (elas são notificadas) e tira o SKU do painel por 7 dias.</p>
+    ${opine('falta algum dado que a compradora olha no ERP antes de decidir? O que ela vê primeiro?')}`;
+}
+function decidir(c) {
+  const tipo = val('dec-tipo'), qtd = Number(val('dec-qtd')) || null, motivo = val('dec-motivo');
+  if (tipo === 'vou_comprar' && !qtd) return alerta('Informe a quantidade.');
+  if (tipo === 'nao_comprar_agora' && !motivo) return alerta('Informe o motivo.');
+  despachar({ tipo: 'decisao', sku: c, decisao: tipo, qtd: tipo === 'vou_comprar' ? qtd : null, motivo: motivo || null, por: 'carla' });
+}
+function alerta(t) { const el = document.getElementById('toast'); el.innerHTML = `<div class="toast">${esc(t)}<br><button onclick="this.parentNode.remove()">Ok</button></div>`; }
+
+function telaEstoque() {
+  const f = visao.filtros.estoque ||= {};
+  let linhas = Object.keys(estado.skus).filter(c => filtrar(c, f));
+  if (f.situacao === 'ruptura') linhas = linhas.filter(c => M.emRuptura(estado, c));
+  if (f.situacao === 'transito') linhas = linhas.filter(c => M.emTransito(estado, c) > 0);
+  const ordem = f.ordem || 'cobertura';
+  linhas.sort((a, b) => ordem === 'nome' ? rot(a).localeCompare(rot(b)) : ordem === 'venda' ? estado.skus[b].media - estado.skus[a].media : (M.coberturaDias(estado, a) ?? 1e9) - (M.coberturaDias(estado, b) ?? 1e9));
+  return `${nota('Carla, compradora chefe', 'lista todos os SKUs, não só os que estão no painel. É a visão geral que hoje ela tira do ERP. Paginada no sistema real, para milhares de SKUs.', 'ticket 08')}
+    ${barraFiltros('estoque', false)}
+    <div class="linha">Situação <select onchange="visao.filtros.estoque.situacao=this.value;render()"><option value="">Todas</option><option value="ruptura" ${f.situacao === 'ruptura' ? 'selected' : ''}>Só em ruptura</option><option value="transito" ${f.situacao === 'transito' ? 'selected' : ''}>Com compra a caminho</option></select>
+      Ordenar por <select onchange="visao.filtros.estoque.ordem=this.value;render()">${[['cobertura', 'Dias que segura'], ['venda', 'Venda diária'], ['nome', 'Nome']].map(([v, t]) => `<option value="${v}" ${ordem === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+    <table><tr><th>SKU</th><th>Produto</th><th>Categoria</th><th class="num">Disponível</th><th class="num">A caminho</th><th class="num">Venda/dia</th><th class="num">Segura</th><th></th></tr>
+    ${linhas.map(c => `<tr><td>${c}</td><td>${esc(rot(c))}</td><td>${estado.skus[c].categoria}</td><td class="num">${estado.skus[c].disponivel}</td><td class="num">${M.emTransito(estado, c)}</td><td class="num">${estado.skus[c].media}</td><td class="num">${dias(M.coberturaDias(estado, c))} ${M.emRuptura(estado, c) ? selo('ruptura', 'verm') : ''}</td><td><button onclick="abrirSku('${c}')">Abrir</button></td></tr>`).join('')}</table>`;
+}
+
+function telaPolitica() {
+  const p = estado.politica;
+  const num = (campo, rotulo, ticket) => `<div class="linha"><label style="min-width:330px">${rotulo}</label><input type="number" step="any" value="${p[campo]}" style="width:90px" onchange="despachar({tipo:'politica',mudanca:{${campo}:Number(this.value)}})"> <span class="suave">${ticket}</span></div>`;
+  const chk = (m, t) => `<label style="display:block"><input type="checkbox" ${p.motivos[m] ? 'checked' : ''} onchange="despachar({tipo:'politica',mudanca:{motivos:{${m}:this.checked}}})"> ${t}</label>`;
+  return `${nota('Carla, compradora chefe', 'as regras dela, em linguagem de comprador. O sistema não embute a opinião de quem programou (ADR-0003).', 'tickets 02, 09, 11, 12, 15')}
+    <h3>Ruptura</h3>
+    ${num('pisoAlertaDias', 'Quantos dias de venda o estoque precisa segurar?', 'abaixo disso: ruptura')}
+    <div class="linha"><label style="min-width:330px">Usar o prazo do fornecedor (lead time) nas contas?</label><select onchange="despachar({tipo:'politica',mudanca:{leadTime:this.value}})"><option value="ignorar" ${p.leadTime === 'ignorar' ? 'selected' : ''}>Não usar (padrão novo)</option><option value="usar" ${p.leadTime === 'usar' ? 'selected' : ''}>Usar o lead time do fornecedor</option></select></div>
+    <h3>Quanto comprar</h3>
+    ${num('pisoReposicaoDias', 'Folga em dias quando a compra chega (piso de reposição)', '')}
+    ${num('cicloDias', 'Cada compra cobre mais quantos dias? (ciclo)', '')}
+    <h3>O que aparece no painel de alertas</h3>
+    ${chk('ruptura', 'Ruptura (segura menos dias que o mínimo)')}${chk('entrega_atrasada', 'Entrega atrasada')}${chk('estoque_divergente', 'Estoque divergente (repositor não achou)')}${chk('ruptura_antes_da_chegada', 'Vai faltar antes da compra chegar (só faz sentido com lead time)')}
+    <h3>Parou de vender (repositor) <span class="suave">a validar com o comprador</span></h3>
+    ${num('diasObservados', 'Quantos dias abertos olhar', 'ticket 11')}
+    ${num('vendaMinima', 'Só vigiar SKUs que vendem pelo menos X por dia', '')}
+    ${num('limiar', 'Sensibilidade (chance de ser normal abaixo de)', '0,01 = 1%')}
+    ${opine('as perguntas estão no jeito que o comprador fala? "Dias que o estoque precisa segurar" é o número que ele tem na cabeça?')}`;
+}
+
+function telaBuscar() {
+  const t = visao.busca;
+  const res = t.length >= 2 ? Object.keys(estado.skus).filter(c => filtrar(c, { busca: t })) : [];
+  return `${nota('Bia, vendedora', 'no balcão, consulta se tem, se vem e quando chega, e avisa quem resolve: a compradora (acabou, vendendo muito) ou o repositor (gôndola vazia). Não vê preço de compra nem fornecedor.', 'tickets 13, 14')}
+    <input id="busca-bia" style="width:100%" placeholder="Buscar: tapete marrom, toalha..." value="${esc(t)}" oninput="visao.busca=this.value;render()">
+    ${t.length < 2 ? '<p class="suave">Digite pelo menos 2 letras.</p>' : res.length ? res.map(c => cartaoVendedora(c)).join('') : '<p class="suave">Nada encontrado.</p>'}
+    ${opine('o que mais a vendedora pergunta ao comprador no dia a dia? Preço de venda? Similar (fica para quando tivermos o Maos)?')}`;
+}
+function cartaoVendedora(c) {
+  const s = estado.skus[c], situ = s.disponivel === 0 ? ['acabou', 'verm'] : M.emRuptura(estado, c) ? ['tem pouco', 'lar'] : ['tem', 'verde'];
+  const pend = M.entregasPendentes(estado, c).map(p => { const pv = M.previsaoEfetiva(estado, p); return `Vem ${p.itens.find(i => i.sku === c).pendente}: ${pv < estado.hoje ? selo('atrasada', 'verm') + 'previsão vencida' : 'chega por volta de ' + M.data(pv)}`; });
+  const aberto = visao.gondolaSku === c;
+  return `<div class="item" style="display:block"><b>${esc(rot(c))}</b><br>${selo(situ[0], situ[1])} ${s.disponivel} no estoque<br>${pend.join('<br>')}
+    <div class="linha"><button onclick="despachar({tipo:'aviso',sku:'${c}',tipoAviso:'acabou',por:'bia'})">Avisar compradora: acabou</button><button onclick="despachar({tipo:'aviso',sku:'${c}',tipoAviso:'vendendo_muito',por:'bia'})">Avisar: vendendo muito</button><button onclick="visao.gondolaSku=${aberto ? 'null' : `'${c}'`};render()">Gôndola vazia</button></div>
+    ${aberto ? `<div class="bloco" style="margin:6px 0">${s.disponivel === 0 ? '<div class="nota">O sistema diz que não tem estoque. Pode avisar mesmo assim.</div>' : ''}
+      Setor <select id="g-setor">${estado.setores.map(x => `<option ${estado.setorDoSku[c] === x ? 'selected' : ''}>${x}</option>`).join('')}</select>${estado.setorDoSku[c] ? '' : ' <span class="suave">(setor ainda desconhecido)</span>'}
+      <input id="g-com" style="width:100%;margin-top:6px" placeholder="Comentário (opcional)"><button class="prim" style="margin-top:6px" onclick="avisarGondola('${c}')">Avisar o repositor</button></div>` : ''}</div>`;
+}
+function avisarGondola(c) { visao.gondolaSku = null; despachar({ tipo: 'avisoGondola', sku: c, setor: val('g-setor'), comentario: val('g-com'), por: 'bia' }); }
+
+function telaMeusAvisos() {
+  const meus = [
+    ...estado.avisos.filter(a => a.por === 'bia').map(a => { const d = estado.decisoes.find(x => x.sku === a.sku && x.seq > a.seq); return { seq: a.seq, t: `${a.tipo === 'acabou' ? 'Acabou' : 'Vendendo muito'}: ${rot(a.sku)}`, para: 'compradora', res: d ? M.textoDecisao({ tipo: d.tipo, qtd: d.qtd, motivo: d.motivo }) : null, dia: a.dia }; }),
+    ...estado.avisosGondola.filter(a => a.por === 'bia').map(a => { const v = estado.verificacoes.find(x => x.sku === a.sku && x.seq > a.seq); return { seq: a.seq, t: `Gôndola vazia: ${rot(a.sku)} (${a.setor})`, para: 'repositor', res: v ? M.TEXTO_VERIFICACAO[v.resultado] : null, dia: a.dia }; }),
+  ].sort((a, b) => b.seq - a.seq);
+  return `${nota('Bia, vendedora', 'mostra o que aconteceu com cada aviso dela, para saber o que dizer ao cliente.', 'tickets 13, 14')}
+    ${meus.length ? meus.map(m => `<div class="item" style="display:block"><b>${esc(m.t)}</b> <span class="suave">${M.data(m.dia)}, para o ${m.para === 'compradora' ? 'a compradora' : 'o repositor'}</span><br>${m.res ? selo(m.res, 'verde') : selo('aguardando ' + (m.para === 'compradora' ? 'a compradora' : 'o repositor'), 'lar')}</div>`).join('') : '<p class="suave">Nenhum aviso ainda.</p>'}`;
+}
+
+function telaPainelRepositor() {
+  const pr = M.painelRepositor(estado), f = visao.filtros.rafa ||= {};
+  const ok = c => (!f.setor || estado.setorDoSku[c] === f.setor) && filtrar(c, f);
+  const cartao = (c, cabecalho, q) => `<div class="item" style="display:block"><b>${esc(rot(c))}</b> ${selo('setor ' + (estado.setorDoSku[c] || '?'), 'lar')}<br>${cabecalho}
+    ${q ? `<br>Vendia ~${q.lambda.toFixed(1)}/dia, vendeu <b>${q.obs}</b> nos últimos ${q.janela.length} dias abertos. ERP diz ${estado.skus[c].disponivel} no depósito.` : `<br>ERP diz ${estado.skus[c].disponivel} no depósito.`}
+    <div class="linha"><input id="v-com-${c}" placeholder="Comentário (opcional)"><select id="v-setor-${c}"><option value="">setor ok</option>${estado.setores.map(x => `<option value="${x}">corrigir: ${x}</option>`).join('')}</select></div>
+    <div class="linha"><button class="prim" onclick="verificar('${c}','repus')">Repus</button><button onclick="verificar('${c}','estava_na_gondola')">Estava na gôndola</button><button onclick="verificar('${c}','sem_estoque_no_deposito')">Não tem no depósito</button><button onclick="ir('rafa','gondola',{produtoMix:'${estado.skus[c].produto}',capDigitada:null})">Montar a gôndola deste produto</button></div></div>`;
+  const av = pr.avisos.filter(i => ok(i.c)), qd = pr.quedas.filter(i => ok(i.c));
+  return `${nota('Rafa, repositor', 'diz o que provavelmente está faltando na gôndola: avisos das vendedoras e SKUs que pararam de vender mas têm estoque. Ele verifica e registra o que achou.', 'tickets 11, 12, 14')}
+    <div class="linha"><select onchange="visao.filtros.rafa.setor=this.value;render()"><option value="">Todos os setores</option>${estado.setores.map(x => `<option ${f.setor === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+    <div class="grupo" style="border-color:var(--vendas)"><h3>Avisos das vendedoras (${av.length})</h3>${av.map(i => cartao(i.c, i.avisos.map(a => selo(`${nome(a.por)}, ${M.data(a.dia)}${a.comentario ? ': ' + esc(a.comentario) : ''}`, 'verde')).join('') + (i.q ? selo('também parou de vender', 'verm') : ''), i.q)).join('') || '<p class="suave">Nenhum.</p>'}</div>
+    <div class="grupo" style="border-color:var(--reposicao)"><h3>Pararam de vender e têm estoque (${qd.length})</h3><p class="suave">Quem perde mais venda primeiro.</p>${qd.map(i => cartao(i.c, selo(`~${Math.round(i.q.perdida)} vendas perdidas`, 'verm'), i.q)).join('') || '<p class="suave">Nenhum.</p>'}</div>
+    ${opine('o repositor usaria isso no celular durante a ronda? Os 3 botões cobrem o que ele encontra?')}`;
+}
+function verificar(c, resultado) { despachar({ tipo: 'verificacao', sku: c, resultado, comentario: val('v-com-' + c), setor: val('v-setor-' + c) || null, por: 'rafa' }); }
+
+function telaGondola() {
+  const prod = visao.produtoMix, salva = estado.capacidades[prod];
+  const cap = visao.capDigitada ?? salva ?? null;
+  const linhas = M.mix(estado, prod, cap);
+  const soma = linhas.reduce((s, l) => s + (l.qtd || 0), 0);
+  return `${nota('Rafa, repositor', 'divide o espaço da gôndola entre as cores e tamanhos pelo que mais vende: mais marrom, menos branco. Toda cor com estoque ganha pelo menos 1 peça, e nada passa do que tem no depósito.', 'ticket 15')}
+    <div class="linha"><select onchange="visao.produtoMix=this.value;visao.capDigitada=null;render()">${Object.entries(M.PRODUTOS).map(([k, v]) => `<option value="${k}" ${k === prod ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+    <div class="linha">Quantas peças cabem na gôndola? <input id="cap" type="number" min="1" style="width:70px" value="${cap ?? ''}" oninput="visao.capDigitada=this.value===''?null:Number(this.value);render()">
+      <button onclick="despachar({tipo:'capacidade',produto:'${prod}',capacidade:Number(val('cap'))})" ${cap ? '' : 'disabled'}>Lembrar este número</button> ${salva ? `<span class="suave">salvo: ${salva}</span>` : ''}</div>
+    <table><tr><th>Cor / tamanho</th><th>Participação nas vendas</th><th class="num">No depósito</th><th class="num">Pôr na gôndola</th></tr>
+    ${linhas.sort((a, b) => b.part - a.part).map(l => `<tr><td>${estado.skus[l.c].cor} ${estado.skus[l.c].tamanho}</td><td><div class="linha"><div class="barra" style="width:100px"><div style="width:${Math.round(l.part * 100)}%"></div></div>${Math.round(l.part * 100)}%</div></td><td class="num">${l.disp}</td><td class="num"><b style="font-size:18px">${l.qtd ?? '-'}</b></td></tr>`).join('')}</table>
+    ${cap ? `<p class="suave">Total: ${soma} de ${cap} lugares${soma < cap ? ' (faltou estoque para preencher tudo)' : ''}.</p>` : '<p class="suave">Sem capacidade: só a participação nas vendas.</p>'}
+    ${opine('uma gôndola por produto ou por produto e tamanho? Vale garantir 1 peça de cada cor, mesmo da que quase não vende?')}`;
+}
+
+function telaUsuarios() {
+  return `${nota('Rodrigo, admin', 'cadastra quem usa o Copilot e dá os papéis. Cada pessoa entra com e-mail e senha e cai na tela do seu papel. Uma pessoa pode ter mais de um papel.', 'tickets 03, 04')}
+    <table><tr><th>Nome</th><th>Papéis</th><th>O que pode ver</th><th>Situação</th><th></th></tr>
+    ${estado.usuarios.map(u => `<tr><td>${u.nome}</td><td>${u.papeis.join(', ')}</td><td class="suave">${{ comprador: 'painel, SKU, estoque, política, preços, chat', vendas: 'busca, disponibilidade, avisos (sem preço de compra)', reposicao: 'painel do repositor, montar gôndola', admin: 'usuários e setores' }[u.papeis[0]]}</td><td>${u.ativo ? selo('ativo', 'verde') : selo('desativado', 'verm')}</td><td>${u.id !== 'rodrigo' ? `<button onclick="despachar({tipo:'usuarioAtivo',uid:'${u.id}'})">${u.ativo ? 'Desativar' : 'Reativar'}</button>` : ''}</td></tr>`).join('')}</table>
+    <p class="suave">No protótipo, desativar não bloqueia a pessoa: é só para mostrar a tela.</p>
+    ${opine('quatro papéis bastam? O comprador também deveria ver a tela do repositor?')}`;
+}
+function telaSetores() {
+  return `${nota('Rodrigo, admin', 'mantém a lista de setores da loja. A vendedora escolhe o setor no aviso de gôndola vazia, e o Copilot aprende o setor de cada SKU.', 'ticket 14')}
+    <ul>${estado.setores.map(s => `<li>${s} <span class="suave">(${Object.values(estado.setorDoSku).filter(x => x === s).length} SKUs conhecidos)</span></li>`).join('')}</ul>
+    <div class="linha"><input id="novo-setor" placeholder="Novo setor"><button onclick="despachar({tipo:'novoSetor',nome:val('novo-setor').trim()})">Adicionar</button></div>`;
+}
+
+function renderLado() {
+  const e = estado;
+  const gondolas = Object.keys(e.skus).map(c => `<tr><td>${c}</td><td><select onchange="despachar({tipo:'mundoGondola',sku:'${c}',fator:Number(this.value)})">${[[1, 'cheia'], [0.5, 'metade'], [0, 'vazia']].map(([v, t]) => `<option value="${v}" ${e.gondola[c] === v ? 'selected' : ''}>${t}</option>`).join('')}</select></td><td class="num">${e.skus[c].disponivel}</td></tr>`).join('');
+  document.getElementById('lado').innerHTML = `
+    <div class="bloco"><h2 style="margin-top:0">Simulação</h2>
+      <div class="grande">${M.data(e.hoje)}</div>
+      <div class="linha"><button class="prim" onclick="despachar({tipo:'avancarDia'})">Avançar 1 dia</button><button onclick="if(confirmarReset())reset()">Recomeçar</button></div>
+      <details><summary>Mundo real (o Copilot não vê): gôndolas e ERP</summary>
+        <table><tr><th>SKU</th><th>Gôndola</th><th class="num">ERP</th></tr>${gondolas}</table>
+        ${e.pedidos.filter(p => !p.recebido).map(p => `<button style="margin-top:4px" onclick="despachar({tipo:'chegarPedido',pedido:'${p.id}'})">Chegou a mercadoria do ${p.id}</button>`).join(' ')}
+      </details></div>
+    <div class="bloco"><h2 style="margin-top:0">Estado agora</h2>
+      <table>${Object.keys(PAPEIS).map(uid => `<tr><td>${nome(uid)}</td><td>${M.naoLidas(e, uid).length} notificações não lidas</td></tr>`).join('')}</table>
+      <p class="suave" style="margin-top:6px">Em ruptura: ${Object.keys(e.skus).filter(c => M.emRuptura(e, c)).join(', ') || 'nenhum'}<br>
+      Pararam de vender: ${Object.keys(e.skus).filter(c => (M.queda(e, c) || {}).ativa).join(', ') || 'nenhum'}<br>
+      Entregas atrasadas: ${e.pedidos.filter(p => !p.recebido && M.previsaoEfetiva(e, p) < e.hoje).map(p => p.id).join(', ') || 'nenhuma'}</p></div>
+    <div class="bloco"><h2 style="margin-top:0">O que acabou de mudar</h2><ul class="log">${e.log.slice(0, 10).map((l, i) => `<li class="${i === 0 && anterior ? 'novo' : ''}">${esc(l)}</li>`).join('')}</ul></div>
+    <div class="bloco"><h2 style="margin-top:0">Quem é quem</h2>
+      <table class="mapa"><tr><th>Pessoa</th><th>Recebe alerta de</th></tr>
+      <tr><td style="color:var(--comprador)">Carla</td><td>ruptura, entrega atrasada, estoque divergente, avisos da Bia</td></tr>
+      <tr><td style="color:var(--vendas)">Bia</td><td>decisão sobre aviso dela, verificação da gôndola que ela avisou</td></tr>
+      <tr><td style="color:var(--reposicao)">Rafa</td><td>parou de vender com estoque, gôndola vazia avisada</td></tr></table></div>`;
+}
+function confirmarReset() { return true; }
+function reset() { estado = M.estadoInicial(); anterior = null; visao.popupVisto = { carla: 0, bia: 0, rafa: 0, rodrigo: 0 }; visao.busca = ''; visao.filtros = {}; visao.capDigitada = null; render(); }
+
+function renderToast() {
+  const uid = visao.uid, novas = M.naoLidas(estado, uid).filter(ep => ep.seq > visao.popupVisto[uid]);
+  const el = document.getElementById('toast');
+  if (!novas.length) { if (el.dataset.tipo === 'pop') { el.innerHTML = ''; el.dataset.tipo = ''; } return; }
+  const porTipo = {};
+  for (const ep of novas) porTipo[ep.tipo] = (porTipo[ep.tipo] || 0) + 1;
+  const NOMES = { ruptura: 'SKU(s) entraram em ruptura', entrega_atrasada: 'entrega(s) atrasaram', aviso: 'aviso(s) da equipe de vendas', estoque_divergente: 'estoque(s) divergente(s)', queda_de_venda: 'SKU(s) pararam de vender com estoque', gondola_vazia: 'aviso(s) de gôndola vazia', decisao_sobre_aviso: 'decisão(ões) sobre os seus avisos', verificacao_sobre_aviso: 'verificação(ões) das gôndolas que você avisou' };
+  el.dataset.tipo = 'pop';
+  el.innerHTML = `<div class="toast"><b>Pop-up para ${nome(uid)}</b> <span style="color:#c7ccd8">(ticket 10)</span><br>${Object.entries(porTipo).map(([t, n]) => `${n} ${NOMES[t]}`).join('<br>')}
+    <br><button onclick="visao.popupVisto['${uid}']=${estado.seq};visao.sinoAberto=true;render()">Ver notificações</button> <button onclick="visao.popupVisto['${uid}']=${estado.seq};render()">Fechar</button></div>`;
+}
+
+// Cenários guiados
+const CENARIOS = [
+  { titulo: '1. Tapete marrom parou de vender', descricao: 'O exemplo da reunião: o marrom vende ~10 por dia e o ERP tem 400. A gôndola esvazia e a venda cai para 5 e depois 0. Observe: a compradora não é incomodada (tem estoque), quem recebe o alerta é o repositor.', passos: [
+    ['Mundo real: a gôndola do marrom começa a esvaziar', () => despachar({ tipo: 'mundoGondola', sku: 'TAP-MAR', fator: 0.5 })],
+    ['Avançar 1 dia (vende uns 5)', () => despachar({ tipo: 'avancarDia' })],
+    ['Mundo real: a gôndola fica vazia', () => despachar({ tipo: 'mundoGondola', sku: 'TAP-MAR', fator: 0 })],
+    ['Avançar 1 dia (vende 0)', () => despachar({ tipo: 'avancarDia' })],
+    ['Ver como Rafa, o repositor (pop-up)', () => ir('rafa', 'painel')],
+    ['Rafa: "Repus"', () => despachar({ tipo: 'verificacao', sku: 'TAP-MAR', resultado: 'repus', por: 'rafa' })],
+    ['Avançar 2 dias: o marrom volta a vender', () => { despachar({ tipo: 'avancarDia' }); despachar({ tipo: 'avancarDia' }); ir('carla', 'sku', { sku: 'TAP-MAR' }); }],
+  ] },
+  { titulo: '2. Não tinha no depósito', descricao: 'Mesmo começo, mas o repositor não acha o tapete no depósito, embora o ERP diga que tem. Observe: vira "estoque divergente" para a compradora.', passos: [
+    ['Mundo real: gôndola do marrom vazia', () => despachar({ tipo: 'mundoGondola', sku: 'TAP-MAR', fator: 0 })],
+    ['Avançar 2 dias', () => { despachar({ tipo: 'avancarDia' }); despachar({ tipo: 'avancarDia' }); ir('rafa', 'painel'); }],
+    ['Rafa: "Não tem no depósito"', () => despachar({ tipo: 'verificacao', sku: 'TAP-MAR', resultado: 'sem_estoque_no_deposito', por: 'rafa' })],
+    ['Ver como Carla: estoque divergente no painel', () => ir('carla', 'painel')],
+    ['Carla: "Não comprar agora: mandei contar o estoque"', () => despachar({ tipo: 'decisao', sku: 'TAP-MAR', decisao: 'nao_comprar_agora', motivo: 'mandei contar o estoque', por: 'carla' })],
+  ] },
+  { titulo: '3. Vendedora avisa gôndola vazia', descricao: 'A Bia passa pelo corredor e vê a gôndola do tapete cinza vazia antes de qualquer conta perceber. Observe: o aviso vai para o repositor, e a Bia sabe o que aconteceu.', passos: [
+    ['Ver como Bia e buscar "tapete cinza"', () => ir('bia', 'buscar', { busca: 'tapete cinza', gondolaSku: 'TAP-CIN' })],
+    ['Bia avisa: gôndola vazia, setor Tapetes', () => despachar({ tipo: 'avisoGondola', sku: 'TAP-CIN', setor: 'Tapetes', comentario: 'cliente procurou e não achou', por: 'bia' })],
+    ['Ver como Rafa (pop-up e topo da lista)', () => ir('rafa', 'painel')],
+    ['Rafa: "Repus"', () => despachar({ tipo: 'verificacao', sku: 'TAP-CIN', resultado: 'repus', por: 'rafa' })],
+    ['Ver como Bia: Meus avisos', () => ir('bia', 'meus')],
+  ] },
+  { titulo: '4. Ruptura e decisão de compra', descricao: 'A toalha bege segura 23 dias e a Bia já avisou que está vendendo muito. Em alguns dias ela cai abaixo de 20. Observe: o pop-up da Carla, a sugestão sem lead time e a notificação da Bia quando a Carla decide.', passos: [
+    ['Avançar até a toalha bege entrar em ruptura', () => { for (let i = 0; i < 8 && !M.emRuptura(estado, 'TBC-BEG'); i++) despachar({ tipo: 'avancarDia' }); ir('carla', 'painel'); }],
+    ['Carla abre a toalha bege', () => ir('carla', 'sku', { sku: 'TBC-BEG' })],
+    ['Carla: "Vou comprar" a quantidade sugerida', () => despachar({ tipo: 'decisao', sku: 'TBC-BEG', decisao: 'vou_comprar', qtd: M.sugestao(estado, 'TBC-BEG').qtd, por: 'carla' })],
+    ['Ver como Bia: o aviso dela foi respondido', () => ir('bia', 'meus')],
+  ] },
+  { titulo: '5. Entrega atrasada e cobrança', descricao: 'O pedido P-102 da Katrina devia ter chegado há 3 dias. Ele traz o edredom casal, que zerou e parou de vender. Observe: o edredom NÃO vai para o repositor (não tem estoque), e a cobrança some com o alerta até a nova previsão.', passos: [
+    ['Ver o painel da Carla', () => ir('carla', 'painel')],
+    ['Carla cobra a Katrina: nova previsão em 5 dias', () => despachar({ tipo: 'cobranca', pedido: 'P-102', novaPrevisao: estado.hoje + 5, comentario: 'caminhão parado na estrada', por: 'carla' })],
+    ['Bia consulta o edredom casal no balcão', () => ir('bia', 'buscar', { busca: 'edredom casal' })],
+    ['Avançar 6 dias: a nova previsão vence', () => { for (let i = 0; i < 6; i++) despachar({ tipo: 'avancarDia' }); ir('carla', 'painel'); }],
+    ['Chegou a mercadoria do P-102', () => { despachar({ tipo: 'chegarPedido', pedido: 'P-102' }); ir('carla', 'painel'); }],
+  ] },
+  { titulo: '6. Com e sem lead time', descricao: 'Por que tiramos o prazo do fornecedor da conta (ADR-0006). O tapete marrom tem 400 peças (40 dias). Sem lead time: não precisa comprar. Com o lead time de 45 dias da Katrina: "vai faltar antes da compra chegar" e compra 900.', passos: [
+    ['Carla abre o tapete marrom (sem lead time)', () => ir('carla', 'sku', { sku: 'TAP-MAR' })],
+    ['Ligar o lead time na política', () => { despachar({ tipo: 'politica', mudanca: { leadTime: 'usar', motivos: { ruptura_antes_da_chegada: true } } }); ir('carla', 'sku', { sku: 'TAP-MAR' }); }],
+    ['Ver o painel: grupo novo', () => ir('carla', 'painel')],
+    ['Voltar ao padrão (sem lead time)', () => { despachar({ tipo: 'politica', mudanca: { leadTime: 'ignorar', motivos: { ruptura_antes_da_chegada: false } } }); ir('carla', 'painel'); }],
+  ] },
+  { titulo: '7. Mix de gôndola do tapete', descricao: 'Compramos 5 cores de tapete. Quantas pôr de cada? Observe: 12 lugares viram 4 marrons e 1 branco, não 2 ou 3 de cada. Com pouco espaço, ganha quem vende mais. Se o depósito tem pouco marrom, o espaço vai para a próxima cor.', passos: [
+    ['Ver como Rafa: montar a gôndola do tapete (12 lugares)', () => ir('rafa', 'gondola', { produtoMix: 'tapete', capDigitada: 12 })],
+    ['E se couberem só 3?', () => ir('rafa', 'gondola', { produtoMix: 'tapete', capDigitada: 3 })],
+    ['E se couberem 30?', () => ir('rafa', 'gondola', { produtoMix: 'tapete', capDigitada: 30 })],
+    ['ERP: só 2 marrons no depósito', () => { despachar({ tipo: 'ajusteErp', sku: 'TAP-MAR', disponivel: 2 }); ir('rafa', 'gondola', { produtoMix: 'tapete', capDigitada: 12 }); }],
+    ['A Carla vê a mesma participação para comprar a grade', () => ir('carla', 'sku', { sku: 'TAP-BRA' })],
+  ] },
+  { titulo: '8. O que NÃO deve alarmar', descricao: 'Casos que pareceriam problema mas não são. O jogo americano vende 1 a cada 3 dias: dois dias sem venda é normal. Domingo a loja fecha: segunda não pode amanhecer com tudo "parado".', passos: [
+    ['Avançar até a segunda seguinte (passa um domingo)', () => { do despachar({ tipo: 'avancarDia' }); while (((estado.hoje % 7) + 7) % 7 !== 0); ir('rafa', 'painel'); }],
+    ['Ver o jogo americano na tela da Carla', () => ir('carla', 'sku', { sku: 'JAM-VER' })],
+  ] },
+];
+let cenario = 0, passo = 0;
+function renderCenarios() {
+  const c = CENARIOS[cenario];
+  document.getElementById('cenarios').innerHTML = `<b>Cenários guiados</b> <span class="suave">(cada um recomeça do zero e roda sempre igual)</span>
+    <div class="abas" style="margin-top:8px">${CENARIOS.map((x, i) => `<button class="aba ${i === cenario ? 'ativa' : ''}" onclick="escolherCenario(${i})">${x.titulo}</button>`).join('')}</div>
+    <div style="border-top:2px solid #1d2230;padding-top:8px"><p style="margin:0">${c.descricao}</p>
+    <div class="passos">${c.passos.map(([t], i) => `<button class="${i < passo ? 'feito' : i === passo ? 'prim' : ''}" ${i === passo ? '' : 'disabled'} onclick="darPasso(${i})">${i + 1}. ${t}</button>`).join('')}</div>
+    ${passo >= c.passos.length ? '<p><b>Fim do cenário.</b> Continue mexendo à vontade ou escolha outro.</p>' : ''}</div>`;
+}
+function escolherCenario(i) { cenario = i; passo = 0; reset(); }
+function darPasso(i) { passo = i + 1; CENARIOS[cenario].passos[i][1](); render(); }
+
+render();
+</script>
+</body>
+</html>

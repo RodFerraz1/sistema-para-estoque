@@ -45,11 +45,23 @@ Vendas médias de um SKU por mês, calculado como média móvel dos últimos 6 m
 _Avoid_: rotatividade, vendas médias, saída.
 
 **Cobertura**:
-Estoque atual dividido pelo giro, expresso em meses. "SKU X tem 2.3 meses de cobertura" = com o giro atual, o estoque atende 2.3 meses.
-_Avoid_: dias de estoque (é o mesmo conceito em outra unidade - escolhemos meses e ficamos com meses).
+Estoque atual dividido pelo giro, expresso em meses. "SKU X tem 2.3 meses de cobertura" = com o giro atual, o estoque atende 2.3 meses. O domínio guarda meses. Para as pessoas, a cobertura aparece em dias (ver Cobertura em dias).
+_Avoid_: dias de estoque (use cobertura em dias).
+
+**Venda média diária**:
+Giro dividido por 30. É a unidade em que o comprador chefe pensa a ruptura.
+_Avoid_: giro diário, média de vendas.
+
+**Cobertura em dias**:
+A cobertura expressa em dias: disponível dividido pela venda média diária. "Segura 12 dias". É como a UI mostra a cobertura ao comprador, à equipe de vendas e ao repositor. Ver ADR-0006.
+_Avoid_: dias de estoque, autonomia.
+
+**Ruptura**:
+Na linguagem do comprador chefe, o SKU está em ruptura quando a cobertura em dias fica abaixo do piso de alerta (os dias de venda que o estoque precisa segurar). No código, é o motivo de alerta `abaixo_do_piso_alerta`. Com disponível zero, a ruptura já é falta na loja. Não depende do lead time (ADR-0006).
+_Avoid_: ruptura antes da chegada (é outro alerta, só com lead time ligado), falta, estoque zerado.
 
 **Lead time**:
-Prazo entre colocar um pedido de compra e receber a mercadoria no CD. Contratual vs observado é uma distinção que importa (ver reunião Q1/2025 no corpus).
+Prazo entre colocar um pedido de compra e receber a mercadoria no CD. Contratual vs observado é uma distinção que importa (ver reunião Q1/2025 no corpus). O comprador não confia nele, e por padrão a política o ignora (ADR-0006).
 _Avoid_: prazo de entrega (ambíguo - pode significar do atacadista pro varejista).
 
 **Ficha (do SKU)**:
@@ -121,6 +133,78 @@ _Avoid_: alerta (é o que o `purchasing` calcula a partir do ERP), insight, risc
 **Onboarding**:
 Sequência de perguntas em linguagem de comprador que preenche a política de compra. Rascunho em `.scratch/sugestao-compra/perguntas-comprador.md`.
 _Avoid_: setup, configuração inicial.
+
+**Similar**:
+Função do ERP real (Maos) que aponta um produto semelhante ao que está faltando, para a vendedora oferecer ao cliente. Ainda não existe no Copilot: depende da integração com o Maos.
+_Avoid_: substituto (é a referência de preço do comprador, outro uso), equivalente.
+
+**Entrega atrasada**:
+Item de pedido de compra `aprovado`, `enviado` ou `recebido_parcial` com quantidade pendente e data prevista de entrega já vencida. É motivo de alerta. No painel aparece agrupada por fornecedor, porque o comprador cobra o fornecedor, não o SKU.
+_Avoid_: atraso do fornecedor (é o sinal do corpus), pedido atrasado.
+
+**Cobrança de entrega**:
+O que o comprador chefe registra depois de cobrar o fornecedor por um pedido de compra com entrega atrasada, com nova previsão opcional. Tira o pedido do painel até a nova previsão ou por um prazo. Fica no Copilot: o ERP não muda.
+_Avoid_: follow-up, reclamação.
+
+### Operação da loja
+
+**Repositor**:
+Pessoa que leva a mercadoria do depósito para a gôndola da loja física. Não compra nada.
+_Avoid_: estoquista, reposição (sozinho é ambíguo com compra de reposição).
+
+**Gôndola**:
+Onde o SKU fica exposto na loja física. O ERP só tem um saldo de estoque, sem separar gôndola e depósito.
+_Avoid_: prateleira, exposição, loja (sozinho).
+
+**Queda de venda**:
+SKU que vende com regularidade e cuja venda nos últimos dias abertos ficou muito abaixo do esperado pela venda diária base, calculado em código com limiares da política. Com estoque disponível, a suspeita é gôndola vazia e o SKU vai para o painel do repositor. Sem estoque, vira ruptura ou entrega atrasada para o comprador.
+_Avoid_: venda parada, anomalia, encalhe (é o sinal do corpus sobre compra anterior).
+
+**Aviso de gôndola vazia**:
+Recado da vendedora ao repositor de que a gôndola de um SKU está vazia, com o setor. Fica aberto até a verificação de gôndola do SKU. Não é o aviso ao comprador: tem outro destino e fecha de outro jeito.
+_Avoid_: aviso (sozinho é o recado ao comprador), pedido de reposição, chamado.
+
+**Setor**:
+Parte da loja física onde fica a gôndola de um SKU (Banho, Cama, Tapetes...). Lista cadastrada pelo admin no Copilot. O Copilot aprende o setor de cada SKU pelos avisos de gôndola vazia e pelas verificações.
+_Avoid_: corredor, seção, departamento, categoria (é do catálogo).
+
+**Verificação de gôndola**:
+O que o repositor registra depois de olhar um SKU com queda de venda ou com aviso de gôndola vazia (e fecha esse aviso): `repus`, `estava_na_gondola` ou `sem_estoque_no_deposito`.
+_Avoid_: conferência, inventário, contagem.
+
+**Estoque divergente**:
+Motivo de alerta de um SKU em que o repositor não achou mercadoria no depósito, mas o ERP diz que há disponível.
+_Avoid_: furo de estoque, quebra.
+
+**Participação nas vendas**:
+Fração da venda de um produto que vem de um SKU dele (uma cor e um tamanho), numa janela de dias abertos. Base do mix de gôndola. Aparece também para o comprador chefe.
+_Avoid_: curva, ranking, mix (sozinho).
+
+**Capacidade da gôndola**:
+Quantas peças de um produto cabem na gôndola, informadas pelo repositor e lembradas pelo Copilot.
+_Avoid_: espaço, tamanho da gôndola, estoque máximo.
+
+**Mix de gôndola**:
+Quantas peças de cada SKU de um produto pôr na gôndola: a capacidade dividida pela participação nas vendas, com ao menos uma peça por SKU com estoque e sem passar do disponível. Calculado em código.
+_Avoid_: sugestão (sozinho é a sugestão de pedido), planograma, grade (é a de compra).
+
+### Usuários e notificações
+
+**Usuário**:
+Pessoa cadastrada no Copilot, com e-mail, senha e um ou mais papéis. Ver ADR-0007.
+_Avoid_: conta, login, cliente (é o varejista).
+
+**Papel**:
+O que o usuário faz no Copilot e decide o que ele vê: `comprador`, `vendas`, `reposicao` ou `admin`.
+_Avoid_: perfil, permissão, cargo.
+
+**Episódio de alerta**:
+Intervalo em que uma condição vale para um SKU ou para um pedido de compra (ruptura, entrega atrasada, queda de venda, estoque divergente), aberto e fechado pela varredura. Avisos e decisões sobre avisos também abrem episódios. Garante que a mesma condição notifica uma vez só.
+_Avoid_: evento, incidente, ocorrência.
+
+**Notificação**:
+Um episódio de alerta visto por um usuário do papel de destino. É não lida enquanto o episódio foi aberto depois do cursor de visto do usuário. Aparece no sino e, quando é nova, num pop-up.
+_Avoid_: alerta (é o que o `purchasing` calcula), aviso (é o recado da equipe de vendas), mensagem.
 
 ### Sistemas
 
