@@ -14,6 +14,8 @@ from tests.fakes import (
     make_estoque,
     make_fornecedor,
     make_fornecedor_sku,
+    make_item_pedido_compra,
+    make_pedido_compra,
     make_sku,
     make_venda,
 )
@@ -55,6 +57,7 @@ def test_completa_compoe_sku_estoque_giro_cobertura_e_fornecedores() -> None:
     assert ficha.sku == sku
     assert ficha.estoque.quantidade_disponivel == 120
     assert ficha.estoque.quantidade_reservada == 10
+    assert ficha.em_transito == 0
     assert ficha.giro.unidades_por_mes == 30.0
     assert ficha.giro.meses_considerados == 6
     assert ficha.cobertura.meses == pytest.approx(4.0)
@@ -92,3 +95,24 @@ def test_completa_sku_sem_snapshot_de_estoque_levanta() -> None:
 
     with pytest.raises(SKUSemEstoque):
         ficha_sku.completa("A")
+
+
+def test_completa_soma_o_que_falta_chegar_dos_pedidos_abertos() -> None:
+    sku = make_sku("A")
+    katrina = make_fornecedor("Katrina Têxtil")
+    enviado = make_pedido_compra(katrina, "enviado")
+    parcial = make_pedido_compra(katrina, "recebido_parcial")
+    ficha_sku = _ficha_sku(
+        skus=[sku],
+        estoques={sku.sku_code: make_estoque(disponivel=50)},
+        pedidos_compra=[enviado, parcial],
+        itens_pedido_compra=[
+            make_item_pedido_compra(enviado, sku, quantidade=100),
+            make_item_pedido_compra(parcial, sku, quantidade=60, quantidade_recebida=20),
+        ],
+    )
+
+    ficha = ficha_sku.completa("A")
+
+    assert ficha is not None
+    assert ficha.em_transito == 140

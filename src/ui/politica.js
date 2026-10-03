@@ -1,7 +1,8 @@
+import { montarChat } from "./chat.js";
 import { api, dataHora, el, mensagem } from "./comum.js";
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-const NUMEROS = ["teto_meses", "extra_sazonal_meses", "piso_alerta_dias", "piso_reposicao_dias", "ciclo_compra_meses", "dias_historico_minimo", "faixa_1_ate_reais", "faixa_2_ate_reais", "faixa_3_ate_reais"];
+const NUMEROS = ["teto_meses", "extra_sazonal_meses", "piso_alerta_dias", "piso_reposicao_dias", "ciclo_compra_meses", "dias_historico_minimo"];
 const OPCOES = ["criterio_fornecedor", "lead_time_base", "sazonalidade_modo"];
 const PERGUNTAS = {
   teto_meses: "pergunta 1",
@@ -14,11 +15,10 @@ const PERGUNTAS = {
   lead_time_base: "pergunta 7",
   sazonalidade_modo: "pergunta 8",
   dias_historico_minimo: "pergunta 9",
-  faixa_1_ate_reais: "faixa 1",
-  faixa_2_ate_reais: "faixa 2",
-  faixa_3_ate_reais: "faixa 3",
-  motivos_de_destaque: "fila de aprovação",
+  motivos_de_alerta: "pergunta 10",
 };
+
+montarChat();
 
 const formulario = document.getElementById("politica");
 const versao = document.getElementById("versao");
@@ -37,10 +37,10 @@ function preencher(politica) {
   for (const caixa of formulario.querySelectorAll('input[name="meses_quentes"]')) {
     caixa.checked = p.meses_quentes.includes(Number(caixa.value));
   }
-  for (const caixa of formulario.querySelectorAll('input[name="motivos_de_destaque"]')) {
-    caixa.checked = p.motivos_de_destaque.includes(caixa.value);
+  for (const caixa of formulario.querySelectorAll('input[name="motivos_de_alerta"]')) {
+    caixa.checked = p.motivos_de_alerta.includes(caixa.value);
   }
-  versao.textContent = `Versão ativa: ${politica.versao}, criada em ${dataHora(politica.criada_em)}.`;
+  versao.textContent = `Versão ${politica.versao} · ${dataHora(politica.criada_em)}`;
 }
 
 function parametros() {
@@ -48,7 +48,7 @@ function parametros() {
   for (const campo of NUMEROS) p[campo] = Number(formulario.elements[campo].value);
   for (const campo of OPCOES) p[campo] = formulario.elements[campo].value;
   p.meses_quentes = [...formulario.querySelectorAll('input[name="meses_quentes"]:checked')].map((c) => Number(c.value));
-  p.motivos_de_destaque = [...formulario.querySelectorAll('input[name="motivos_de_destaque"]:checked')].map((c) => c.value);
+  p.motivos_de_alerta = [...formulario.querySelectorAll('input[name="motivos_de_alerta"]:checked')].map((c) => c.value);
   return p;
 }
 
@@ -79,7 +79,7 @@ formulario.addEventListener("submit", async (evento) => {
     resultado.replaceChildren(
       mensagem(
         "sucesso",
-        `Política salva: versão ${politica.versao}. As sugestões já na fila não mudam; gere a fila de novo para usar a política nova.`,
+        `Política salva: versão ${politica.versao}. O painel e as sugestões de pedido já usam a versão nova.`,
       ),
     );
   } catch (e) {

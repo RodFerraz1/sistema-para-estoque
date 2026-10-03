@@ -3,11 +3,15 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import OperationalError
+from starlette.responses import Response
+from starlette.types import Scope
 
 from src.ai.decisao import DecisaoIndisponivel
-from src.api.aprovacao import router as aprovacao_router
 from src.api.chat import router as chat_router
+from src.api.health import banco_indisponivel
 from src.api.health import router as health_router
+from src.api.painel import router as painel_router
 from src.api.politica_compra import router as politica_compra_router
 from src.api.rag import decisao_indisponivel
 from src.api.rag import router as rag_router
@@ -19,6 +23,16 @@ from src.ficha_sku.service import SKUSemEstoque
 UI_DIR = Path(__file__).parent / "ui"
 
 
+class UISemCache(StaticFiles):
+    """Sem `Cache-Control`, o navegador reaproveita HTML, CSS e JS antigos por heurística e a
+    UI não muda depois de um deploy. Com `no-cache` ele revalida sempre pelo ETag (304 sem mudança)."""
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 def create_app() -> FastAPI:
     # Lida na subida para a configuração inválida (REDATOR sem a chave do provedor) impedir o app de subir.
     get_settings()
@@ -28,11 +42,12 @@ def create_app() -> FastAPI:
     app.include_router(politica_compra_router)
     app.include_router(rag_router)
     app.include_router(chat_router)
-    app.include_router(aprovacao_router)
+    app.include_router(painel_router)
     # Handler no app, e não no endpoint, porque a dependência do Jev também lança sem JEV_KEY.
     app.add_exception_handler(DecisaoIndisponivel, decisao_indisponivel)
     app.add_exception_handler(SKUSemEstoque, sku_sem_estoque)
-    app.mount("/ui", StaticFiles(directory=UI_DIR, html=True), name="ui")
+    app.add_exception_handler(OperationalError, banco_indisponivel)
+    app.mount("/ui", UISemCache(directory=UI_DIR, html=True), name="ui")
 
     @app.get("/", include_in_schema=False)
     def raiz() -> RedirectResponse:

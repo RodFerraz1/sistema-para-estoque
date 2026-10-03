@@ -244,3 +244,30 @@ def test_itens_em_transito_de_filtra_e_ordena_por_previsao() -> None:
 
 def test_itens_em_transito_de_sku_inexistente() -> None:
     assert InMemoryERPAdapter().itens_em_transito_de("NAO-EXISTE") == []
+
+
+def test_itens_de_pedido_de_traz_o_cabecalho_do_mais_recente_ao_mais_antigo() -> None:
+    sku, outro = make_sku("TBC-001"), make_sku("TBC-002")
+    fornecedor = make_fornecedor("Katrina Têxtil")
+    antigo = make_pedido_compra(fornecedor, "recebido_total", criado_em=datetime(2026, 3, 1, tzinfo=UTC))
+    recente = make_pedido_compra(fornecedor, "cancelado", criado_em=datetime(2026, 8, 1, tzinfo=UTC))
+    erp = InMemoryERPAdapter(
+        skus=[sku, outro],
+        fornecedores=[fornecedor],
+        pedidos_compra=[antigo, recente],
+        itens_pedido_compra=[
+            make_item_pedido_compra(antigo, sku, quantidade=96, preco_unitario_centavos=1700),
+            make_item_pedido_compra(recente, sku, quantidade=48, preco_unitario_centavos=1800),
+            make_item_pedido_compra(recente, outro, quantidade=10, preco_unitario_centavos=999),
+        ],
+    )
+
+    itens = erp.itens_de_pedido_de("TBC-001")
+
+    assert [(i.pedido_id, i.status, i.quantidade, i.preco_unitario_centavos) for i in itens] == [
+        (recente.id, "cancelado", 48, 1800),
+        (antigo.id, "recebido_total", 96, 1700),
+    ]
+    assert {(i.fornecedor_id, i.fornecedor_nome) for i in itens} == {(fornecedor.id, "Katrina Têxtil")}
+    assert itens[0].criado_em == datetime(2026, 8, 1, tzinfo=UTC)
+    assert erp.itens_de_pedido_de("NAO-EXISTE") == []

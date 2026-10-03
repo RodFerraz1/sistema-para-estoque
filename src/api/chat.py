@@ -22,6 +22,9 @@ from src.api.schemas import (
     RegistroDecisaoResponse,
     RespostaChatResponse,
 )
+from src.api.skus import sku_ou_404
+from src.catalog.dependencies import get_catalog
+from src.catalog.service import Catalog
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -90,15 +93,21 @@ def _registro_to_response(registro: RegistroDecisao) -> RegistroDecisaoResponse:
         duracao_ms=registro.duracao_ms,
         sinais=[sinais_do_sku_to_response(s) for s in registro.sinais],
         citacoes=[verificacao_to_response(c) for c in registro.citacoes],
+        sku_em_contexto=registro.sku_em_contexto,
     )
 
 
 @router.post("", response_model=RespostaChatResponse)
 def chat(
     corpo: PerguntaChatRequest,
+    catalog: Catalog = Depends(get_catalog),
     copilot: Copilot = Depends(get_copilot),
 ) -> RespostaChatResponse:
-    return _to_response(copilot.responder(corpo.pergunta))
+    """Com `sku_code`, a pergunta sobre situação ou sugestão que não cita produto vale
+    para esse SKU. 404 com SKU desconhecido."""
+    if corpo.sku_code is not None:
+        sku_ou_404(catalog, corpo.sku_code)
+    return _to_response(copilot.responder(corpo.pergunta, corpo.sku_code))
 
 
 @router.get("/registros", response_model=list[RegistroDecisaoResponse])

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SKU - Copilot de Compras</title>
+  <link rel="stylesheet" href="estilo.css">
+  <script type="module" src="sku.js"></script>
+</head>
+<body>
+  <header>
+    <div class="conteudo">
+      <strong class="marca">Copilot de Compras</strong>
+      <nav>
+        <a href="index.html">Painel</a>
+        <a href="politica.html">Política</a>
+      </nav>
+      <button id="abrir-chat" type="button" class="abrir-chat" aria-expanded="false" aria-controls="chat-lateral">Perguntar ao Copilot</button>
+    </div>
+  </header>
+  <main class="conteudo">
+    <a class="voltar" href="index.html">&larr; Painel</a>
+    <div class="cabecalho-pagina">
+      <div>
+        <h1 id="titulo">SKU</h1>
+        <p id="subtitulo" class="suave"></p>
+      </div>
+    </div>
+    <div id="erro"></div>
+
+    <div id="blocos" class="layout-sku">
+      <div>
+        <section class="card" aria-labelledby="t-situacao">
+          <h2 id="t-situacao">Situação do estoque</h2>
+          <div id="situacao"><p class="carregando">Carregando...</p></div>
+        </section>
+
+        <section class="card" aria-labelledby="t-sugestao">
+          <h2 id="t-sugestao">Sugestão de compra</h2>
+          <div id="sugestao"><p class="carregando">Carregando...</p></div>
+        </section>
+
+        <section class="card" aria-labelledby="t-sinais">
+          <h2 id="t-sinais">O que os documentos dizem</h2>
+          <div id="sinais"><p class="carregando">Lendo contratos, atas e políticas. Pode levar alguns segundos.</p></div>
+        </section>
+
+        <section class="card" aria-labelledby="t-vendas">
+          <h2 id="t-vendas">Vendas dos últimos 12 meses</h2>
+          <div id="vendas"><p class="carregando">Carregando...</p></div>
+        </section>
+
+        <section class="card" aria-labelledby="t-precos">
+          <h2 id="t-precos">Preços para negociar</h2>
+          <div id="precos"><p class="carregando">Carregando...</p></div>
+        </section>
+      </div>
+
+      <aside>
+        <section class="card" aria-labelledby="t-avisos">
+          <h2 id="t-avisos">Avisos da equipe de vendas</h2>
+          <div id="avisos"><p class="carregando">Carregando...</p></div>
+        </section>
+
+        <section class="card" aria-labelledby="t-decisao">
+          <h2 id="t-decisao">O que você decidiu?</h2>
+          <form id="decisao-form" novalidate>
+            <fieldset class="campo escolhas">
+              <legend class="suave">A decisão fecha os avisos e tira o produto do painel por 7 dias. O pedido você lança no Maos.</legend>
+              <label><input type="radio" name="tipo" value="vou_comprar"> Vou comprar</label>
+              <label><input type="radio" name="tipo" value="negociando"> Estou negociando</label>
+              <label><input type="radio" name="tipo" value="nao_comprar_agora"> Não comprar agora</label>
+            </fieldset>
+            <div id="campo-quantidade" class="campo" hidden>
+              <label for="quantidade">Quantidade</label>
+              <div class="unidade"><input id="quantidade" type="number" min="1" step="1"> un.</div>
+              <p id="ajuda-quantidade" class="suave"></p>
+            </div>
+            <div id="campo-motivo" class="campo" hidden>
+              <label for="motivo">Por que não comprar agora?</label>
+              <textarea id="motivo" maxlength="2000" placeholder="Ex.: o representante subiu o preço; vou esperar a feira"></textarea>
+            </div>
+            <div class="campo">
+              <label for="comentario-decisao">Comentário <span class="suave">(opcional)</span></label>
+              <textarea id="comentario-decisao" maxlength="2000"></textarea>
+            </div>
+            <div class="campo">
+              <label for="decidido-por">Seu nome</label>
+              <input id="decidido-por" maxlength="200" autocomplete="name">
+            </div>
+            <button id="registrar" type="submit" class="primario grande">Registrar decisão</button>
+            <div id="resultado-decisao"></div>
+          </form>
+        </section>
+
+        <section class="card" aria-labelledby="t-decisoes">
+          <h2 id="t-decisoes">Decisões anteriores</h2>
+          <div id="decisoes"><p class="carregando">Carregando...</p></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+</body>
+</html>

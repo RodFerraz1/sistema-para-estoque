@@ -2,7 +2,8 @@
 de confiança e monta os dados, e o redator só escreve a resposta.
 
 Esclarecimento e fora de escopo são respostas feitas em código, sem redator. A
-sugestão de compra leva os sinais do corpus de cada sugestão, e toda resposta
+sugestão de compra leva os sinais do corpus de cada sugestão, a pergunta sobre alertas
+e avisos leva o painel de alertas calculado na hora, e toda resposta
 redigida por LLM tem as citações conferidas pelo Jev e marcadas quando não são
 confirmadas.
 """
@@ -19,7 +20,7 @@ from src.ai.busca import BuscaContexto
 from src.ai.citacoes import conferir_citacoes
 from src.ai.contexto import renderizar_contexto
 from src.ai.decisao import DecisaoIndisponivel, DecisionModel
-from src.ai.identificacao import identificar_skus, produtos_do_catalogo
+from src.ai.identificacao import do_contexto, identificar_skus, observacao_do_contexto, produtos_do_catalogo
 from src.ai.redator import LLM_INDISPONIVEL, Redator, RedatorIndisponivel, RedatorSemLLM, limpar_redacao
 from src.ai.registro import RegistrosDecisao
 from src.ai.schemas import (
@@ -43,6 +44,7 @@ from src.ai.schemas import (
 from src.ai.sinais import SinaisCorpus
 from src.catalog.service import Catalog
 from src.ficha_sku.service import FichaSKU, SKUSemEstoque
+from src.painel.service import Painel
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.purchasing.schemas import SugestaoPedido
 from src.purchasing.service import Purchasing
@@ -67,11 +69,12 @@ DESCRICOES_INTENCAO: dict[Intencao, str] = {
     "situacao_sku": "ver a situação de um SKU (estoque, giro e cobertura)",
     "sugestao_compra": "uma sugestão de compra",
     "politica_ou_fornecedor": "saber da política de compra e dos fornecedores",
+    "alertas_e_avisos": "ver o que pede atenção no painel de alertas e os avisos da equipe de vendas",
     "fora_de_escopo": "algo fora das compras",
 }
 RESPOSTA_FORA_DE_ESCOPO = (
     "Só consigo ajudar com as compras do atacadista: situação de SKU, sugestão de pedido, "
-    "política de compra e fornecedores."
+    "política de compra, fornecedores, painel de alertas e avisos da equipe de vendas."
 )
 ESCLARECIMENTO_DE_SKU = (
     "Não identifiquei o produto no catálogo. Informe o código do SKU (ex: TBC-BEGE-70140-01) "
@@ -80,6 +83,14 @@ ESCLARECIMENTO_DE_SKU = (
 OBSERVACAO_SUGESTAO_SEM_SKU = (
     "Nenhum SKU do catálogo foi identificado na pergunta: a quantidade da sugestão depende de um "
     "SKU do catálogo (código, ou nome do produto com cor e tamanho)."
+)
+OBSERVACAO_PAINEL_VAZIO = (
+    "Nenhum SKU está no painel de alertas agora: sem aviso aberto da equipe de vendas "
+    "nem motivo de alerta da política de compra."
+)
+OBSERVACAO_PRODUTO_FORA_DO_PAINEL = (
+    "Nenhum SKU citado na pergunta está no painel de alertas agora: sem aviso aberto da "
+    "equipe de vendas nem motivo de alerta da política de compra."
 )
 OBSERVACAO_SEM_SINAIS = (
     "Não foi possível calcular os sinais do corpus agora (o modelo de decisão está indisponível), "
@@ -107,6 +118,7 @@ class Copilot:
         ficha_sku: FichaSKU,
         purchasing: Purchasing,
         politicas: PoliticaCompraRepositorio,
+        painel: Painel,
         busca: BuscaContexto,
         sinais: SinaisCorpus,
         redator: Redator,
@@ -117,22 +129,24 @@ class Copilot:
         self._ficha_sku = ficha_sku
         self._purchasing = purchasing
         self._politicas = politicas
+        self._painel = painel
         self._busca = busca
         self._sinais = sinais
         self._redator = redator
         self._registros = registros
 
-    def responder(self, pergunta: str) -> RespostaCopilot:
-        """Grava um registro de decisão por resposta. Propaga `DecisaoIndisponivel`
-        (sem entendimento não há roteamento nem registro) e a falha ao gravar
-        (o registro é requisito de auditoria)."""
+    def responder(self, pergunta: str, sku_em_contexto: str | None = None) -> RespostaCopilot:
+        """Grava um registro de decisão por resposta. `sku_em_contexto` é o SKU da tela de
+        onde o comprador perguntou: vale para situação e sugestão quando a pergunta não
+        cita produto. Propaga `DecisaoIndisponivel` (sem entendimento não há roteamento
+        nem registro) e a falha ao gravar (o registro é requisito de auditoria)."""
         inicio = time.perf_counter()
-        resposta = self._decidir(pergunta, uuid4())
+        resposta = self._decidir(pergunta, uuid4(), sku_em_contexto)
         duracao_ms = round((time.perf_counter() - inicio) * 1000)
-        self._registros.gravar(_registro(pergunta, resposta, duracao_ms))
+        self._registros.gravar(_registro(pergunta, resposta, duracao_ms, sku_em_contexto))
         return resposta
 
-    def _decidir(self, pergunta: str, registro_id: UUID) -> RespostaCopilot:
+    def _decidir(self, pergunta: str, registro_id: UUID, sku_em_contexto: str | None) -> RespostaCopilot:
         produtos = produtos_do_catalogo(self._catalog.listar_skus())
         entendimento = self._decisao.entender_pergunta(pergunta, produtos)
         faixa = _faixa(entendimento.intencao.confianca)
@@ -169,10 +183,15 @@ class Copilot:
         identificacao = None
         if intencao in ("situacao_sku", "sugestao_compra"):
             identificacao = identificar_skus(pergunta, entendimento, produtos)
+            if not identificacao.skus and sku_em_contexto is not None:
+                identificacao = do_contexto(sku_em_contexto)
             if intencao == "situacao_sku" and not identificacao.skus:
                 return resposta_copilot(
                     _esclarecimento_de_sku(identificacao.candidatos), "pediu_esclarecimento", identificacao
                 )
+        elif intencao == "alertas_e_avisos":
+            # Sem o SKU da tela: "algum vendedor avisou?" pergunta do painel inteiro.
+            identificacao = identificar_skus(pergunta, entendimento, produtos)
 
         montado = self._montar(pergunta, intencao, identificacao, produtos)
         texto, redator = self._redigir(pergunta, montado.montagem)
@@ -203,6 +222,8 @@ class Copilot:
     ) -> _MontagemComCitaveis:
         skus = identificacao.skus if identificacao else []
         observacoes: list[str] = []
+        if identificacao and identificacao.origem == "contexto":
+            observacoes.append(observacao_do_contexto(skus[0]))
         if identificacao and identificacao.total_skus > len(skus):
             observacoes.append(
                 f"A pergunta corresponde a {identificacao.total_skus} SKUs; "
@@ -237,6 +258,14 @@ class Copilot:
                 observacoes=observacoes,
             )
             return _MontagemComCitaveis(montagem, citaveis)
+
+        if intencao == "alertas_e_avisos":
+            alertas = self._painel.painel().alertas
+            if skus:
+                alertas = [a for a in alertas if a.sku.sku_code in skus]
+            if not alertas:
+                observacoes.append(OBSERVACAO_PRODUTO_FORA_DO_PAINEL if skus else OBSERVACAO_PAINEL_VAZIO)
+            return _MontagemComCitaveis(Montagem(alertas=alertas, observacoes=observacoes), [])
 
         trechos, conflitos = self._buscar(pergunta)
         return _MontagemComCitaveis(Montagem(trechos=trechos, conflitos=conflitos, observacoes=observacoes), trechos)
@@ -274,7 +303,9 @@ class Copilot:
         return (limpar_redacao(texto) if self._redator.usa_llm else texto), self._redator
 
 
-def _registro(pergunta: str, resposta: RespostaCopilot, duracao_ms: int) -> RegistroDecisao:
+def _registro(
+    pergunta: str, resposta: RespostaCopilot, duracao_ms: int, sku_em_contexto: str | None
+) -> RegistroDecisao:
     return RegistroDecisao(
         id=resposta.registro_id,
         criado_em=datetime.now(UTC),
@@ -291,6 +322,7 @@ def _registro(pergunta: str, resposta: RespostaCopilot, duracao_ms: int) -> Regi
         duracao_ms=duracao_ms,
         sinais=[SinaisDoSKU(sku_code=s.sugestao.sku_code, sinais=s.sinais) for s in resposta.sugestoes],
         citacoes=resposta.citacoes,
+        sku_em_contexto=sku_em_contexto,
     )
 
 

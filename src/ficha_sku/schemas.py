@@ -9,12 +9,14 @@ from src.sales.schemas import GiroMedioMensal
 
 
 class Ficha(BaseModel):
-    """Estado atual de um SKU pronto pra decisão de compra."""
+    """Estado atual de um SKU pronto pra decisão de compra. `em_transito` soma as
+    unidades ainda por chegar dos pedidos de compra abertos."""
 
     model_config = ConfigDict(frozen=True)
 
     sku: SKU
     estoque: Estoque
+    em_transito: int
     giro: GiroMedioMensal
     cobertura: Cobertura
     fornecedores: list[FornecedorParaSKU]

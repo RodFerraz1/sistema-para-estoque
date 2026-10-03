@@ -41,10 +41,7 @@ def _parametros(**overrides: Any) -> dict[str, Any]:
         "meses_quentes": [11, 12],
         "extra_sazonal_meses": 1.0,
         "dias_historico_minimo": 90,
-        "faixa_1_ate_reais": 20_000,
-        "faixa_2_ate_reais": 80_000,
-        "faixa_3_ate_reais": 200_000,
-        "motivos_de_destaque": ["ruptura_antes_da_chegada", "encalhe"],
+        "motivos_de_alerta": ["ruptura_antes_da_chegada", "viola_teto"],
     }
     return base | overrides
 
@@ -60,17 +57,14 @@ def test_get_devolve_a_politica_ativa(client: TestClient) -> None:
             "teto_meses": 3.0,
             "piso_alerta_dias": 20,
             "piso_reposicao_dias": 30,
-            "ciclo_compra_meses": 1.0,
+            "ciclo_compra_meses": 2.0,
             "lead_time_base": "observado",
             "criterio_fornecedor": "menor_preco",
             "sazonalidade_modo": "alertar",
             "meses_quentes": [5, 6, 11, 12],
             "extra_sazonal_meses": 2.0,
             "dias_historico_minimo": 60,
-            "faixa_1_ate_reais": 15_000,
-            "faixa_2_ate_reais": 60_000,
-            "faixa_3_ate_reais": 150_000,
-            "motivos_de_destaque": ["ruptura_antes_da_chegada", "viola_teto"],
+            "motivos_de_alerta": ["ruptura_antes_da_chegada", "abaixo_do_piso_alerta"],
         },
     }
 
@@ -99,12 +93,15 @@ def test_put_invalido_devolve_422_e_nao_grava(
     assert repo.ativa().versao == 1
 
 
-def test_put_com_faixas_fora_de_ordem_devolve_422(
-    client: TestClient, repo: InMemoryPoliticaCompraRepositorio
+@pytest.mark.parametrize(
+    "overrides",
+    [{"faixa_1_ate_reais": 15_000}, {"motivos_de_alerta": ["encalhe"]}],
+    ids=["faixa-de-aprovacao", "motivo-do-corpus"],
+)
+def test_put_com_campo_do_fluxo_antigo_devolve_422(
+    client: TestClient, repo: InMemoryPoliticaCompraRepositorio, overrides: dict[str, Any]
 ) -> None:
-    response = client.put(
-        "/politica-compra", json=_parametros(faixa_1_ate_reais=90_000)
-    )
+    response = client.put("/politica-compra", json=_parametros(**overrides))
 
     assert response.status_code == 422
     assert repo.ativa().versao == 1

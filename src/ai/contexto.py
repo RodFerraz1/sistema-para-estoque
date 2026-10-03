@@ -6,19 +6,23 @@ a unidade da cobertura no CONTEXT.md (os pisos da política, guardados em dias,
 são convertidos com `DIAS_POR_MES`), e a comparação da cobertura com o piso de
 alerta e o teto já vem pronta. Os sinais do corpus saem abaixo de cada sugestão,
 com os ids dos trechos de origem. Os trechos do corpus vêm delimitados e marcados
-como dado não confiável.
+como dado não confiável. O painel de alertas sai com as contagens já feitas e as datas
+dos avisos no horário de Brasília.
 """
 from __future__ import annotations
 
 import re
+from datetime import datetime, timedelta, timezone
 
 from src.ai.schemas import ConflitoEntreTrechos, Montagem, SugestaoComSinais, TrechoClassificado
 from src.catalog.schemas import FornecedorParaSKU
 from src.ficha_sku.schemas import Ficha
+from src.painel.schemas import Aviso, ItemAlerta, TipoAviso
 from src.politica_compra.schemas import (
     DIAS_POR_MES,
     CriterioFornecedor,
     LeadTimeBase,
+    MotivoAlerta,
     ParametrosPolitica,
     PoliticaCompra,
 )
@@ -47,6 +51,17 @@ _CRITERIOS: dict[CriterioFornecedor, str] = {
     CriterioFornecedor.MENOR_PRECO: "menor preço",
     CriterioFornecedor.MENOR_LEAD_TIME: "menor lead time",
 }
+_MOTIVOS_DE_ALERTA: dict[MotivoAlerta, str] = {
+    MotivoAlerta.RUPTURA_ANTES_DA_CHEGADA: "o estoque acaba antes de uma compra feita hoje chegar",
+    MotivoAlerta.ABAIXO_DO_PISO_ALERTA: "cobertura atual abaixo do piso de alerta da política",
+    MotivoAlerta.VIOLA_TETO: "a compra sugerida passa do teto da política",
+    MotivoAlerta.LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO: "o fornecedor entrega acima do lead time contratado",
+    MotivoAlerta.ABAIXO_PEDIDO_MINIMO: "a compra sugerida fica abaixo do pedido mínimo do fornecedor",
+    MotivoAlerta.PERIODO_SAZONAL: "a compra chega em época forte de vendas",
+}
+_TIPOS_DE_AVISO: dict[TipoAviso, str] = {"acabou": "Acabou", "vendendo_muito": "Vendendo muito"}
+# O Brasil não tem horário de verão desde 2019.
+_BRASILIA = timezone(timedelta(hours=-3))
 _TAG_DE_TRECHO = re.compile(r"<(/?)(trecho)", re.IGNORECASE)
 
 
@@ -61,6 +76,8 @@ def renderizar_contexto(montagem: Montagem) -> str:
         secoes.append(
             _secao("Sugestões de pedido (cálculo da política de compra)", *map(_sugestao, montagem.sugestoes))
         )
+    if montagem.alertas:
+        secoes.append(_painel(montagem.alertas))
     if montagem.politica:
         secoes.append(_politica(montagem.politica))
     if montagem.trechos:
@@ -165,6 +182,57 @@ def _memoria(calculo: MemoriaCalculo) -> list[str]:
         f"Quantidade necessária: {_unidades(calculo.qtd_necessaria)}",
         f"Cobertura na chegada, com a compra: {_meses(calculo.cobertura_na_chegada_meses)}",
     ]
+
+
+def _painel(alertas: list[ItemAlerta]) -> str:
+    com_aviso = sum(1 for a in alertas if a.avisos_abertos)
+    resumo = (
+        f"{len(alertas)} {'SKU' if len(alertas) == 1 else 'SKUs'} no painel: "
+        f"{com_aviso or 'nenhum'} com aviso aberto da equipe de vendas e "
+        f"{(len(alertas) - com_aviso) or 'nenhum'} sem aviso, só por motivo de alerta. "
+        "Ordem do painel: primeiro os com aviso ou que acabam antes da compra chegar."
+    )
+    return _secao("Painel de alertas (calculado agora)", resumo, *map(_item_alerta, alertas))
+
+
+def _item_alerta(item: ItemAlerta) -> str:
+    sku = item.sku
+    linhas = [f"### {sku.sku_code}", f"- Produto: {sku.produto_nome}, {sku.cor}, {sku.tamanho}"]
+    if item.avisos_abertos:
+        linhas.append("- Avisos abertos da equipe de vendas:")
+        linhas.extend(f"  - {_aviso(a)}" for a in item.avisos_abertos)
+    if item.motivos:
+        linhas.append("- Motivos de alerta:")
+        linhas.extend(f"  - {_MOTIVOS_DE_ALERTA[m]}" for m in item.motivos)
+    else:
+        linhas.append("- Motivos de alerta: nenhum, está no painel só pelo aviso")
+    linhas.append(f"- Estoque disponível: {_unidades(item.disponivel)}")
+    if item.cobertura_atual_meses is None:
+        linhas.append("- Cobertura atual: indefinida, o SKU não vendeu nos meses considerados")
+    else:
+        linhas.append(f"- Cobertura atual: {_meses(item.cobertura_atual_meses)}")
+    if item.cobertura_na_chegada_sem_compra_meses is not None:
+        linhas.append(
+            f"- Cobertura quando uma compra feita hoje chegar, sem comprar: "
+            f"{_meses(item.cobertura_na_chegada_sem_compra_meses)}"
+        )
+    if item.quantidade_sugerida is not None:
+        linhas.append(f"- Sugestão de pedido: {_unidades(item.quantidade_sugerida)} de {item.fornecedor_sugerido}")
+    else:
+        linhas.append("- Sugestão de pedido: não comprar agora")
+    return "\n".join(linhas)
+
+
+def _aviso(aviso: Aviso) -> str:
+    texto = (
+        f"{_TIPOS_DE_AVISO[aviso.tipo]}, avisado por {aviso.avisado_por} "
+        f"em {_data(aviso.criado_em)}"
+    )
+    return f'{texto}: "{aviso.comentario}"' if aviso.comentario else texto
+
+
+def _data(momento: datetime) -> str:
+    return momento.astimezone(_BRASILIA).strftime("%d/%m/%Y")
 
 
 def _politica(politica: PoliticaCompra) -> str:

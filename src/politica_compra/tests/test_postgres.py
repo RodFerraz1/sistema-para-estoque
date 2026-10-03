@@ -16,7 +16,7 @@ from src.politica_compra.postgres import PostgresPoliticaCompraRepositorio
 from src.politica_compra.schemas import (
     CriterioFornecedor,
     LeadTimeBase,
-    MotivoDestaque,
+    MotivoAlerta,
     PARAMETROS_V1,
     SazonalidadeModo,
 )
@@ -71,7 +71,7 @@ def test_salvar_nova_versao_round_trip_e_vira_ativa(
             "criterio_fornecedor": CriterioFornecedor.MENOR_LEAD_TIME,
             "sazonalidade_modo": SazonalidadeModo.IGNORAR,
             "meses_quentes": (12, 1),
-            "motivos_de_destaque": (MotivoDestaque.ENCALHE, MotivoDestaque.VIOLA_TETO),
+            "motivos_de_alerta": (MotivoAlerta.PERIODO_SAZONAL, MotivoAlerta.VIOLA_TETO),
         }
     )
 
@@ -93,11 +93,11 @@ def test_versoes_antigas_continuam_gravadas(
     assert repo.versao(anterior.versao) == anterior
 
 
-@pytest.mark.parametrize("motivos", [tuple(MotivoDestaque), ()], ids=["todos", "nenhum"])
-def test_motivos_de_destaque_cabem_na_coluna(
-    repo: PostgresPoliticaCompraRepositorio, motivos: tuple[MotivoDestaque, ...]
+@pytest.mark.parametrize("motivos", [tuple(MotivoAlerta), ()], ids=["todos", "nenhum"])
+def test_motivos_de_alerta_cabem_na_coluna(
+    repo: PostgresPoliticaCompraRepositorio, motivos: tuple[MotivoAlerta, ...]
 ) -> None:
-    salva = repo.salvar_nova_versao(PARAMETROS_V1.model_copy(update={"motivos_de_destaque": motivos}))
+    salva = repo.salvar_nova_versao(PARAMETROS_V1.model_copy(update={"motivos_de_alerta": motivos}))
 
     assert repo.versao(salva.versao) == salva
-    assert salva.parametros.motivos_de_destaque == motivos
+    assert salva.parametros.motivos_de_alerta == motivos

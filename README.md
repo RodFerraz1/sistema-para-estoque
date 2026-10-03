@@ -1,10 +1,12 @@
 # Copilot de Compras
 
-Assistente de decisão de compras para um atacadista de cama, mesa e banho: sugere o que comprar, quanto, de quem e quando, a partir de um ERP simulado e de um corpus de documentos (contratos, atas, políticas), sempre com o comprador chefe aprovando. Vocabulário, decisões e restrições de domínio vivem em [`CONTEXT.md`](CONTEXT.md).
+Assistente de decisão de compras para um atacadista de cama, mesa e banho: sugere o que comprar, quanto, de quem e quando, a partir de um ERP simulado e de um corpus de documentos (contratos, atas, políticas), sempre com o comprador chefe decidindo no fim. Vocabulário, decisões e restrições de domínio vivem em [`CONTEXT.md`](CONTEXT.md).
 
-**MVP completo (M0-M8 do [roadmap](.scratch/copilot-compras/roadmap.md)).** A sugestão de pedido é determinística: giro, cobertura, em trânsito, lead time e MOQ calculados em código, com os parâmetros de uma política de compra que o próprio comprador preenche num onboarding. Em volta dela, a IA segue a [ADR-0002](docs/adr/0002-jev-decide-codigo-executa-llm-redige.md): o Jev (TypeSafe) toma decisões tipadas com confiança (intenção da pergunta, relevância de trecho, sinais do corpus como atraso do fornecedor e encalhe, verificação de citações), o código executa e um LLM (Claude) só redige a resposta do chat. A fila de aprovação junta as sugestões de todos os SKUs com os sinais e a faixa de aprovação, e só a aprovação humana cria o pedido no ERP. Para ver tudo funcionando em 5 a 8 minutos, siga o [roteiro de demo](docs/demo.md).
+**MVP completo (M0-M8 do [roadmap](.scratch/copilot-compras/roadmap.md)).** A sugestão de pedido é determinística: giro, cobertura, em trânsito, lead time e MOQ calculados em código, com os parâmetros de uma política de compra que o próprio comprador preenche num onboarding. Em volta dela, a IA segue a [ADR-0002](docs/adr/0002-jev-decide-codigo-executa-llm-redige.md): o Jev (TypeSafe) toma decisões tipadas com confiança (intenção da pergunta, relevância de trecho, sinais do corpus como atraso do fornecedor e encalhe, verificação de citações), o código executa e um LLM (Claude) só redige a resposta do chat.
 
-![Fila de aprovação com uma sugestão em destaque, a faixa, os alertas e o sinal de encalhe do corpus](docs/img/fila.png)
+O produto segue o trabalho do comprador chefe, do alerta à decisão ([ADR-0005](docs/adr/0005-copilot-termina-na-decisao-de-compra.md)): a equipe de vendas avisa pelo celular que um SKU acabou ou está vendendo muito; o **painel de alertas** junta esses avisos com os SKUs que vão faltar segundo a política; a **tela do SKU** reúne situação, vendas, sugestão de pedido, sinais do corpus e preços para negociar com o representante, com o chat ao lado já no contexto do SKU; e o fluxo termina numa **decisão de compra** (`vou_comprar`, `negociando` ou `nao_comprar_agora`). O Copilot não cria pedido de compra: o pedido sai no ERP real do atacadista, depois da negociação. Para ver tudo funcionando em 5 a 8 minutos, siga o [roteiro de demo](docs/demo.md).
+
+![Painel de alertas com os SKUs que acabam antes da compra chegar e um aviso da equipe de vendas](docs/img/painel.png)
 
 ## Pré-requisitos
 
@@ -28,7 +30,7 @@ uv run python -m scripts.seed
 uv run python -m scripts.ingerir_corpus
 ```
 
-A ingestão baixa o modelo de embedding para `.cache/fastembed` na primeira vez. Os endpoints que usam o Jev (`/rag/busca`, `/chat`, `/skus/{sku_code}/sugestao-compra/sinais` e `POST /sugestoes/gerar`) também precisam da `JEV_KEY` (chave da API da TypeSafe) no `.env`: copie o `.env.example` e preencha. Sem a chave, só esses respondem 503. A chave do redator (`ANTHROPIC_API_KEY`) é opcional: sem ela, o chat responde com os dados que reuniu, sem redação.
+A ingestão baixa o modelo de embedding para `.cache/fastembed` na primeira vez. Os endpoints que usam o Jev (`/rag/busca`, `/chat` e `/skus/{sku_code}/sugestao-compra/sinais`) também precisam da `JEV_KEY` (chave da API da TypeSafe) no `.env`: copie o `.env.example` e preencha. Sem a chave, só esses respondem 503. A chave do redator (`ANTHROPIC_API_KEY`) é opcional: sem ela, o chat responde com os dados que reuniu, sem redação.
 
 O app fica em `http://localhost:8000`. Confirme com:
 
@@ -37,20 +39,20 @@ curl http://localhost:8000/health
 # {"status":"ok","db":"ok"}
 ```
 
-A UI fica em `http://localhost:8000/ui/` (a raiz redireciona para lá). Fora do Docker, suba só o banco (`docker compose up -d db`) e rode o app com `uv run uvicorn src.main:app`.
+A UI fica em `http://localhost:8000/ui/` (a raiz redireciona para o painel de alertas). A página da equipe de vendas é `http://localhost:8000/ui/aviso.html`. Fora do Docker, suba só o banco (`docker compose up -d db`) e rode o app com `uv run uvicorn src.main:app`.
 
 ### Resetar o ambiente local
 
-O seed (`uv run python -m scripts.seed`) apaga e recria só o schema `erp`, inclusive os pedidos aprovados pela fila. As tabelas do Copilot (schema `copilot`) não são tocadas por ele e acumulam o que o uso e os smokes gravam: sugestões da fila (gerar de novo marca as pendentes como `substituida`), registros de decisão do chat e versões da política. Para voltar ao estado inicial:
+O seed (`uv run python -m scripts.seed`) apaga e recria só o schema `erp`. As tabelas do Copilot (schema `copilot`) não são tocadas por ele e acumulam o que o uso grava: avisos da equipe de vendas, decisões de compra, registros de decisão do chat e versões da política. Para voltar ao estado inicial:
 
 ```bash
 uv run python -m scripts.seed
 docker compose exec db psql -U copilot -d copilot -c "
-  TRUNCATE copilot.sugestoes_fila, copilot.registros_decisao;
+  TRUNCATE copilot.avisos, copilot.decisoes_compra, copilot.registros_decisao;
   DELETE FROM copilot.politicas_compra WHERE versao > 1;"
 ```
 
-A fila e os registros de decisão ficam vazios e a política volta à v1 (a da migration). Os trechos do corpus não precisam de reset: a ingestão é idempotente.
+O painel volta a ter só os motivos de alerta calculados, os registros de decisão ficam vazios e a política volta à v1 (a da migration). Os trechos do corpus não precisam de reset: a ingestão é idempotente.
 
 ## Variáveis de ambiente
 
@@ -88,8 +90,7 @@ uv run pytest -m "not externo and not externo_llm"
 
 # Só smoke end-to-end (requer docker compose up; aplica migrations, seed e ingestão
 # do corpus sozinho, o que apaga e recria os dados do schema erp no banco local;
-# a fila de aprovação que ele gera é apagada no fim, e as pendentes que ela
-# substituiu voltam a pendentes)
+# o aviso e a decisão de compra que o smoke do painel grava são apagados no fim)
 uv run pytest tests/smoke/
 
 # Todos os testes marcados como smoke, incluindo tests/test_seed_smoke.py
@@ -105,7 +106,14 @@ uv run pytest
 | Método | Rota | O que devolve |
 | ------ | ---- | ------------- |
 | `GET` | `/health` | Saúde do app e do banco. |
-| `GET` | `/skus/{sku_code}/analise` | Análise composta: nome, categoria, estoque, giro, cobertura, fornecedores. |
+| `GET` | `/painel` | Painel de alertas calculado na hora: `alertas` (SKUs com aviso aberto ou motivo de alerta, na ordem de urgência), `decididos` (com decisão de compra vigente) e `skus_com_erro`. 503 com o banco fora do ar. |
+| `POST` | `/avisos` | Aviso da equipe de vendas (`sku_code`, `tipo` `acabou` ou `vendendo_muito`, `avisado_por`, `comentario` opcional). 201; 404 sem o SKU; 422 com o SKU inativo. |
+| `GET` | `/skus?busca=...` | Busca da página de aviso: até 20 SKUs ativos com todas as palavras no código, nome, cor ou tamanho, sem diferenciar acento nem maiúscula (mínimo de 2 caracteres). |
+| `GET` | `/skus/{sku_code}/avisos` | Avisos abertos do SKU (sem decisão de compra posterior), do mais recente para o mais antigo. |
+| `GET` | `/skus/{sku_code}/decisoes` | Decisões de compra do SKU, da mais recente para a mais antiga. |
+| `POST` | `/skus/{sku_code}/decisoes` | Registra a decisão de compra (`tipo`, `decidido_por`, `quantidade` em `vou_comprar`, `motivo` em `nao_comprar_agora`, `comentario` opcional), com a sugestão e a versão da política do momento. 201; 404 sem o SKU; 422 nas validações. Não cria pedido de compra. |
+| `GET` | `/skus/{sku_code}/precos` | Referências para negociar: preço pago em cada pedido de compra (sem os cancelados), preço atual por fornecedor e até 10 substitutos (outro produto da mesma categoria e tamanho) pelo menor preço. |
+| `GET` | `/skus/{sku_code}/analise` | Análise composta: nome, categoria, cor, tamanho, estoque, em trânsito, giro, cobertura, fornecedores. |
 | `GET` | `/skus/abaixo-do-piso?dias=20` | SKUs com cobertura abaixo do piso de alerta. Sem `dias`, usa o `piso_alerta_dias` da política ativa. |
 | `GET` | `/skus/{sku_code}/sugestao-compra` | Sugestão de pedido: quantidade, fornecedor, valor, memória de cálculo e alertas. |
 | `GET` | `/skus/{sku_code}/sugestao-compra/sinais` | Sinais do corpus sobre o fornecedor e o produto da sugestão, com os trechos de origem. Lista vazia quando a sugestão não tem fornecedor; 503 sem o Jev. |
@@ -113,17 +121,11 @@ uv run pytest
 | `GET` | `/skus/{sku_code}/sazonalidade` | Multiplicadores mês-a-mês (1 = neutro). |
 | `GET` | `/skus/{sku_code}/fornecedores` | Preço, MOQ e lead time por fornecedor. |
 | `GET` | `/politica-compra` | Política de compra ativa (`versao`, `criada_em`, `parametros`). |
-| `PUT` | `/politica-compra` | Recebe os parâmetros completos, inclusive os limites das faixas de aprovação e os motivos de destaque da fila, valida e grava uma versão nova (201, ou 422 se inválida). |
+| `PUT` | `/politica-compra` | Recebe os parâmetros completos, inclusive os motivos de alerta do painel, valida e grava uma versão nova (201, ou 422 se inválida). |
 | `GET` | `/rag/busca?q=...&k=30` | Trechos do corpus mais parecidos com a pergunta, classificados pelo filtro do Jev, e os conflitos entre eles. |
-| `POST` | `/chat` | Responde em texto a pergunta do comprador chefe, com o entendimento do Jev, a faixa de confiança, a ação, os dados que foram ao redator (sugestões com os sinais do corpus) e a verificação das citações. |
+| `POST` | `/chat` | Responde em texto a pergunta do comprador chefe, com o entendimento do Jev, a faixa de confiança, a ação, os dados que foram ao redator (sugestões com os sinais do corpus) e a verificação das citações. `sku_code` opcional: o SKU da tela de onde ele pergunta (404 se não existe). |
 | `GET` | `/chat/registros?limite=20` | Registros de decisão do chat, do mais recente para o mais antigo (`limite` de 1 a 100). |
-| `POST` | `/sugestoes/gerar` | Gera a sugestão de todos os SKUs ativos e põe na fila as que têm compra, com os sinais do corpus e a faixa de aprovação, no lugar das pendentes anteriores. Leva uns 40 s com o seed; 503 sem `JEV_KEY`. |
-| `GET` | `/sugestoes?status=pendente` | Fila de aprovação. `status`: `pendente` (padrão, na ordem da fila), `aprovada`, `rejeitada` ou `substituida`. |
-| `GET` | `/sugestoes/{id}` | Uma sugestão da fila (404 se não existe). |
-| `GET` | `/sugestoes/{id}/faixa?quantidade=N` | Faixa de aprovação da sugestão com essa quantidade, sem decidir nada (404 sem a sugestão, 422 abaixo do MOQ). A UI consulta antes de aprovar uma quantidade editada. |
-| `POST` | `/sugestoes/{id}/aprovar` | Aprova (`aprovado_por`, `quantidade` e `justificativa` opcionais) e cria o pedido de compra `aprovado` no ERP. 409 se já foi decidida, 422 abaixo do MOQ ou sem a justificativa que a faixa exige. |
-| `POST` | `/sugestoes/{id}/rejeitar` | Rejeita (`rejeitado_por`, `motivo`). 409 se já foi decidida. |
-| `GET` | `/ui/` | UI mínima: fila de aprovação, chat e onboarding da política. `/` redireciona para cá. |
+| `GET` | `/ui/` | UI sem build: painel de alertas, tela do SKU, página de aviso da equipe de vendas, onboarding da política e o chat lateral. `/` redireciona para cá. |
 
 `sku_code` é o código legível do SKU (ex.: `CB-AZUL-CASAL-05`), não o UUID.
 
@@ -136,17 +138,20 @@ Unidades monetárias: `preco_unitario_reais` vem em **centavos** (`7488` = R$ 74
   "sku_code": "CB-AZUL-CASAL-05",
   "produto_nome": "Colcha Bouti",
   "categoria": "jogo_cama",
+  "cor": "azul",
+  "tamanho": "casal",
   "estoque": {
     "quantidade_disponivel": 90,
     "quantidade_reservada": 11,
     "atualizado_em": "2026-09-01T00:00:00Z"
   },
+  "em_transito_unidades": 144,
   "giro": {
-    "unidades_por_mes": 32.0,
+    "unidades_por_mes": 27.666666666666668,
     "meses_considerados": 6
   },
   "cobertura": {
-    "meses": 2.8125,
+    "meses": 3.253012048192771,
     "sem_giro": false
   },
   "fornecedores": [
@@ -181,7 +186,7 @@ Os valores de giro e cobertura dependem da data em que o seed rodou.
 ```json
 {
   "sku_code": "ED-BEGE-QUEEN-02",
-  "quantidade": 85,
+  "quantidade": 98,
   "motivo": null,
   "fornecedor": {
     "fornecedor_id": "5ad64b40-3bf9-59f0-914f-c1ac3117be68",
@@ -193,22 +198,22 @@ Os valores de giro e cobertura dependem da data em que o seed rodou.
     "prazo_pagamento_padrao": "28/56",
     "pedido_minimo_reais": 25000
   },
-  "valor_estimado_centavos": 791945,
+  "valor_estimado_centavos": 913066,
   "calculo": {
-    "giro_mensal": 52.333333333333336,
+    "giro_mensal": 44.833333333333336,
     "disponivel": 81,
     "em_transito": 56,
     "posicao": 137,
     "lead_time_dias": 67,
     "lead_time_origem": "observado",
-    "estoque_na_chegada": 20.12222222222222,
-    "qtd_necessaria": 85,
-    "cobertura_na_chegada_meses": 2.008704883227176
+    "estoque_na_chegada": 36.87222222222222,
+    "qtd_necessaria": 98,
+    "cobertura_na_chegada_meses": 3.008302354399008
   },
   "alertas": [
     {
       "tipo": "abaixo_pedido_minimo",
-      "mensagem": "O pedido de R$ 7.919,45 fica abaixo do pedido mínimo de R$ 25.000,00 do fornecedor Verdela Home. Junte com outros SKUs dele."
+      "mensagem": "O pedido de R$ 9.130,66 fica abaixo do pedido mínimo de R$ 25.000,00 do fornecedor Verdela Home. Junte com outros SKUs dele."
     },
     {
       "tipo": "lead_time_observado_acima_do_contratado",
@@ -229,7 +234,7 @@ A sugestão é calculada na hora e não é gravada. Quando não há o que compra
 
 ### Política de compra
 
-O mecanismo da sugestão (contar o que está em trânsito, descontar o consumo durante o lead time, respeitar o MOQ, nunca esconder violação de teto) é fixo no código. Os parâmetros de estratégia (teto, pisos, ciclo de compra, qual lead time usar, critério de fornecedor, sazonalidade, regra de SKU novo) são do comprador chefe e ficam na política de compra, versionada em `copilot.politicas_compra`. Cada `PUT /politica-compra` cria uma versão nova, e a ativa é a de maior `versao`. A v1 nasce na migration com os valores da política v3 do corpus.
+O mecanismo da sugestão (contar o que está em trânsito, descontar o consumo durante o lead time, respeitar o MOQ, nunca esconder violação de teto) é fixo no código. Os parâmetros de estratégia (teto, pisos, ciclo de compra, qual lead time usar, critério de fornecedor, sazonalidade, regra de SKU novo, motivos de alerta do painel) são do comprador chefe e ficam na política de compra, versionada em `copilot.politicas_compra`. Cada `PUT /politica-compra` cria uma versão nova, e a ativa é a de maior `versao`. A v1 nasce na migration com os valores da política v3 do corpus; a migration `0009` a levou ao ciclo de compra de 2 meses ("no mínimo 60 dias de cobertura de venda", pedido do dev para o MVP) e aos motivos de alerta padrão. Como piso de reposição mais ciclo fecha exatamente no teto de 3 meses, o cálculo aceita passar do teto por menos de uma unidade, que é só o arredondamento para unidade inteira.
 
 A justificativa está em [`docs/adr/0003-politica-de-compra-configuravel.md`](docs/adr/0003-politica-de-compra-configuravel.md). Os parâmetros sem base na política v3 são chutes até o comprador responder [`.scratch/sugestao-compra/perguntas-comprador.md`](.scratch/sugestao-compra/perguntas-comprador.md). As respostas viram um `PUT /politica-compra`, sem mudança de código; a página de política da UI (`/ui/politica.html`) faz essas perguntas na linguagem do comprador, cada uma preenchida com o valor ativo, e grava a versão nova.
 
@@ -362,7 +367,7 @@ sequenceDiagram
     alt faixa baixa, fora de escopo ou SKU não identificado
         K->>K: esclarecimento ou resposta fixa, em código
     else faixa alta ou média
-        K->>K: identificação dos SKUs (código na pergunta ou produto do Jev)
+        K->>K: identificação dos SKUs (código na pergunta, produto do Jev ou SKU da tela)
         K->>D: por intenção: fichas, sugestões de pedido, política ativa
         K->>P: busca vetorial no corpus (sugestão, política ou fornecedor)
         K->>J: relevância, evidência, premissa, injeção e conflitos dos trechos
@@ -377,10 +382,10 @@ sequenceDiagram
     A-->>C: resposta
 ```
 
-1. **Entendimento** (Jev, um request): duas `Choice` sobre a pergunta, com as probabilidades. A intenção (`situacao_sku`, `sugestao_compra`, `politica_ou_fornecedor` ou `fora_de_escopo`) e o produto do catálogo que a pergunta cita (ou `nenhum`).
+1. **Entendimento** (Jev, um request): duas `Choice` sobre a pergunta, com as probabilidades. A intenção (`situacao_sku`, `sugestao_compra`, `politica_ou_fornecedor`, `alertas_e_avisos` ou `fora_de_escopo`) e o produto do catálogo que a pergunta cita (ou `nenhum`).
 2. **Faixa de confiança** da intenção (`FAIXAS` em `src/ai/chat.py`): alta (a partir de 0,80) responde; média (a partir de 0,50) responde, mas começa confirmando o que entendeu; baixa pede esclarecimento com as duas intenções mais prováveis, sem ler dados nem chamar o redator. Fora de escopo recebe uma resposta fixa.
-3. **SKUs** (`src/ai/identificacao.py`): um código de SKU escrito na pergunta sempre ganha. Sem código, vale o produto escolhido pelo Jev com confiança a partir de `LIMIAR_PRODUTO` (0,60, medido com `scripts.avaliar_entendimento`), estreitado pelas cores e tamanhos citados, até 12 SKUs. Se a pergunta é sobre a situação de um SKU e nenhum foi identificado, o chat pede o código e cita os produtos candidatos.
-4. **Montagem** por intenção: situação do SKU lê as fichas e a política ativa; sugestão de compra calcula as sugestões (as mesmas de `/sugestao-compra`), os sinais do corpus de cada uma, lê a política e busca no corpus; política ou fornecedor só busca no corpus. Da busca, vão ao redator só os trechos `aceito` e `conflitante`, até 10, e os trechos de origem dos sinais completam esse total (os da pergunta têm prioridade).
+3. **SKUs** (`src/ai/identificacao.py`): um código de SKU escrito na pergunta sempre ganha. Sem código, vale o produto escolhido pelo Jev com confiança a partir de `LIMIAR_PRODUTO` (0,60, medido com `scripts.avaliar_entendimento`), estreitado pelas cores e tamanhos citados, até 12 SKUs. Sem nenhum dos dois, vale o SKU da tela de onde o comprador perguntou (`sku_code` no corpo, origem `contexto`; ver "Chat em contexto"). Se a pergunta é sobre a situação de um SKU e nenhum foi identificado, o chat pede o código e cita os produtos candidatos.
+4. **Montagem** por intenção: situação do SKU lê as fichas e a política ativa; sugestão de compra calcula as sugestões (as mesmas de `/sugestao-compra`), os sinais do corpus de cada uma, lê a política e busca no corpus; política ou fornecedor só busca no corpus; alertas e avisos lê o painel de alertas calculado na hora (avisos abertos da equipe de vendas, motivos de alerta, cobertura e sugestão), só dos SKUs citados quando a pergunta cita produto, sem usar o SKU da tela e sem buscar no corpus. Da busca, vão ao redator só os trechos `aceito` e `conflitante`, até 10, e os trechos de origem dos sinais completam esse total (os da pergunta têm prioridade).
 5. **Redação**: o código renderiza o contexto (`src/ai/contexto.py`) com todo número já calculado, os sinais abaixo de cada sugestão e os trechos marcados como dado não confiável, e o redator escolhido por `REDATOR` (`ClaudeRedator` em `src/ai/claude.py`) redige seguindo `INSTRUCOES_REDATOR` (`src/ai/redator.py`): começar pelas quantidades de cada sugestão, falar de todo sinal do corpus com um trecho de origem, copiar os números sem converter nem comparar, não recomendar fornecedor nem opinar sobre a compra, citar só ids de trecho, um por frase, e nunca aprovar pedido. A redação passa por uma limpeza em código (`limpar_redacao`: hífen não separável vira hífen, espaços especiais viram espaço, `【】` vira `[]` e o espaço de largura zero sai), para o código do SKU ser copiável e as citações serem extraídas. Sem a chave da Anthropic, ou se o Claude falhar, o `RedatorSemLLM` devolve o contexto sem redação e `redator` vira `sem_llm`.
 6. **Verificação das citações** (só quando um LLM redigiu): cada `[id do trecho]` da redação é conferido pelo Jev contra a frase que o cita, e o que não é confirmado fica marcado no texto. Detalhes na seção seguinte.
 
@@ -627,123 +632,138 @@ O script conta, por caso e no total, o que dá para medir sem ler a resposta: co
 - **Faixa média quase some, e as faixas não foram recalibradas.** Com os critérios novos, 44 das 45 perguntas rotuladas saem com confiança alta e nenhuma intenção sai errada, então a regra não tem negativos: as faixas (0,80 e 0,50) e o `LIMIAR_PRODUTO` (0,60) ficam por amostra insuficiente. Não há como saber se uma intenção errada também viria com confiança alta.
 - **Poucos SKUs identificados pelo nome.** Quando o Jev escolhe o produto com confiança abaixo de 0,60, ou não acha o produto (a toalha de rosto 45x70 não existe no catálogo), a pergunta de situação pede o código do SKU e a de sugestão de compra responde só com o corpus e a política, sem quantidade. Na rodada final, 3 das 5 perguntas de situação pediram o código e 4 das 5 de sugestão ficaram sem SKU.
 
-### Fila de aprovação: `/sugestoes`
+### Fluxo do comprador: painel, aviso e decisão de compra
 
-É o fim do fluxo: o Copilot sugere, o comprador chefe aprova e o pedido aparece no ERP fake. O módulo `aprovacao` guarda a fila em `copilot.sugestoes_fila` (migration [`0007_sugestoes_fila`](alembic/versions/0007_sugestoes_fila.py)).
+O Copilot segue o trabalho do comprador chefe, do alerta à decisão ([ADR-0005](docs/adr/0005-copilot-termina-na-decisao-de-compra.md)). O módulo `painel` é dono dos avisos da equipe de vendas (`copilot.avisos`, migration [`0010_avisos`](alembic/versions/0010_avisos.py)), das decisões de compra (`copilot.decisoes_compra`, migration [`0011_decisoes_compra`](alembic/versions/0011_decisoes_compra.py)) e da composição do painel de alertas. O Copilot não escreve no ERP: o pedido de compra sai no ERP real, depois da negociação com o representante.
 
 ```mermaid
 sequenceDiagram
+    actor V as Equipe de vendas
     actor C as Comprador chefe
-    participant A as API /sugestoes
-    participant F as aprovacao
+    participant A as API
+    participant M as painel
     participant U as purchasing
-    participant S as ai (sinais)
-    participant J as Jev
     participant P as Postgres
 
-    C->>A: POST /sugestoes/gerar
-    A->>F: gerar_fila
+    V->>A: POST /avisos (acabou ou vendendo muito)
+    A->>M: registrar_aviso
+    M->>P: copilot.avisos
+    C->>A: GET /painel
+    A->>M: painel
     loop cada SKU ativo
-        F->>U: sugerir_pedido (determinístico)
+        M->>U: sugerir_pedido (determinístico, sem Jev)
     end
-    F->>S: sinais das sugestões com compra
-    S->>J: um cálculo por par (fornecedor, produto)
-    F->>U: faixa de aprovação de cada sugestão
-    F->>P: grava a fila em copilot.sugestoes_fila (as pendentes anteriores viram substituida)
-    C->>A: GET /sugestoes (destaque primeiro, depois a mais urgente)
-    C->>A: POST /sugestoes/{id}/aprovar (quantidade, justificativa)
-    A->>F: aprovar
-    F->>P: reserva a sugestão (SELECT ... FOR UPDATE)
-    F->>U: faixa com a quantidade aprovada (justificativa da faixa 2 em diante)
-    F->>U: submeter_pedido
-    U->>P: pedido aprovado em erp.pedidos_compra (via erp_adapter)
-    F->>P: sugestão aprovada com o id do pedido
-    A-->>C: pedido criado, que passa a contar como em trânsito
+    M-->>C: alertas (aviso ou ruptura primeiro) e decididos
+    C->>A: tela do SKU: análise, sugestão, sinais, preços, vendas, avisos e decisões
+    C->>A: POST /chat com o sku_code da tela
+    C->>A: POST /skus/{sku}/decisoes (vou_comprar, negociando ou nao_comprar_agora)
+    A->>M: registrar_decisao
+    M->>U: sugestão do momento (quantidade e versão da política)
+    M->>P: copilot.decisoes_compra
 ```
 
-1. **Gerar** (`POST /sugestoes/gerar`, ação explícita do comprador, não roda a cada listagem): calcula a sugestão de cada SKU ativo, fica com as que têm compra, calcula os sinais do corpus uma vez por par (fornecedor, produto) e a faixa de aprovação de cada uma. As novas entram no lugar de todas as pendentes anteriores, que viram `substituida`; as decididas não mudam. Com o seed, são 80 SKUs, umas 30 sugestões e uns 40 s, quase todos nos sinais (uns 800 requests do Jev, menos de US$ 0,02). Com o Jev fora do ar, as sugestões entram sem sinais (`sinais` nulo) e a resposta traz `sinais_indisponiveis: true`; sem `JEV_KEY`, a resposta é 503, como nos outros endpoints do Jev.
-2. **Ordem** (`GET /sugestoes`): primeiro as em destaque, depois a mais urgente, que é a de menor cobertura na chegada sem contar a compra (`cobertura_na_chegada_sem_compra_meses`, negativa quando o estoque acaba antes da compra chegar). Destaca a sugestão com algum alerta ou sinal do corpus entre os `motivos_de_destaque` da versão da política com que ela foi gerada, que o comprador escolhe no onboarding (migration [`0008_motivos_de_destaque`](alembic/versions/0008_motivos_de_destaque.py)). O padrão é ruptura antes da chegada e violação do teto: no seed, destaca 10 das 31 sugestões, com ou sem o Jev. Com todos os alertas de risco e os sinais, como era antes, destacava 30 de 31 (26 sem o Jev) e não separava nada; só o sinal de atraso a mais dá 15, os três sinais 18, o lead time observado 26. O destaque e os sinais só ordenam, nunca aprovam.
-3. **Aprovar** (`POST /sugestoes/{id}/aprovar`): com a quantidade sugerida ou outra (`quantidade`, maior que zero e no mínimo o MOQ). A faixa é recalculada com essa quantidade e a versão da política da sugestão (a mesma do resto do cálculo; uma política salva depois só vale na próxima geração), e da faixa 2 em diante a `justificativa` é obrigatória (422 sem ela). O `purchasing.submeter_pedido` cria em `erp.pedidos_compra` um pedido `aprovado` de um item, com entrega prevista para hoje mais o lead time da sugestão e a observação "Criado pelo Copilot a partir da sugestão <id>, aprovado por <nome>.". A partir daí o pedido conta como em trânsito, e a próxima sugestão do SKU já o desconta. É o único caminho da API que escreve no ERP. A sugestão fica reservada na fila (`SELECT ... FOR UPDATE`) enquanto o pedido é criado: uma segunda aprovação simultânea espera e recebe 409 sem criar outro pedido, e se o ERP falhar a sugestão continua pendente.
-4. **Rejeitar** (`POST /sugestoes/{id}/rejeitar`): exige o nome e o motivo, que ficam gravados.
-
-Decidir uma sugestão que não está mais pendente dá 409. O nome de quem decide é informado, não verificado: não há autenticação.
-
-**Faixa de aprovação** (`src/purchasing/faixa.py`, de [`politicas/aprovacao-compras.md`](corpus/politicas/aprovacao-compras.md)): a faixa base sai do valor dos itens, com os limites `faixa_1_ate_reais`, `faixa_2_ate_reais` e `faixa_3_ate_reais` da política de compra (15.000, 60.000 e 150.000 na v1, inclusivos; acima é a faixa 4; migration [`0006_faixas_aprovacao`](alembic/versions/0006_faixas_aprovacao.py)). As exceções do documento são mecanismo: sem violação do teto, é reposição regular e desce uma faixa; com violação, sobe uma; fornecedor sem pedido anterior no ERP vai no mínimo para a faixa 3. `aprovadores` diz quem precisa aprovar, e `ajustes` traz uma frase por exceção que mudou a faixa. O documento avalia o valor com impostos e frete, que o ERP fake não tem.
-
-Exemplo real de um item de `GET /sugestoes` (Jev real, banco do seed, gerado antes dos motivos de destaque), com `calculo`, os campos de decisão (todos nulos) e o `fornecedor` cortados (o `fornecedor` é o mesmo de `/sugestao-compra`):
+**Painel de alertas** (`GET /painel`, a home da UI). Calculado na hora, sem estado próprio, com a política ativa: para cada SKU ativo, a sugestão de pedido e a cobertura atual (só o disponível). Os **motivos de alerta** de um SKU são os alertas da sugestão que estão nos `motivos_de_alerta` da política, mais `abaixo_do_piso_alerta` quando a cobertura atual fica abaixo do `piso_alerta_dias`. O padrão é ruptura antes da chegada e abaixo do piso de alerta; o comprador muda na pergunta 10 da tela de política (migration [`0009_motivos_de_alerta`](alembic/versions/0009_motivos_de_alerta.py)). O SKU entra no painel se tem aviso aberto ou algum motivo. Vêm primeiro os com aviso aberto ou ruptura antes da chegada e, em cada grupo, a menor cobertura na chegada sem a compra (os SKUs sem cálculo no fim do grupo, o código desempata). Um SKU sem a linha de estoque no ERP vai para `skus_com_erro` em vez de derrubar o painel. Com o seed, o painel leva uns 2 s e traz 9 SKUs, todos com ruptura antes da chegada. O painel não chama o Jev.
 
 ```json
 {
-  "id": "e2a045c6-5eba-4ce6-8363-99b1fa2a46ff",
-  "criado_em": "2026-10-01T00:25:09.946221Z",
-  "status": "pendente",
-  "destaque": true,
-  "sku_code": "TBC-BEGE-70140-01",
-  "produto_nome": "Toalha Banho Conforto",
-  "cobertura_na_chegada_sem_compra_meses": 0.32105263157894726,
-  "sugestao": {
-    "sugestao": {
-      "sku_code": "TBC-BEGE-70140-01",
-      "quantidade": 213,
-      "motivo": null,
-      "valor_estimado_centavos": 363378,
-      "alertas": [
-        {
-          "tipo": "abaixo_pedido_minimo",
-          "mensagem": "O pedido de R$ 3.633,78 fica abaixo do pedido mínimo de R$ 12.000,00 do fornecedor Katrina Têxtil. Junte com outros SKUs dele."
-        },
-        {
-          "tipo": "periodo_sazonal",
-          "mensagem": "A compra chega em época forte (novembro e dezembro). Pela R2, dá pra comprar até 2,0 meses de estoque a mais, com registro em ata."
-        }
-      ],
-      "politica_versao": 395
-    },
-    "sinais": [
-      {
-        "tipo": "atraso_do_fornecedor",
-        "mensagem": "Os documentos relatam atraso de entrega da Katrina Têxtil.",
-        "trechos": [
-          "fornecedores/katrina-textil.md#lead-time",
-          "reunioes/2025-q1-revisao-fornecedores.md#riscos-consolidados-de-fornecimento"
-        ],
-        "probabilidade": 0.96
-      }
-    ]
-  },
-  "faixa": {
-    "faixa": 1,
-    "aprovadores": "comprador chefe",
-    "exige_justificativa": false,
-    "ajustes": []
-  }
+  "sku_code": "JDCP-ROSA-SOLTEIRO-10",
+  "produto_nome": "Jogo de Cama Percal 200 fios",
+  "cor": "rosa",
+  "tamanho": "solteiro",
+  "disponivel": 62,
+  "cobertura_atual_meses": 1.1923076923076923,
+  "cobertura_na_chegada_sem_compra_meses": -0.7743589743589744,
+  "motivos": ["ruptura_antes_da_chegada"],
+  "quantidade_sugerida": 156,
+  "fornecedor_sugerido": "Verdela Home",
+  "avisos_abertos": 0,
+  "ultimo_aviso": null,
+  "so_por_aviso": false
 }
 ```
 
-Aqui o destaque vinha só do sinal de atraso, que não está nos motivos de destaque padrão: com a política padrão, essa sugestão não fica em destaque. A faixa base (R$ 3.633,78) já é a 1, então a reposição regular não tem o que descer e `ajustes` fica vazio. Na mesma geração, a única sugestão fora da faixa 1 foi uma toalha de mesa da Aurora que viola o teto: subiu da faixa 1 para a 2 e exige justificativa.
+**Aviso da equipe de vendas** (`POST /avisos`, página `/ui/aviso.html`). A vendedora busca o SKU pelo nome, cor ou tamanho (`GET /skus?busca=`, sem diferenciar acento nem maiúscula), marca `acabou` ou `vendendo_muito`, escreve um comentário se quiser e envia. O SKU entra no painel na hora, no primeiro grupo, mesmo quando o cálculo não vê problema (`so_por_aviso`), porque a loja pode estar vendo algo que o histórico não mostra. SKU inativo não aceita aviso (422).
+
+**Decisão de compra** (`POST /skus/{sku}/decisoes`, na tela do SKU). `vou_comprar` exige a quantidade (maior que zero), `nao_comprar_agora` exige o motivo, e `negociando` só tira o SKU do painel enquanto o comprador conversa com o representante. A decisão guarda a quantidade sugerida e a versão da política do momento, para comparar depois o que o Copilot sugeriu com o que o comprador decidiu. Nada é atualizado: **aviso aberto** é o que não tem decisão do mesmo SKU depois dele, e **decisão vigente** é a mais recente do SKU, com menos de 7 dias (`PRAZO_DA_DECISAO`) e sem aviso posterior. Com decisão vigente, o SKU sai dos alertas e vai para `decididos`; volta quando a decisão faz 7 dias (se ainda tiver motivo) ou na hora, se chegar um aviso novo.
+
+**Preços para negociar** (`GET /skus/{sku}/precos`). Quando o representante quer subir o preço, a tela do SKU mostra o que o atacadista já pagou em cada pedido de compra (sem os cancelados), o preço atual de cada fornecedor e até 10 substitutos (SKUs ativos de outro produto, da mesma categoria e tamanho, pelo menor preço atual). No `ED-BEGE-CASAL-01`, por exemplo:
+
+```json
+{
+  "historico": [
+    {
+      "data": "2026-04-24T00:00:00Z",
+      "fornecedor_nome": "Katrina Têxtil",
+      "preco_unitario_centavos": 8561,
+      "quantidade": 180,
+      "status": "recebido_total"
+    }
+  ],
+  "precos_atuais": [
+    {
+      "fornecedor_id": "a8429f54-2d78-535a-a5d9-f7e8a36dbef0",
+      "fornecedor_nome": "Aurora Home Center",
+      "preco_unitario_reais": 8593,
+      "moq_unidades": 48,
+      "lead_time_dias_contratado": 40,
+      "lead_time_dias_observado": 52,
+      "prazo_pagamento_padrao": "30/60",
+      "pedido_minimo_reais": 10000
+    }
+  ],
+  "substitutos": [
+    {
+      "sku_code": "CB-OFF--CASAL-08",
+      "produto_nome": "Colcha Bouti",
+      "cor": "off-white",
+      "tamanho": "casal",
+      "preco_unitario_centavos": 7323,
+      "fornecedor_nome": "Katrina Têxtil"
+    }
+  ]
+}
+```
+
+Recortado: são três fornecedores (Aurora, Katrina a R$ 89,49 e Verdela) e nove substitutos.
+
+O seed tem só 15 pedidos de compra, então muitos SKUs não têm histórico. O preço pago nos pedidos antigos do seed fica 1% abaixo do atual por mês de idade, para o histórico ter o que mostrar.
+
+**Chat em contexto** (`POST /chat` com `sku_code`). Na tela do SKU, o chat lateral manda o SKU da tela. Para as intenções `situacao_sku` e `sugestao_compra`, se a pergunta não leva a nenhum SKU (nem por código, nem pelo produto que o Jev escolheu), vale o SKU da tela, com a origem `contexto` na identificação: "por que está acabando?" funciona sem repetir o produto. Pergunta que cita outro produto responde sobre o citado; as outras intenções ignoram o contexto. A intenção continua com o Jev e a regra é do código ([ADR-0002](docs/adr/0002-jev-decide-codigo-executa-llm-redige.md)). O registro de decisão grava o `sku_em_contexto` (migration [`0012_sku_em_contexto`](alembic/versions/0012_sku_em_contexto.py)).
 
 ### UI: `/ui/`
 
-HTML, CSS e JS puros em `src/ui/`, sem build e sem framework, servidos pelo próprio FastAPI e falando só com a API. Três páginas com um menu comum:
+HTML, CSS e JS puros, sem build, servidos pelo próprio app. A navegação do comprador é Painel e Política, com o botão do chat no cabeçalho.
 
-- **Fila** (`/ui/index.html`): o botão "Gerar sugestões" (com o aviso de que leva perto de 1 min) e um card por pendente, na ordem da fila, com o produto, o fornecedor, a quantidade e o MOQ, o valor, a cobertura na chegada, a faixa com os aprovadores e os ajustes, os alertas, os sinais com os ids dos trechos e a memória de cálculo recolhida. Aprovar abre no card um formulário com o nome, a quantidade (preenchida com a sugerida) e a justificativa; mudar a quantidade consulta a faixa nova e avisa se ela passa a exigir justificativa, antes de enviar. Rejeitar pede o nome e o motivo. Depois da aprovação, o card mostra o id do pedido criado no ERP. Um filtro mostra as aprovadas e as rejeitadas.
-- **Chat** (`/ui/chat.html`): a resposta em texto, com as citações não confirmadas destacadas, e o que o Copilot entendeu (intenção, confiança, faixa, ação, SKUs), as sugestões com os alertas e os sinais, as citações com o veredito e os trechos usados.
-- **Política** (`/ui/politica.html`): o onboarding da [ADR-0003](docs/adr/0003-politica-de-compra-configuravel.md). As perguntas 1 a 9 de [`perguntas-comprador.md`](.scratch/sugestao-compra/perguntas-comprador.md) na linguagem do comprador, uma para os limites das faixas de aprovação e uma para o que põe uma sugestão no topo da fila, cada uma preenchida com o valor ativo. Salvar grava uma versão nova da política (ou mostra o erro de validação com o número da pergunta); a fila só muda quando é gerada de novo. As perguntas 10 a 14 aparecem só para leitura, como "como o sistema entende o ERP".
+- **Painel** (`/ui/`): no topo, quatro contadores (pedidos da equipe de vendas, vão faltar antes da compra chegar, outros alertas e decididos nos últimos 7 dias) e os botões para abrir e copiar o link da página das vendedoras. Embaixo, os SKUs em três grupos de cards, na ordem do painel: "Pedidos da equipe de vendas" (com aviso aberto: o tipo, quem avisou, quando e o comentário), "Vão faltar antes da compra chegar" e "Outros alertas". Cada card diz em frase o que acontece ("Acaba cerca de 23 dias antes de uma compra feita hoje chegar"), o estoque, quanto tempo ele dura, os motivos e a sugestão, e abre a tela do SKU. No fim, a seção recolhida "Decididos nos últimos 7 dias". Mensagens claras para painel vazio e para banco fora do ar (503).
+- **Tela do SKU** (`/ui/sku.html?sku=<código>`): à esquerda, a situação do estoque em números grandes (em estoque, a caminho, vende por mês, quanto o estoque dura), a sugestão de compra com alertas e memória de cálculo (ou o motivo quando é zero), o que os documentos dizem (sinais do corpus), as vendas dos últimos 12 meses em barras (mês sem venda marcado como possível ruptura) e os preços para negociar. À direita, os avisos da equipe de vendas, o formulário "O que você decidiu?" e as decisões anteriores. Os blocos carregam em paralelo e os sinais do corpus chegam por último, sem bloquear o resto; com o Jev fora do ar, o bloco mostra "indisponível". O formulário muda os campos conforme o tipo e, depois de registrar, volta ao painel.
+- **Aviso** (`/ui/aviso.html`): a página da equipe de vendas, feita para celular, sem navegação e sem chat. Busca com espera curta, dois botões grandes para o tipo, comentário, nome lembrado no navegador e confirmação na própria página, pronta para o próximo aviso.
+- **Política** (`/ui/politica.html`): o onboarding da [ADR-0003](docs/adr/0003-politica-de-compra-configuravel.md). As perguntas 1 a 9 de [`perguntas-comprador.md`](.scratch/sugestao-compra/perguntas-comprador.md) na linguagem do comprador e a pergunta 10, sobre o que põe um produto no painel de alertas, cada uma preenchida com o valor ativo. Salvar grava uma versão nova da política (ou mostra o erro de validação com o número da pergunta); o painel usa a versão nova na próxima vez que abrir. As perguntas 11 a 15 aparecem só para leitura, como "como o sistema entende o ERP".
+- **Chat lateral** (botão "Perguntar ao Copilot" no cabeçalho do painel, da tela do SKU e da política): uma conversa, com perguntas sugeridas para começar (na tela do SKU, sobre o próprio produto) e a resposta em texto com as citações não confirmadas em vermelho. Em "Como o Copilot chegou nisso", recolhido, ficam o entendimento (intenção, confiança, faixa, ação, SKUs), as fichas, as sugestões com os alertas e os sinais, as citações com o veredito e os trechos usados. Mostra o SKU em contexto, quando há. A largura se ajusta arrastando a borda, e o botão "Tela cheia" expande; no celular, abre em tela cheia.
 
-A fila está na imagem do topo. O onboarding da política, com cada pergunta preenchida com o valor da versão ativa:
+A tela do SKU, com a situação, a sugestão, os sinais do corpus, as vendas e a decisão de compra ao lado:
+
+![Tela do SKU com a situação do estoque, a sugestão de pedido com alertas, o sinal de demanda sazonal do corpus, as vendas de 12 meses e, ao lado, o aviso aberto e o formulário da decisão de compra](docs/img/sku.png)
+
+A página de aviso, no celular:
+
+![Página de aviso da equipe de vendas no celular, com a busca do produto, os dois botões de tipo, o comentário e o nome](docs/img/aviso.png)
+
+O onboarding da política, com cada pergunta preenchida com o valor da versão ativa:
 
 ![Onboarding da política de compra, com as perguntas de estoque máximo, datas fortes e estoque mínimo](docs/img/politica.png)
 
-As duas telas foram capturadas com o Chrome headless (`--screenshot --window-size=1280,900 --virtual-time-budget=10000`) contra o seed, o corpus ingerido e a fila gerada. O chat depende de digitar uma pergunta, o que a captura por URL não faz, e aparece neste README pelos exemplos reais em texto.
+As telas foram capturadas com o Chrome headless (`--screenshot --virtual-time-budget=20000`; 1280x1000 no painel, 1280x1400 na tela do SKU, 1280x900 na política e 390x844 na página de aviso, dentro de um iframe porque o headless não abre janela tão estreita) contra o seed e o corpus ingerido, com um aviso de demonstração no `ED-BEGE-CASAL-01`. O chat depende de digitar uma pergunta, o que a captura por URL não faz, e aparece neste README pelos exemplos reais em texto.
 
-O nome de quem decide fica no `localStorage` do navegador só por conveniência. `tests/test_ui.py` confere que as páginas e os assets respondem e que todo endpoint chamado pelos `.js` existe na OpenAPI do app.
+O nome de quem avisa e de quem decide fica no `localStorage` do navegador só por conveniência. `tests/test_ui.py` confere que as páginas e os assets respondem, que todo endpoint chamado pelos `.js` existe na OpenAPI do app e que a página de aviso não tem navegação nem chat.
 
-### Limites conhecidos da aprovação
+### Limites conhecidos do fluxo do comprador
 
-- **Motivos de destaque são chute até o comprador responder.** O padrão (ruptura e teto) foi escolhido pelo desenvolvedor para o destaque separar alguma coisa no seed; o comprador muda na tela de política.
-- **Quase tudo na faixa 1.** As sugestões do seed ficam bem abaixo de R$ 15.000 e só um fornecedor sem pedido anterior, uma violação do teto ou uma quantidade editada para cima (triplicar a sugerida, por exemplo) pedem justificativa.
-- **Janela entre o ERP e a fila.** O ERP e a fila são sistemas separados (no MVP, schemas do mesmo Postgres, gravados em transações distintas). A reserva impede o pedido duplicado, mas se o pedido for criado no ERP e a gravação da fila falhar logo depois, o pedido fica sem a sugestão aprovada (com o id da sugestão na observação) e a sugestão continua pendente.
-- **Um pedido por sugestão.** Cada aprovação vira um pedido de um item; juntar os SKUs do mesmo fornecedor num pedido, para chegar ao pedido mínimo, é pós-MVP. A faixa também não coleta as aprovações dos outros papéis: só diz quem precisa aprovar.
+- **Sem login.** A vendedora e o comprador informam o nome à mão; qualquer um com o link registra aviso e decisão.
+- **O painel é o único canal.** Não há notificação por e-mail, WhatsApp ou push: o comprador só vê um aviso quando abre o Copilot.
+- **Painel calculado a cada abertura.** O tempo cresce com o número de SKUs ativos (uns 2 s com os 80 do seed), porque calcula a sugestão de cada um. Se ficar lento, o caminho é cache por requisição no adapter Postgres, não guardar o painel.
+- **Regras de cálculo ainda do MVP.** O giro não desconta os meses de ruptura ("quanto vendia quando o estoque estava saudável") e o ciclo de compra é um só para todos os SKUs (2 meses por padrão). Com piso de 30 dias, ciclo de 2 meses e teto de 3, a compra cai exatamente no teto: o cálculo tolera menos de uma unidade acima dele, do arredondamento, e só o MOQ viola o teto de verdade.
+- **Prazo da decisão fixo.** Os 7 dias são uma constante do código, não parâmetro da política.
+- **Histórico de preço ralo no seed.** Ver acima; com o ERP real, ele vem dos pedidos de verdade.
 
 A documentação interativa (OpenAPI) fica em `http://localhost:8000/docs`.
 
@@ -759,9 +779,9 @@ src/
 ├── sales/            giro médio, histórico de vendas, sazonalidade
 ├── ficha_sku/        compõe a ficha completa de um SKU (usada por /analise)
 ├── politica_compra/  política de compra versionada (schema copilot)
-├── purchasing/       sugestão de pedido (quanto, de quem, memória de cálculo, alertas), faixa de aprovação e submissão do pedido aprovado ao ERP
+├── purchasing/       sugestão de pedido (quanto, de quem, memória de cálculo, alertas) e referências de preço (histórico pago, preço atual, substitutos)
 ├── ai/               corpus, ingestão no pgvector, busca com o filtro do Jev, sinais do corpus, verificação de citações, chat (entendimento, identificação dos SKUs, roteamento, contexto, redator Claude, registro de decisão)
-├── aprovacao/        fila de aprovação (geração, ordem, decisão humana) em copilot.sugestoes_fila
+├── painel/           painel de alertas, avisos da equipe de vendas e decisões de compra (copilot.avisos e copilot.decisoes_compra)
 ├── api/              camada HTTP (FastAPI routers, DTOs de resposta)
 ├── ui/               UI estática servida em /ui (HTML, CSS e JS puros, sem build)
 ├── db/               config, engine, health-check
@@ -778,13 +798,13 @@ Grafo de dependência (setas: "depende de"), com os serviços externos:
 
 ```mermaid
 flowchart TD
-    api[api] --> aprovacao[aprovacao]
+    api[api] --> painel[painel]
     api --> ai[ai]
     api --> ficha_sku[ficha_sku]
-    aprovacao --> purchasing[purchasing]
-    aprovacao --> ai
+    painel --> purchasing[purchasing]
     ai --> purchasing
     purchasing --> ficha_sku
+    purchasing --> catalog
     purchasing --> politica_compra[politica_compra]
     purchasing -- pedidos de compra --> erp_adapter[erp_adapter]
     ficha_sku --> catalog[catalog]
@@ -799,24 +819,24 @@ flowchart TD
     ai --> Claude[("Claude (Anthropic)")]
     erp_adapter --> Postgres[("Postgres + pgvector<br/>schemas erp e copilot")]
     politica_compra --> Postgres
-    aprovacao --> Postgres
+    painel --> Postgres
     ai --> Postgres
 
     classDef externo fill:#eef,stroke:#88a
     class Jev,Claude,Postgres externo
 ```
 
-O grafo mostra só as arestas principais. As chamadas diretas de `api`, `aprovacao`, `ai` e `purchasing` para os módulos de baixo estão na lista:
+O grafo mostra só as arestas principais. As chamadas diretas de `api`, `painel`, `ai` e `purchasing` para os módulos de baixo estão na lista:
 
-- `api` depende de `aprovacao` (para `/sugestoes`), `purchasing` (para `/sugestao-compra`), `ficha_sku` (para `/analise`), `politica_compra` (para `/politica-compra` e o piso padrão de `/abaixo-do-piso`) e `ai` (para `/rag/busca`, `/sugestao-compra/sinais`, `/chat` e os sinais da geração da fila), e chama `catalog`, `inventory`, `sales` direto nos endpoints de leitura simples. A UI (`src/ui/`) não é módulo de domínio: são arquivos estáticos que o `main.py` serve e que só falam com a API por HTTP.
-- `aprovacao` depende de `catalog` (SKUs ativos), `purchasing` (`sugerir_pedido`, `politica_da`, `faixa_aprovacao` e `submeter_pedido`) e `ai` (`SinaisCorpus`, recebido na chamada de `gerar_fila`), e fala direto com `copilot.sugestoes_fila`, atrás do port `SugestoesFilaRepositorio`. Nada depende dele além da `api`.
-- `purchasing` depende de `ficha_sku`, `inventory`, `sales` e `politica_compra`, e importa o DTO `FornecedorParaSKU` de `catalog.schemas`. Do `erp_adapter`, só usa os pedidos de compra, que não têm módulo de leitura próprio: `fornecedor_tem_pedido` (para a faixa) e `criar_pedido_compra`, a única escrita do Copilot no ERP, chamada só por `submeter_pedido`, que por sua vez só a aprovação humana chama.
+- `api` depende de `painel` (para `/painel`, `/avisos` e as decisões), `purchasing` (para `/sugestao-compra` e `/precos`), `ficha_sku` (para `/analise`), `politica_compra` (para `/politica-compra` e o piso padrão de `/abaixo-do-piso`) e `ai` (para `/rag/busca`, `/sugestao-compra/sinais` e `/chat`), e chama `catalog`, `inventory`, `sales` direto nos endpoints de leitura simples. A UI (`src/ui/`) não é módulo de domínio: são arquivos estáticos que o `main.py` serve e que só falam com a API por HTTP.
+- `painel` depende de `catalog` (SKUs ativos e o SKU do aviso), `inventory` (disponível e cobertura atual), `purchasing` (só `sugerir_pedido`) e `politica_compra` (motivos de alerta e piso), e fala direto com `copilot.avisos` e `copilot.decisoes_compra`, atrás dos ports `AvisosRepositorio` e `DecisoesRepositorio`. Não chama o `ai`. Nada depende dele além da `api`.
+- `purchasing` depende de `catalog`, `ficha_sku`, `inventory`, `sales` e `politica_compra`. Do `erp_adapter`, só lê os pedidos de compra (`itens_de_pedido_de`, para o histórico de preço), que não têm módulo de leitura próprio. O Copilot não escreve no ERP.
 - `politica_compra` fala direto com o schema `copilot` do Postgres. Não passa pelo `erp_adapter`, porque a política é dado do Copilot, não do ERP.
 - `ai` fala direto com `copilot.trechos_corpus` (pgvector), atrás do port `TrechosRepositorio`, com `copilot.registros_decisao`, atrás do port `RegistrosDecisao`, com a API da TypeSafe, atrás do port `DecisionModel`, e com a Anthropic (Claude), atrás do port `Redator`. No chat, só lê dos outros módulos: `catalog` (lista de SKUs), `ficha_sku` (ficha completa), `purchasing` (só `sugerir_pedido`) e `politica_compra` (política ativa). Nada no `ai` escreve no ERP.
 - `ficha_sku` depende de `catalog`, `inventory`, `sales` e não fala com o `erp_adapter` direto.
 - `inventory` depende de `sales` (cobertura precisa de giro).
 - `catalog`, `inventory`, `sales` e `purchasing` dependem de `erp_adapter`.
-- `erp_adapter` importa só os DTOs de domínio (`catalog.schemas`, `inventory.schemas`, `sales.schemas`) para devolvê-los prontos. O DTO da escrita (`ItemNovoPedido`) é dele (`erp_adapter/schemas.py`), para o `purchasing` depender do `erp_adapter` sem ciclo. Os serviços desses módulos ele não chama.
+- `erp_adapter` importa só os DTOs de domínio (`catalog.schemas`, `inventory.schemas`, `sales.schemas`) para devolvê-los prontos. O DTO dos itens de pedido (`ItemDePedido`) é dele (`erp_adapter/schemas.py`), para o `purchasing` depender do `erp_adapter` sem ciclo. Os serviços desses módulos ele não chama.
 - Nenhum outro caminho é permitido: `catalog` não chama `inventory`, `sales` não chama `catalog`, etc.
 
 A justificativa da organização por domínio (e não por camada técnica) e a política de fronteiras entre módulos estão em [`docs/adr/0001-monolito-modular-por-dominio.md`](docs/adr/0001-monolito-modular-por-dominio.md).

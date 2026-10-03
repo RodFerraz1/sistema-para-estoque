@@ -17,7 +17,7 @@ from src.ai.dependencies import (
     get_trechos_repositorio,
 )
 from src.ai.in_memory import FakeEmbedder, InMemoryDecisionModel, InMemoryRegistrosDecisao
-from src.ai.schemas import Entendimento
+from src.ai.schemas import Entendimento, Intencao
 from src.erp_adapter.dependencies import get_erp_adapter
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.main import app
@@ -37,6 +37,7 @@ from tests.fakes import (
 )
 
 SKU = make_sku("TBC-BEGE-70140-01", produto_nome="Toalha Banho Conforto", cor="bege")
+DA_TELA = make_sku("LC-BRAN-CASAL-01", produto_nome="Lençol Casal", cor="branco", tamanho="casal")
 PERGUNTA = "Qual a situação do SKU TBC-BEGE-70140-01?"
 DEPENDENCIAS = (
     get_erp_adapter,
@@ -72,11 +73,13 @@ def preparar(
     )
     katrina = make_fornecedor("Katrina Têxtil")
     adapter = InMemoryERPAdapter(
-        skus=[SKU],
+        skus=[SKU, DA_TELA],
         fornecedores=[katrina],
-        fornecedores_por_sku={SKU.sku_code: [make_fornecedor_sku(katrina)]},
-        estoques={SKU.sku_code: make_estoque(disponivel=120)},
-        vendas=[make_venda(SKU, datetime(2026, mes, 5, tzinfo=UTC), 100) for mes in range(3, 9)],
+        fornecedores_por_sku={s.sku_code: [make_fornecedor_sku(katrina)] for s in (SKU, DA_TELA)},
+        estoques={SKU.sku_code: make_estoque(disponivel=120), DA_TELA.sku_code: make_estoque(disponivel=30)},
+        vendas=[
+            make_venda(s, datetime(2026, mes, 5, tzinfo=UTC), 100) for s in (SKU, DA_TELA) for mes in range(3, 9)
+        ],
     )
     politicas = InMemoryPoliticaCompraRepositorio()
     redator = redator or RedatorGravador()
@@ -259,6 +262,7 @@ def test_registros_mostram_as_perguntas_respondidas_da_mais_recente(client: Test
         "resposta": "A TBC-BEGE-70140-01 tem 120 unidades.",
         "sinais": [],
         "citacoes": [],
+        "sku_em_contexto": None,
     }
 
 
@@ -356,3 +360,87 @@ def test_chat_de_sugestao_com_o_jev_fora_do_ar_nos_sinais_devolve_e_grava_sinais
     assert sugestao["sinais"] is None
     [registro] = client.get("/chat/registros").json()
     assert registro["sinais"] == [{"sku_code": "TBC-BEGE-70140-01", "sinais": None}]
+
+
+def _pergunta_na_tela(client: TestClient, pergunta: str, sku_code: str | None = DA_TELA.sku_code) -> dict:
+    response = client.post("/chat", json={"pergunta": pergunta, "sku_code": sku_code})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+@pytest.mark.parametrize("intencao", ["situacao_sku", "sugestao_compra"])
+def test_pergunta_sem_produto_na_tela_do_sku_usa_o_sku_da_tela(client: TestClient, intencao: Intencao) -> None:
+    redator = RedatorGravador("Está acabando porque vende 100 por mês.")
+    preparar(jev(make_entendimento(intencao, 0.93)), redator)
+
+    body = _pergunta_na_tela(client, "Por que está acabando?")
+
+    assert body["identificacao"] == {
+        "skus": [DA_TELA.sku_code],
+        "total_skus": 1,
+        "origem": "contexto",
+        "produto": None,
+        "candidatos": [],
+    }
+    assert [f["sku_code"] for f in body["fichas"]] + [s["sugestao"]["sku_code"] for s in body["sugestoes"]] == [
+        DA_TELA.sku_code
+    ]
+    [(_, contexto)] = redator.chamadas
+    assert f"o comprador está na tela do SKU {DA_TELA.sku_code}" in contexto
+
+
+def test_produto_citado_tem_precedencia_sobre_o_sku_da_tela(client: TestClient) -> None:
+    preparar(jev(make_entendimento("situacao_sku", 0.93)))
+
+    body = _pergunta_na_tela(client, PERGUNTA)
+
+    assert body["identificacao"]["skus"] == [SKU.sku_code]
+    assert body["identificacao"]["origem"] == "codigo"
+    assert [f["sku_code"] for f in body["fichas"]] == [SKU.sku_code]
+
+
+def test_politica_ou_fornecedor_ignora_o_sku_da_tela(client: TestClient) -> None:
+    redator = RedatorGravador("O lead time da Katrina é de 45 dias.")
+    preparar(
+        jev(make_entendimento("politica_ou_fornecedor", 0.93), padrao={"relevante": 0.9, "tem_evidencia": 0.9}),
+        redator,
+    )
+
+    body = _pergunta_na_tela(client, "Qual o lead time da Katrina?")
+
+    assert body["identificacao"] is None
+    assert body["fichas"] == []
+    [(_, contexto)] = redator.chamadas
+    assert DA_TELA.sku_code not in contexto
+
+
+def test_sem_sku_na_tela_o_chat_pede_esclarecimento_como_antes(client: TestClient) -> None:
+    preparar(jev(make_entendimento("situacao_sku", 0.93)))
+
+    body = _pergunta_na_tela(client, "Por que está acabando?", sku_code=None)
+
+    assert body["acao"] == "pediu_esclarecimento"
+    assert body["identificacao"]["origem"] == "nenhum"
+
+
+def test_registro_grava_o_sku_da_tela(client: TestClient) -> None:
+    registros = preparar(jev(make_entendimento("situacao_sku", 0.93)))
+
+    _pergunta_na_tela(client, PERGUNTA)
+    _pergunta_na_tela(client, "Por que está acabando?", sku_code=None)
+
+    sem_tela, na_tela = registros.listar(10)
+    assert na_tela.sku_em_contexto == DA_TELA.sku_code
+    assert na_tela.skus == [SKU.sku_code]
+    assert sem_tela.sku_em_contexto is None
+    recente, antigo = client.get("/chat/registros").json()
+    assert (recente["sku_em_contexto"], antigo["sku_em_contexto"]) == (None, DA_TELA.sku_code)
+
+
+def test_sku_da_tela_desconhecido_responde_404_sem_registro(client: TestClient) -> None:
+    registros = preparar(jev(make_entendimento("situacao_sku", 0.93)))
+
+    response = client.post("/chat", json={"pergunta": "Por que está acabando?", "sku_code": "NAO-EXISTE"})
+
+    assert response.status_code == 404
+    assert registros.listar(10) == []

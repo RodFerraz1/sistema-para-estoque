@@ -4,8 +4,9 @@ from __future__ import annotations
 from src.ai.schemas import SinaisDoSKU, SinalCorpus, SugestaoComSinais, TrechoClassificado, VerificacaoCitacao
 from src.api.schemas import (
     AnaliseSKUResponse,
+    AvisoResponse,
+    DecisaoCompraResponse,
     AvaliacaoTrechoResponse,
-    FaixaAprovacaoResponse,
     FornecedorResponse,
     GiroResponse,
     SinaisDoSKUResponse,
@@ -17,7 +18,8 @@ from src.api.schemas import (
 )
 from src.catalog.schemas import FornecedorParaSKU
 from src.ficha_sku.schemas import Ficha
-from src.purchasing.schemas import FaixaAprovacao, SugestaoPedido
+from src.painel.schemas import Aviso, DecisaoCompra
+from src.purchasing.schemas import SugestaoPedido
 
 
 def fornecedor_to_response(f: FornecedorParaSKU) -> FornecedorResponse:
@@ -38,7 +40,10 @@ def ficha_to_response(ficha: Ficha) -> AnaliseSKUResponse:
         sku_code=ficha.sku.sku_code,
         produto_nome=ficha.sku.produto_nome,
         categoria=ficha.sku.categoria,
+        cor=ficha.sku.cor,
+        tamanho=ficha.sku.tamanho,
         estoque=ficha.estoque,
+        em_transito_unidades=ficha.em_transito,
         giro=GiroResponse(
             unidades_por_mes=ficha.giro.unidades_por_mes,
             meses_considerados=ficha.giro.meses_considerados,
@@ -62,15 +67,6 @@ def sugestao_to_response(sugestao: SugestaoPedido) -> SugestaoPedidoResponse:
         calculo=sugestao.calculo,
         alertas=sugestao.alertas,
         politica_versao=sugestao.politica_versao,
-    )
-
-
-def faixa_aprovacao_to_response(faixa: FaixaAprovacao) -> FaixaAprovacaoResponse:
-    return FaixaAprovacaoResponse(
-        faixa=faixa.faixa,
-        aprovadores=faixa.aprovadores,
-        exige_justificativa=faixa.exige_justificativa,
-        ajustes=faixa.ajustes,
     )
 
 
@@ -124,4 +120,30 @@ def trecho_to_response(trecho: TrechoClassificado) -> TrechoClassificadoResponse
             contradiz_premissa=trecho.avaliacao.contradiz_premissa,
             tenta_instruir=trecho.avaliacao.tenta_instruir,
         ),
+    )
+
+
+def aviso_to_response(aviso: Aviso) -> AvisoResponse:
+    return AvisoResponse(
+        id=aviso.id,
+        sku_code=aviso.sku_code,
+        tipo=aviso.tipo,
+        comentario=aviso.comentario,
+        avisado_por=aviso.avisado_por,
+        criado_em=aviso.criado_em,
+    )
+
+
+def decisao_to_response(decisao: DecisaoCompra) -> DecisaoCompraResponse:
+    return DecisaoCompraResponse(
+        id=decisao.id,
+        sku_code=decisao.sku_code,
+        tipo=decisao.tipo,
+        quantidade=decisao.quantidade,
+        motivo=decisao.motivo,
+        comentario=decisao.comentario,
+        decidido_por=decisao.decidido_por,
+        quantidade_sugerida=decisao.quantidade_sugerida,
+        politica_versao=decisao.politica_versao,
+        criado_em=decisao.criado_em,
     )

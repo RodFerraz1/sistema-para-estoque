@@ -9,32 +9,32 @@ Toda função pública recebe e retorna **DTOs do próprio módulo**, não SQLAl
 ## Dependência entre módulos
 
 ```
-          api
-           │
-           ▼
-       aprovacao ─────────────┐
-        │     │               │
-        ▼     ▼               │
-       ai ─► purchasing ──────┼──────┐
-              │      │        │      │ pedidos de compra
-              ▼      ▼        │      │
-           sales  inventory   │      │
-              │      │        │      │
-              └──┬───┘        │      │
-                 ▼            │      │
-              catalog ◄───────┘      │
-                 │                   │
-                 ▼                   │
-            erp_adapter ◄────────────┘
-                 │
-                 ▼
-           (ERP fake DB)
+           api
+            │
+            ▼
+           ai ──────► painel
+            │           │
+            ▼           │
+        purchasing ◄────┘
+         │      │   └────────────┐
+         ▼      ▼                │ histórico de preço
+      sales  inventory           │
+         │      │                │
+         └──┬───┘                │
+            ▼                    │
+         catalog                 │
+            │                    │
+            ▼                    │
+       erp_adapter ◄─────────────┘
+            │
+            ▼
+      (ERP fake DB, só leitura)
 ```
 
 - `ai` orquestra e chama outros módulos como tools do LLM, **respeitando divisão por risco** (ver seção abaixo).
-- `aprovacao` guarda a fila de aprovação e registra a decisão humana. Depende de `ai` (sinais do corpus na geração), `catalog` (SKUs ativos) e `purchasing` (sugestão, faixa, versão da política da sugestão e `submeter_pedido`). Nada depende dele além da `api`.
+- `painel` calcula o painel de alertas na hora e guarda os avisos da equipe de vendas e as decisões de compra (append-only, em `copilot.avisos` e `copilot.decisoes_compra`). Depende de `purchasing` (sugestão de cada SKU ativo), `catalog`, `inventory` e `politica_compra` (motivos de alerta da política ativa). Não chama o Jev. O `ai` depende dele para a intenção `alertas_e_avisos`. Ver ADR-0005.
 - `purchasing` é o único que sabe compor sugestões formais de compra - combina dados dos outros de forma determinística.
-- `purchasing -> erp_adapter`: só para pedido de compra (`fornecedor_tem_pedido`, para a faixa, e `criar_pedido_compra`, a única escrita do Copilot no ERP). Pedido de compra não tem módulo de leitura próprio, e criar um só para repassar duas chamadas seria um módulo raso. O DTO da escrita (`ItemNovoPedido`) fica em `erp_adapter/schemas.py`, então a aresta tem um sentido só e não há ciclo.
+- `purchasing -> erp_adapter`: só para o histórico de preço pago (`itens_de_pedido_de`, nas referências de preço da tela do SKU). Pedido de compra não tem módulo de leitura próprio, e criar um só para repassar uma chamada seria um módulo raso. O status do pedido (`StatusPedidoCompra`) fica em `erp_adapter/schemas.py`, então a aresta tem um sentido só e não há ciclo. O Copilot não escreve no ERP (ADR-0005).
 - `catalog`, `inventory`, `sales` são "leitores" do ERP com lógica de domínio própria (não são só query wrappers).
 - `erp_adapter` é a única camada que fala com o banco do ERP fake. Importa os DTOs de domínio de `catalog`, `inventory` e `sales` para devolvê-los prontos, mas nunca de `purchasing` nem de módulos acima.
 
@@ -44,7 +44,7 @@ Sem ciclos. Se surgir vontade de fazer `catalog` chamar `sales`, é sinal de que
 
 > Desde a ADR-0002 quem escolhe a tool é o Jev (pergunta tipada com confiança) e quem chama é o código do `ai`. O LLM só redige a resposta e não tem tools. Onde abaixo se lê "LLM chama", leia "o `ai` chama após decisão do Jev". A divisão por risco não muda.
 
-O `ai` só pode chamar diretamente **tools de leitura**. Tools que geram decisão ou escrita passam por `purchasing` (determinístico) e por aprovação humana.
+O `ai` só pode chamar diretamente **tools de leitura**. Tools que compõem decisão passam por `purchasing` (determinístico), e a decisão de compra é sempre do comprador chefe.
 
 **Tools de leitura (LLM chama direto)**:
 - `catalog.get_sku`, `catalog.list_fornecedores_para_sku`, `catalog.skus_similares`
@@ -58,9 +58,11 @@ Se o LLM alucinar em leitura, o pior é resposta ruim - nada muda no mundo.
 - `purchasing.sugerir_pedido`: LLM pode chamar. Retorna sugestão estruturada e determinística. `purchasing` internamente consulta os leitores e aplica política.
 - `purchasing.validar_contra_politica`: LLM pode chamar.
 
-**Ações irreversíveis (LLM NÃO chama - humano aprova fora do fluxo LLM)**:
-- `purchasing.submeter_pedido`: cria pedido no ERP. Só `aprovacao.aprovar` chama, e só o endpoint `POST /sugestoes/{id}/aprovar` chama esse.
-- `aprovacao.aprovar` e `aprovacao.rejeitar`: decisão humana, só via endpoints da fila (a UI de aprovação).
+**Ações irreversíveis**: nenhuma. Desde a ADR-0005 o Copilot termina na decisão de compra e o ERP é só leitura: o comprador chefe negocia com o representante e lança o pedido no ERP real.
+
+**Escritas humanas (LLM NÃO chama)**:
+- `painel.registrar_decisao`: decisão de compra do comprador chefe, só via `POST /skus/{sku_code}/decisoes` (tela do SKU). Fica no Copilot e não muda o ERP.
+- `painel.registrar_aviso`: aviso da equipe de vendas, só via `POST /avisos` (página de aviso).
 
 Essa divisão é o que impede alucinação de virar prejuízo real.
 
@@ -79,7 +81,6 @@ class ERPAdapter(Protocol):
     def get_estoque_atual(self, sku_id: UUID) -> int: ...
     def list_movimentacoes(self, sku_id: UUID, desde: date) -> list[MovimentacaoRaw]: ...
     def list_vendas(self, sku_id: UUID, desde: date) -> list[VendaRaw]: ...
-    def criar_pedido_compra(self, fornecedor_id: UUID, itens: list[ItemNovoPedido], data_prevista_entrega: date, observacao: str) -> UUID: ...
     def get_pedido_compra(self, pedido_id: UUID) -> PedidoCompraRaw: ...
     def list_pedidos_compra(self, filtros: FiltrosPedido) -> list[PedidoCompraRaw]: ...
 ```
@@ -139,28 +140,25 @@ Orquestra sugestão de compra. Único que sabe compor a decisão.
 class Purchasing:
     def sugerir_pedido(self, sku_code: str) -> SugestaoPedido | None: ...
     def politica_da(self, sugestao: SugestaoPedido) -> PoliticaCompra: ...  # versão com que foi calculada
-    def faixa_aprovacao(self, sugestao: SugestaoPedido, quantidade: int | None = None) -> FaixaAprovacao: ...
-    def submeter_pedido(self, sugestao: SugestaoPedido, quantidade: int, aprovado_por: str, referencia: str) -> UUID:
-        ...  # cria pedido de compra no ERP; só a aprovação humana chama
+    def referencias_de_preco(self, sku_code: str) -> ReferenciasDePreco | None: ...  # preço pago, preço atual, substitutos
 ```
 
-`SugestaoPedido` é rica: SKU, quantidade sugerida, fornecedor sugerido, memória de cálculo, alertas de política (violação de teto de estoque, etc) e a versão da política usada. A fila e a decisão humana ficam no `aprovacao`.
+`SugestaoPedido` é rica: SKU, quantidade sugerida, fornecedor sugerido, memória de cálculo, alertas de política (violação de teto de estoque, etc) e a versão da política usada. A decisão de compra fica no `painel`.
 
-### `aprovacao`
+### `painel`
 
-Fila de aprovação das sugestões de pedido e a decisão do comprador chefe. Guarda a fila em `copilot.sugestoes_fila`, atrás do port `SugestoesFilaRepositorio`.
+Painel de alertas do comprador chefe, avisos da equipe de vendas e decisões de compra (ADR-0005). Avisos e decisões ficam atrás dos ports `AvisosRepositorio` e `DecisoesRepositorio`.
 
 ```python
-class Aprovacao:
-    def gerar_fila(self, sinais: SinaisCorpus) -> ResultadoGeracao: ...  # substitui todas as pendentes
-    def listar(self, status: StatusSugestao = "pendente") -> list[SugestaoNaFila]: ...
-    def carregar(self, id: UUID) -> SugestaoNaFila | None: ...
-    def faixa_para(self, id: UUID, quantidade: int) -> FaixaAprovacao: ...
-    def aprovar(self, id: UUID, aprovado_por: str, quantidade: int | None = None, justificativa: str | None = None) -> SugestaoNaFila: ...
-    def rejeitar(self, id: UUID, rejeitado_por: str, motivo: str) -> SugestaoNaFila: ...
+class Painel:
+    def painel(self) -> PainelDeAlertas: ...  # calculado na hora: alertas e decididos
+    def registrar_aviso(self, sku_code: str, tipo: TipoAviso, avisado_por: str, comentario: str | None = None) -> Aviso: ...
+    def registrar_decisao(self, sku_code: str, tipo: TipoDecisao, decidido_por: str, quantidade: int | None = None, motivo: str | None = None, comentario: str | None = None) -> DecisaoCompra: ...
+    def avisos_abertos(self, sku_code: str) -> list[Aviso]: ...
+    def decisoes(self, sku_code: str) -> list[DecisaoCompra]: ...
 ```
 
-Depende de `ai`, `catalog` e `purchasing`. O destaque usa os motivos de destaque da versão da política da sugestão, e a aprovação reserva a linha da fila antes de chamar o ERP.
+Depende de `catalog`, `inventory`, `politica_compra` e `purchasing`. Aviso aberto e decisão vigente saem das datas: nada é atualizado.
 
 ### `ai`
 
@@ -181,9 +179,9 @@ Internamente `ai` pergunta ao Jev qual é a intenção e qual tool usar, chama `
 O ERP fake e o Copilot devem viver em bancos separados **logicamente**, mesmo que rodem no mesmo Postgres:
 
 - `erp_db` (ou schema `erp`): produtos, skus, fornecedores, estoque, vendas, pedidos_compra.
-- `copilot_db` (ou schema `copilot`): sugestões geradas, aprovações humanas, embeddings dos documentos, histórico de conversas.
+- `copilot_db` (ou schema `copilot`): política de compra, avisos, decisões de compra, embeddings dos documentos, registro de decisão do chat.
 
-Motivo: o ERP fake simula um sistema externo. O Copilot não deveria escrever nessas tabelas exceto via `erp_adapter.criar_pedido_compra()` (que representa uma chamada de API externa). Ter bancos separados torna essa separação um *guard rail* que o schema aplica sozinho.
+Motivo: o ERP fake simula um sistema externo. O Copilot não escreve nessas tabelas (ADR-0005). Ter bancos separados torna essa separação um *guard rail* que o schema aplica sozinho.
 
 Duas opções:
 

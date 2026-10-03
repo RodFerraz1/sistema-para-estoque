@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Avisar o comprador - Copilot de Compras</title>
+  <link rel="stylesheet" href="estilo.css">
+  <script type="module" src="aviso.js"></script>
+</head>
+<body>
+  <header>
+    <div class="conteudo estreito">
+      <strong class="marca">Copilot de Compras</strong>
+    </div>
+  </header>
+  <main class="conteudo estreito">
+    <h1>Avisar o comprador</h1>
+    <p class="suave">Um produto acabou ou está vendendo muito? Avise aqui e o comprador vê na hora.</p>
+
+    <form id="aviso-form" class="card" novalidate>
+      <div class="campo">
+        <label for="busca">Produto</label>
+        <input id="busca" type="search" autocomplete="off" enterkeyhint="search" maxlength="100" placeholder="Digite o nome, a cor ou o tamanho">
+        <p id="busca-status" class="suave" aria-live="polite"></p>
+        <ul id="resultados" class="resultados" aria-label="Produtos encontrados"></ul>
+        <div id="escolhido" class="escolhido" hidden></div>
+      </div>
+
+      <fieldset class="campo">
+        <legend><strong>O que está acontecendo?</strong></legend>
+        <div class="tipos" role="group" aria-label="Tipo do aviso">
+          <button type="button" data-tipo="acabou" aria-pressed="false">Acabou<small>não tem na loja</small></button>
+          <button type="button" data-tipo="vendendo_muito" aria-pressed="false">Vendendo muito<small>muita gente pedindo</small></button>
+        </div>
+      </fieldset>
+
+      <div class="campo">
+        <label for="comentario">Comentário <span class="suave">(opcional)</span></label>
+        <textarea id="comentario" maxlength="2000" placeholder="Ex.: cliente X quer 200 peças"></textarea>
+      </div>
+
+      <div class="campo">
+        <label for="nome">Seu nome</label>
+        <input id="nome" maxlength="200" autocomplete="name">
+      </div>
+
+      <button id="enviar" type="submit" class="primario grande">Enviar aviso</button>
+      <div id="resultado"></div>
+    </form>
+  </main>
+</body>
+</html>

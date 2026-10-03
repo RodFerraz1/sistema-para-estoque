@@ -23,10 +23,14 @@ from src.ai.schemas import (
     TipoSinal,
     Veredito,
 )
-from src.aprovacao.schemas import StatusSugestao
+from src.erp_adapter.schemas import StatusPedidoCompra
 from src.inventory.schemas import Cobertura, Estoque
-from src.politica_compra.schemas import ParametrosPolitica
+from src.painel.schemas import TipoAviso, TipoDecisao
+from src.politica_compra.schemas import MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
+
+Nome = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+TextoLivre = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
 
 
 class GiroResponse(BaseModel):
@@ -50,12 +54,17 @@ class FornecedorResponse(BaseModel):
 
 
 class AnaliseSKUResponse(BaseModel):
+    """`em_transito_unidades` soma o que ainda falta chegar dos pedidos de compra abertos."""
+
     model_config = ConfigDict(frozen=True)
 
     sku_code: str
     produto_nome: str
     categoria: str
+    cor: str
+    tamanho: str
     estoque: Estoque
+    em_transito_unidades: int
     giro: GiroResponse
     cobertura: Cobertura
     fornecedores: list[FornecedorResponse]
@@ -170,7 +179,10 @@ class ResultadoBuscaResponse(BaseModel):
 
 
 class PerguntaChatRequest(BaseModel):
+    """`sku_code`: o SKU da tela de onde o comprador pergunta, se houver."""
+
     pergunta: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+    sku_code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
 
 
 class EscolhaResponse(BaseModel):
@@ -234,62 +246,136 @@ class RegistroDecisaoResponse(BaseModel):
     duracao_ms: int
     sinais: list[SinaisDoSKUResponse]
     citacoes: list[VerificacaoCitacaoResponse]
+    sku_em_contexto: str | None
 
 
-class FaixaAprovacaoResponse(BaseModel):
+
+class PrecoPagoResponse(BaseModel):
+    """Preço unitário pago num pedido de compra, em centavos. `data` é a data do pedido."""
+
     model_config = ConfigDict(frozen=True)
 
-    faixa: int
-    aprovadores: str
-    exige_justificativa: bool
-    ajustes: list[str]
+    data: datetime
+    fornecedor_nome: str
+    preco_unitario_centavos: int
+    quantidade: int
+    status: StatusPedidoCompra
 
 
-class SugestaoNaFilaResponse(BaseModel):
-    """Os campos de decisão ficam nulos enquanto a sugestão está pendente ou quando foi
-    substituída."""
+class SubstitutoResponse(BaseModel):
+    """O menor preço atual entre os fornecedores do substituto, em centavos."""
 
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    produto_nome: str
+    cor: str
+    tamanho: str
+    preco_unitario_centavos: int
+    fornecedor_nome: str
+
+
+class PrecosResponse(BaseModel):
+    """`historico` do pedido mais recente para o mais antigo, sem os cancelados;
+    `precos_atuais` do fornecedor mais barato ao mais caro; até 10 `substitutos`, pelo preço."""
+
+    model_config = ConfigDict(frozen=True)
+
+    historico: list[PrecoPagoResponse]
+    precos_atuais: list[FornecedorResponse]
+    substitutos: list[SubstitutoResponse]
+
+
+class SKUResumoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    produto_nome: str
+    cor: str
+    tamanho: str
+
+
+class AvisoResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: UUID
-    criado_em: datetime
-    status: StatusSugestao
-    destaque: bool
     sku_code: str
-    produto_nome: str
-    cobertura_na_chegada_sem_compra_meses: float
-    sugestao: SugestaoComSinaisResponse
-    faixa: FaixaAprovacaoResponse
-    decidido_em: datetime | None
-    decidido_por: str | None
-    quantidade_aprovada: int | None
-    justificativa: str | None
-    motivo_rejeicao: str | None
-    pedido_compra_id: UUID | None
+    tipo: TipoAviso
+    comentario: str | None
+    avisado_por: str
+    criado_em: datetime
 
 
-class ResultadoGeracaoResponse(BaseModel):
+class RegistrarAvisoRequest(BaseModel):
+    sku_code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    tipo: TipoAviso
+    avisado_por: Nome
+    comentario: TextoLivre | None = None
+
+
+class ItemAlertaResponse(BaseModel):
+    """`cobertura_atual_meses` nula para SKU sem giro; `cobertura_na_chegada_sem_compra_meses`
+    nula quando a sugestão não tem cálculo. Quantidade e fornecedor só com compra.
+    `so_por_aviso`: tem aviso aberto e nenhum motivo de alerta calculado."""
+
     model_config = ConfigDict(frozen=True)
 
-    geradas: int
-    substituidas: int
-    skus_avaliados: int
-    sinais_indisponiveis: bool
+    sku_code: str
+    produto_nome: str
+    cor: str
+    tamanho: str
+    disponivel: int
+    cobertura_atual_meses: float | None
+    cobertura_na_chegada_sem_compra_meses: float | None
+    motivos: list[MotivoAlerta]
+    quantidade_sugerida: int | None
+    fornecedor_sugerido: str | None
+    avisos_abertos: int
+    ultimo_aviso: AvisoResponse | None
+    so_por_aviso: bool
 
 
-Nome = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-TextoLivre = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
+class DecisaoCompraResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    sku_code: str
+    tipo: TipoDecisao
+    quantidade: int | None
+    motivo: str | None
+    comentario: str | None
+    decidido_por: str
+    quantidade_sugerida: int
+    politica_versao: int
+    criado_em: datetime
 
 
-class AprovarSugestaoRequest(BaseModel):
-    """Sem `quantidade`, aprova a sugerida. A `justificativa` é obrigatória quando a faixa
-    da quantidade aprovada exige."""
+class RegistrarDecisaoRequest(BaseModel):
+    """`quantidade` só em `vou_comprar`, maior que zero; `motivo` obrigatório em
+    `nao_comprar_agora`."""
 
-    aprovado_por: Nome
+    tipo: TipoDecisao
+    decidido_por: Nome
     quantidade: int | None = None
-    justificativa: TextoLivre | None = None
+    motivo: TextoLivre | None = None
+    comentario: TextoLivre | None = None
 
 
-class RejeitarSugestaoRequest(BaseModel):
-    rejeitado_por: Nome
-    motivo: Annotated[TextoLivre, StringConstraints(min_length=1)]
+class ItemDecididoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    produto_nome: str
+    cor: str
+    tamanho: str
+    decisao: DecisaoCompraResponse
+
+
+class PainelResponse(BaseModel):
+    """`decididos`: os SKUs com decisão de compra vigente, a mais recente primeiro."""
+
+    model_config = ConfigDict(frozen=True)
+
+    alertas: list[ItemAlertaResponse]
+    decididos: list[ItemDecididoResponse]
+    skus_com_erro: list[str]

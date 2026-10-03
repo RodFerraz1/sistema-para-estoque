@@ -3,39 +3,34 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Fila de aprovação - Copilot de Compras</title>
+  <title>Painel de alertas - Copilot de Compras</title>
   <link rel="stylesheet" href="estilo.css">
-  <script type="module" src="fila.js"></script>
+  <script type="module" src="painel.js"></script>
 </head>
 <body>
   <header>
     <div class="conteudo">
-      <strong>Copilot de Compras</strong>
+      <strong class="marca">Copilot de Compras</strong>
       <nav>
-        <a href="index.html" aria-current="page">Fila</a>
-        <a href="chat.html">Chat</a>
+        <a href="index.html" aria-current="page">Painel</a>
         <a href="politica.html">Política</a>
       </nav>
+      <button id="abrir-chat" type="button" class="abrir-chat" aria-expanded="false" aria-controls="chat-lateral">Perguntar ao Copilot</button>
     </div>
   </header>
   <main class="conteudo">
-    <h1>Fila de aprovação</h1>
-    <p class="suave">Sugestões de pedido que esperam a sua decisão. Primeiro as em destaque (ruptura, teto, lead time ou sinal do corpus), depois as mais urgentes. Aprovar cria o pedido de compra no ERP.</p>
-
-    <div class="acoes">
-      <button id="gerar" class="primario" type="button">Gerar sugestões</button>
-      <span class="suave">Avalia todos os SKUs ativos e substitui as pendentes.</span>
+    <div class="cabecalho-pagina">
+      <div>
+        <h1 id="saudacao">Painel de alertas</h1>
+        <p class="suave">O que pede a sua atenção agora, calculado na hora com a política de compra.</p>
+      </div>
+      <div class="acoes">
+        <a id="link-aviso" class="botao" href="aviso.html" target="_blank" rel="noopener">Página das vendedoras ↗</a>
+        <button id="copiar-link" type="button">Copiar link</button>
+      </div>
     </div>
-    <div id="resultado-geracao"></div>
-
-    <h2>Sugestões</h2>
-    <div class="filtro" role="group" aria-label="Filtrar por status">
-      <button type="button" data-status="pendente" aria-pressed="true">Pendentes</button>
-      <button type="button" data-status="aprovada" aria-pressed="false">Aprovadas</button>
-      <button type="button" data-status="rejeitada" aria-pressed="false">Rejeitadas</button>
-    </div>
-    <p id="contagem" class="suave"></p>
-    <div id="lista"></div>
+    <p id="carregando" class="carregando">Calculando o painel...</p>
+    <div id="painel"></div>
   </main>
 </body>
 </html>

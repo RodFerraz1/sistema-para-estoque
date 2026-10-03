@@ -200,5 +200,77 @@
     "produtos_aceitos": [
       "nenhum"
     ]
+  },
+  {
+    "id": "a01",
+    "pergunta": "Algum vendedor pediu para comprar algum item?",
+    "intencao": "alertas_e_avisos",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "a02",
+    "pergunta": "Teve aviso das vendedoras hoje?",
+    "intencao": "alertas_e_avisos",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "a03",
+    "pergunta": "Quais produtos estão no painel de alertas?",
+    "intencao": "alertas_e_avisos",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "a04",
+    "pergunta": "Alguém avisou que a luva térmica tá vendendo muito?",
+    "intencao": "alertas_e_avisos",
+    "produtos_aceitos": [
+      "Luva Térmica"
+    ]
+  },
+  {
+    "id": "a05",
+    "pergunta": "O que tá acabando e precisa da minha atenção?",
+    "intencao": "alertas_e_avisos",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "a06",
+    "pergunta": "Quem da equipe de vendas falou que o jogo americano acabou?",
+    "intencao": "alertas_e_avisos",
+    "produtos_aceitos": [
+      "Jogo Americano"
+    ]
+  },
+  {
+    "id": "a07",
+    "pergunta": "Tem algum pedido dos vendedores em aberto?",
+    "intencao": "alertas_e_avisos",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "a08",
+    "pergunta": "Quais SKUs vão faltar antes da compra chegar?",
+    "intencao": "alertas_e_avisos",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
+  },
+  {
+    "id": "a09",
+    "pergunta": "algum vendedor pediu algum item",
+    "intencao": "alertas_e_avisos",
+    "produtos_aceitos": [
+      "nenhum"
+    ]
   }
 ]

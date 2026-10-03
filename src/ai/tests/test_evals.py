@@ -5,15 +5,16 @@ from __future__ import annotations
 import json
 from collections import Counter
 from pathlib import Path
+from typing import get_args
 
 from scripts.relatorio_registros import normalizar_pergunta
 from scripts.seed import FORNECEDORES, PRODUTOS
 from src.ai.corpus import ler_corpus
-from src.ai.schemas import NENHUM_PRODUTO, Trecho
+from src.ai.schemas import NENHUM_PRODUTO, Intencao, Trecho
 
 RAIZ = Path(__file__).resolve().parents[3]
 EVALS = RAIZ / "evals"
-INTENCOES = {"situacao_sku", "sugestao_compra", "politica_ou_fornecedor", "fora_de_escopo"}
+INTENCOES = set(get_args(Intencao))
 
 
 def carregar(nome: str) -> list[dict]:
@@ -58,7 +59,8 @@ def test_casos_cobrem_intencoes_e_premissas_falsas() -> None:
     assert len(casos) == 20
     assert len({caso["id"] for caso in casos}) == 20
     por_intencao = Counter(caso["intencao"] for caso in casos)
-    assert set(por_intencao) == INTENCOES
+    # Alertas e avisos não buscam no corpus: os casos deles ficam só em intencoes.json.
+    assert set(por_intencao) == INTENCOES - {"alertas_e_avisos"}
     assert min(por_intencao.values()) >= 4
     assert sum(caso["premissa_falsa"] is not None for caso in casos) >= 2
     for caso in casos:
@@ -116,7 +118,7 @@ def test_casos_do_redator_tem_o_formato_dos_casos_sem_repetir_pergunta() -> None
         assert caso["pergunta"] not in perguntas_dos_casos, caso["id"]
 
 
-def test_intencoes_tem_as_quatro_intencoes_sem_repetir_casos_e_com_produtos_do_seed() -> None:
+def test_intencoes_tem_todas_as_intencoes_sem_repetir_casos_e_com_produtos_do_seed() -> None:
     casos = carregar("intencoes.json")
     perguntas_dos_casos = {normalizar_pergunta(caso["pergunta"]) for caso in carregar("casos.json")}
     nomes = {produto.nome for produto in PRODUTOS} | {NENHUM_PRODUTO}

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 
@@ -31,6 +32,9 @@ from src.catalog.service import Catalog
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.ficha_sku.service import FichaSKU
 from src.inventory.service import Inventory
+from src.painel.in_memory import InMemoryAvisosRepositorio, InMemoryDecisoesRepositorio
+from src.painel.schemas import Aviso, TipoAviso
+from src.painel.service import Painel
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
 from src.purchasing.service import Purchasing
 from src.sales.service import Sales
@@ -57,7 +61,9 @@ KATRINA = make_fornecedor("Katrina Têxtil", lead_time_dias_contratado=35)
 PERGUNTA = "Como tá a toalha banho conforto?"
 
 
-def erp(skus: list[SKU] | None = None, *, sem_estoque: set[str] = frozenset()) -> InMemoryERPAdapter:
+def erp(
+    skus: list[SKU] | None = None, *, sem_estoque: set[str] = frozenset(), disponivel: int = 40
+) -> InMemoryERPAdapter:
     skus = skus or [TOALHA_BEGE, TOALHA_BRANCA, PERCAL_CASAL]
     return InMemoryERPAdapter(
         skus=skus,
@@ -66,7 +72,7 @@ def erp(skus: list[SKU] | None = None, *, sem_estoque: set[str] = frozenset()) -
             s.sku_code: [make_fornecedor_sku(KATRINA, preco_unitario_reais=1800, moq_unidades=48)]
             for s in skus
         },
-        estoques={s.sku_code: make_estoque(disponivel=40) for s in skus if s.sku_code not in sem_estoque},
+        estoques={s.sku_code: make_estoque(disponivel=disponivel) for s in skus if s.sku_code not in sem_estoque},
         vendas=[
             make_venda(s, datetime(2026, mes, 5, tzinfo=UTC), 100, key=f"{s.sku_code}|{mes}")
             for s in skus
@@ -107,6 +113,7 @@ def copilot(
     so_nos_sinais: Collection[str] = (),
     adapter: InMemoryERPAdapter | None = None,
     registros: InMemoryRegistrosDecisao | None = None,
+    avisos: Sequence[Aviso] = (),
 ) -> Copilot:
     """Com `falhar_busca`, o Jev falha se a busca no corpus for chamada. Os trechos de
     `so_nos_sinais` só são aceitos na busca focada dos sinais."""
@@ -116,6 +123,19 @@ def copilot(
     inventory = Inventory(adapter, sales)
     ficha_sku = FichaSKU(catalog, inventory, sales)
     politicas = InMemoryPoliticaCompraRepositorio(now=NOW)
+    purchasing = Purchasing(catalog, ficha_sku, inventory, sales, politicas, adapter, now=NOW)
+    repositorio_avisos = InMemoryAvisosRepositorio()
+    for aviso in avisos:
+        repositorio_avisos.gravar(aviso)
+    painel = Painel(
+        catalog,
+        inventory,
+        purchasing,
+        politicas,
+        repositorio_avisos,
+        InMemoryDecisoesRepositorio(),
+        relogio=lambda: NOW,
+    )
     decisao = DecisaoComTrechosSoNosSinais(
         avaliacoes,
         so_nos_sinais=so_nos_sinais,
@@ -135,8 +155,9 @@ def copilot(
         decisao,
         catalog,
         ficha_sku,
-        Purchasing(ficha_sku, inventory, sales, politicas, adapter, now=NOW),
+        purchasing,
         politicas,
+        painel,
         busca,
         SinaisCorpus(busca, decisao),
         redator or RedatorGravador(),
@@ -306,6 +327,72 @@ def test_politica_ou_fornecedor_redige_so_com_a_busca() -> None:
     assert "## Fichas de SKU" not in contexto
 
 
+def aviso(sku: SKU, tipo: TipoAviso = "vendendo_muito", comentario: str | None = None) -> Aviso:
+    return Aviso(
+        id=uuid4(), sku_code=sku.sku_code, tipo=tipo, comentario=comentario, avisado_por="Rodrigo", criado_em=NOW
+    )
+
+
+def test_alertas_e_avisos_redige_com_o_painel_sem_busca() -> None:
+    redator = RedatorGravador()
+
+    resposta = copilot(
+        make_entendimento("alertas_e_avisos", 0.95),
+        redator=redator,
+        avisos=[aviso(TOALHA_BEGE, comentario="Muita gente pedindo")],
+        falhar_busca=True,
+    ).responder("Algum vendedor pediu algum item?")
+
+    assert resposta.acao == "respondeu"
+    assert resposta.identificacao is not None
+    assert resposta.identificacao.origem == "nenhum"
+    assert resposta.fichas == resposta.sugestoes == resposta.trechos == []
+    contexto = contexto_de(redator)
+    assert "## Painel de alertas (calculado agora)" in contexto
+    assert "3 SKUs no painel: 1 com aviso aberto da equipe de vendas e 2 sem aviso, só por motivo de alerta." in contexto
+    assert '  - Vendendo muito, avisado por Rodrigo em 15/09/2026: "Muita gente pedindo"' in contexto
+    assert all(f"### {s.sku_code}" in contexto for s in (TOALHA_BEGE, TOALHA_BRANCA, PERCAL_CASAL))
+    assert "## Fichas de SKU" not in contexto
+    assert "## Trechos do corpus" not in contexto
+
+
+def test_alertas_e_avisos_de_produto_citado_traz_so_os_skus_dele() -> None:
+    redator = RedatorGravador()
+
+    copilot(
+        make_entendimento("alertas_e_avisos", 0.95, produto=PERCAL), redator=redator, falhar_busca=True
+    ).responder("O jogo de cama percal tem aviso?")
+
+    contexto = contexto_de(redator)
+    assert "### JDCP-BRAN-CASAL-01" in contexto
+    assert "TBC-BEGE-70140-01" not in contexto
+    assert "1 SKU no painel: nenhum com aviso aberto da equipe de vendas e 1 sem aviso, só por motivo de alerta." in contexto
+
+
+def test_alertas_e_avisos_nao_usa_o_sku_da_tela() -> None:
+    redator = RedatorGravador()
+
+    copilot(make_entendimento("alertas_e_avisos", 0.95), redator=redator, falhar_busca=True).responder(
+        "Algum vendedor pediu algum item?", sku_em_contexto="JDCP-BRAN-CASAL-01"
+    )
+
+    contexto = contexto_de(redator)
+    assert "### TBC-BEGE-70140-01" in contexto
+    assert "tela do SKU" not in contexto
+
+
+def test_alertas_e_avisos_com_painel_vazio_vira_observacao() -> None:
+    redator = RedatorGravador()
+
+    copilot(
+        make_entendimento("alertas_e_avisos", 0.95), redator=redator, adapter=erp(disponivel=500), falhar_busca=True
+    ).responder("Tem algo pedindo atenção?")
+
+    contexto = contexto_de(redator)
+    assert "## Painel de alertas" not in contexto
+    assert "Nenhum SKU está no painel de alertas agora: sem aviso aberto da equipe de vendas" in contexto
+
+
 def test_fora_de_escopo_responde_texto_fixo_sem_busca_nem_redator() -> None:
     redator = RedatorGravador()
 
@@ -316,7 +403,7 @@ def test_fora_de_escopo_responde_texto_fixo_sem_busca_nem_redator() -> None:
     assert resposta.resposta == RESPOSTA_FORA_DE_ESCOPO
     assert resposta.resposta == (
         "Só consigo ajudar com as compras do atacadista: situação de SKU, sugestão de pedido, "
-        "política de compra e fornecedores."
+        "política de compra, fornecedores, painel de alertas e avisos da equipe de vendas."
     )
     assert resposta.acao == "fora_de_escopo"
     assert resposta.redator is None
@@ -478,6 +565,7 @@ def test_resposta_redigida_grava_o_registro_e_devolve_o_id() -> None:
         "resposta": "A toalha bege tem 40 unidades.",
         "sinais": [],
         "citacoes": [],
+        "sku_em_contexto": None,
     }
     assert registro.criado_em.tzinfo is not None
     assert registro.duracao_ms >= 0

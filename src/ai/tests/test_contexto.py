@@ -49,6 +49,7 @@ def ficha(*, giro: float = 45.333, cobertura: float | None = 2.72, fornecedores=
     return Ficha(
         sku=SKU,
         estoque=make_estoque(disponivel=1234),
+        em_transito=0,
         giro=GiroMedioMensal(unidades_por_mes=giro, meses_considerados=6, total_unidades=272),
         cobertura=Cobertura(meses=cobertura, sem_giro=cobertura is None),
         fornecedores=[make_fornecedor_sku(KATRINA, preco_unitario_reais=123456, lead_time_dias_observado=62)]
@@ -243,7 +244,7 @@ def test_politica_traz_os_parametros_com_meses_em_decimal() -> None:
     assert "- Teto: 3,0 meses de cobertura quando a compra chega" in contexto
     assert "- Piso de alerta: 0,7 meses de cobertura" in contexto
     assert "- Piso de reposição: 1,0 mês de cobertura quando a compra chega" in contexto
-    assert "- Ciclo de compra: 1,0 mês de giro por compra" in contexto
+    assert "- Ciclo de compra: 2,0 meses de giro por compra" in contexto
     assert "- Lead time base: observado" in contexto
     assert "- Critério de fornecedor: menor preço" in contexto
 

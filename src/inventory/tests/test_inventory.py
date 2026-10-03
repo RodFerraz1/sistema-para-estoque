@@ -5,7 +5,8 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from src.erp_adapter.in_memory import InMemoryERPAdapter, StatusPedidoCompra
+from src.erp_adapter.in_memory import InMemoryERPAdapter
+from src.erp_adapter.schemas import StatusPedidoCompra
 from src.inventory.service import Inventory
 from src.sales.service import Sales
 from tests.fakes import (

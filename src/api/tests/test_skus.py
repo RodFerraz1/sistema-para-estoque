@@ -81,6 +81,8 @@ def test_analise_sku_retorna_shape_esperado() -> None:
     assert body["sku_code"] == "TBC-BEG-70140"
     assert body["produto_nome"] == "Toalha Banho"
     assert body["categoria"] == "felpudo"
+    assert (body["cor"], body["tamanho"]) == ("branco", "70x140")
+    assert body["em_transito_unidades"] == 0
     assert body["estoque"]["quantidade_disponivel"] == 120
     assert body["estoque"]["quantidade_reservada"] == 10
     assert body["giro"]["unidades_por_mes"] > 0

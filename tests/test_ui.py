@@ -7,9 +7,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.main import UI_DIR, app
-from src.politica_compra.schemas import MotivoDestaque
+from src.politica_compra.schemas import MotivoAlerta
 
-PAGINAS = ["index.html", "chat.html", "politica.html"]
+PAGINAS = ["index.html", "sku.html", "aviso.html", "politica.html"]
+PAGINAS_DO_COMPRADOR = {"index.html": "painel.js", "sku.html": "sku.js", "politica.html": "politica.js"}
 TIPOS = {".html": "text/html", ".css": "text/css", ".js": "text/javascript"}
 REFERENCIA_NO_HTML = re.compile(r'(?:src|href)="([^"]+)"')
 IMPORT_NO_JS = re.compile(r'from\s+"\./([^"]+)"')
@@ -52,7 +53,7 @@ def test_raiz_redireciona_para_a_ui(client: TestClient) -> None:
     assert response.headers["location"] == "/ui/"
 
 
-def test_ui_sem_pagina_serve_a_fila(client: TestClient) -> None:
+def test_ui_sem_pagina_serve_o_painel(client: TestClient) -> None:
     response = client.get("/ui/")
 
     assert response.status_code == 200
@@ -68,9 +69,16 @@ def test_paginas_respondem_html(client: TestClient, pagina: str) -> None:
     assert '<html lang="pt-BR">' in response.text
 
 
+@pytest.mark.parametrize("arquivo", ["", "index.html", "estilo.css", "painel.js"])
+def test_ui_pede_ao_navegador_para_revalidar_sempre(client: TestClient, arquivo: str) -> None:
+    response = client.get(f"/ui/{arquivo}")
+
+    assert response.headers["cache-control"] == "no-cache"
+
+
 def test_assets_referenciados_respondem_com_o_tipo_certo(client: TestClient) -> None:
     assets = _assets()
-    assert {"estilo.css", "comum.js", "fila.js", "chat.js", "politica.js"} <= assets
+    assert {"estilo.css", "comum.js", "painel.js", "sku.js", "aviso.js", "chat.js", "politica.js"} <= assets
 
     for asset in sorted(assets):
         response = client.get(f"/ui/{asset}")
@@ -82,7 +90,18 @@ def test_assets_referenciados_respondem_com_o_tipo_certo(client: TestClient) -> 
 def test_cada_pagina_chama_a_api() -> None:
     chamadas = _chamadas()
 
-    assert {metodo for metodo, _ in chamadas["fila.js"]} == {"GET", "POST"}
+    assert ("GET", "/painel") in chamadas["painel.js"]
+    assert {metodo for metodo, _ in chamadas["aviso.js"]} == {"GET", "POST"}
+    assert ("POST", "/skus/${sku}/decisoes") in chamadas["sku.js"]
+    assert {caminho.split("/")[-1].split("?")[0] for _, caminho in chamadas["sku.js"]} >= {
+        "analise",
+        "avisos",
+        "decisoes",
+        "sugestao-compra",
+        "sinais",
+        "precos",
+        "vendas",
+    }
     assert ("POST", "/chat") in chamadas["chat.js"]
     assert {("GET", "/politica-compra"), ("PUT", "/politica-compra")} <= set(chamadas["politica.js"])
 
@@ -90,20 +109,66 @@ def test_cada_pagina_chama_a_api() -> None:
 def test_endpoints_chamados_pelos_js_existem_no_app() -> None:
     chamadas = [(script, m, c) for script, lista in _chamadas().items() for m, c in lista]
 
-    assert len(chamadas) >= 7
+    assert len(chamadas) >= 3
     inexistentes = [(script, m, c) for script, m, c in chamadas if not _existe_rota(m, c)]
     assert inexistentes == []
 
 
 def test_rota_inexistente_nao_passa_na_conferencia() -> None:
-    assert not _existe_rota("POST", "/sugestoes/${s.id}/cancelar")
+    assert not _existe_rota("POST", "/sugestoes/${s.id}/aprovar")
     assert not _existe_rota("DELETE", "/politica-compra")
-    assert _existe_rota("POST", "/sugestoes/${s.id}/aprovar")
+    assert _existe_rota("GET", "/skus/${sku}/sugestao-compra")
 
 
-def test_onboarding_tem_uma_opcao_por_motivo_de_destaque() -> None:
+def test_onboarding_tem_uma_opcao_por_motivo_de_alerta() -> None:
     html = (UI_DIR / "politica.html").read_text()
 
-    opcoes = set(re.findall(r'name="motivos_de_destaque" value="([^"]+)"', html))
+    opcoes = set(re.findall(r'name="motivos_de_alerta" value="([^"]+)"', html))
 
-    assert opcoes == {m.value for m in MotivoDestaque}
+    assert opcoes == {m.value for m in MotivoAlerta}
+
+
+def test_politica_nao_tem_faixa_de_aprovacao() -> None:
+    assert "faixa" not in (UI_DIR / "politica.html").read_text() + (UI_DIR / "politica.js").read_text()
+
+
+def test_pagina_de_aviso_nao_tem_navegacao_nem_chat() -> None:
+    html = (UI_DIR / "aviso.html").read_text()
+
+    assert "<nav" not in html
+    assert "chat" not in html.lower()
+    assert 'name="viewport"' in html
+
+
+def test_painel_tem_link_para_a_pagina_de_aviso() -> None:
+    assert 'href="aviso.html"' in (UI_DIR / "index.html").read_text()
+
+
+def test_linhas_do_painel_abrem_a_tela_do_sku() -> None:
+    assert "sku.html?sku=" in (UI_DIR / "painel.js").read_text()
+
+
+def test_decididos_ficam_recolhidos_por_padrao() -> None:
+    painel = (UI_DIR / "painel.js").read_text()
+
+    assert "Decididos nos últimos 7 dias" in painel
+    assert re.search(r'"details",\s*\{ class: "card decididos"[^}]*\}', painel)
+
+
+def test_chat_html_saiu(client: TestClient) -> None:
+    assert client.get("/ui/chat.html").status_code == 404
+
+
+@pytest.mark.parametrize(("pagina", "script"), PAGINAS_DO_COMPRADOR.items())
+def test_telas_do_comprador_tem_o_chat_lateral_e_navegacao_painel_e_politica(pagina: str, script: str) -> None:
+    html = (UI_DIR / pagina).read_text()
+
+    assert re.findall(r'<nav>(.*?)</nav>', html, re.S)[0].count("<a ") == 2
+    assert 'href="index.html"' in html and 'href="politica.html"' in html
+    assert 'id="abrir-chat"' in html
+    assert re.search(r"montarChat\(", (UI_DIR / script).read_text())
+
+
+def test_tela_do_sku_passa_o_sku_em_contexto_ao_chat() -> None:
+    assert "montarChat(skuCode" in (UI_DIR / "sku.js").read_text()
+    assert "sku_code: skuEmContexto" in (UI_DIR / "chat.js").read_text()

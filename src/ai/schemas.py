@@ -9,16 +9,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.catalog.schemas import SKU
 from src.ficha_sku.schemas import Ficha
+from src.painel.schemas import ItemAlerta
 from src.politica_compra.schemas import PoliticaCompra
 from src.purchasing.schemas import SugestaoPedido
 
 Classificacao = Literal["aceito", "conflitante", "descartado"]
 MotivoDescarte = Literal["injecao", "irrelevante", "sem_evidencia"]
 Probabilidade = Annotated[float, Field(ge=0, le=1)]
-Intencao = Literal["situacao_sku", "sugestao_compra", "politica_ou_fornecedor", "fora_de_escopo"]
+Intencao = Literal["situacao_sku", "sugestao_compra", "politica_ou_fornecedor", "alertas_e_avisos", "fora_de_escopo"]
 Faixa = Literal["alta", "media", "baixa"]
 Acao = Literal["respondeu", "confirmou_e_respondeu", "pediu_esclarecimento", "fora_de_escopo"]
-OrigemIdentificacao = Literal["codigo", "produto", "nenhum"]
+OrigemIdentificacao = Literal["codigo", "produto", "contexto", "nenhum"]
 TipoSinal = Literal["atraso_do_fornecedor", "demanda_sazonal", "encalhe"]
 Relacao = Literal["sustenta", "contradiz", "nao_trata"]
 Veredito = Literal["confirmada", "sem_suporte", "contradita", "inventada", "incerta"]
@@ -136,7 +137,8 @@ class ProdutoCatalogo(BaseModel):
 
 class Identificacao(BaseModel):
     """SKUs de uma pergunta do chat. `total_skus` conta os identificados antes do corte
-    em `MAX_SKUS_POR_RESPOSTA`."""
+    em `MAX_SKUS_POR_RESPOSTA`. Origem `contexto`: a pergunta não citou produto e vale o
+    SKU da tela de onde o comprador perguntou."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -263,12 +265,14 @@ class CitacoesConferidas(BaseModel):
 
 
 class Montagem(BaseModel):
-    """Dados que o código reuniu para responder uma pergunta do chat."""
+    """Dados que o código reuniu para responder uma pergunta do chat. `alertas` são os
+    itens do painel de alertas, na ordem dele."""
 
     model_config = ConfigDict(frozen=True)
 
     fichas: list[Ficha] = []
     sugestoes: list[SugestaoComSinais] = []
+    alertas: list[ItemAlerta] = []
     politica: PoliticaCompra | None = None
     trechos: list[TrechoClassificado] = []
     conflitos: list[ConflitoEntreTrechos] = []
@@ -300,7 +304,8 @@ class RegistroDecisao(BaseModel):
     """O que fica gravado de cada pergunta respondida pelo chat. `intencao` e
     `confianca` repetem o `entendimento` para o M8 filtrar sem abrir o jsonb.
     `trechos` são os ids que foram ao redator. `sinais` traz um item por sugestão,
-    com `sinais` nulo quando não foram calculados."""
+    com `sinais` nulo quando não foram calculados. `sku_em_contexto` é o SKU da tela de
+    onde o comprador perguntou, nulo fora da tela do SKU."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -319,3 +324,4 @@ class RegistroDecisao(BaseModel):
     duracao_ms: int
     sinais: list[SinaisDoSKU]
     citacoes: list[VerificacaoCitacao]
+    sku_em_contexto: str | None = None

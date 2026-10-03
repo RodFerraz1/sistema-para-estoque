@@ -4,6 +4,7 @@ const INTENCOES = {
   situacao_sku: "Situação do SKU",
   sugestao_compra: "Sugestão de compra",
   politica_ou_fornecedor: "Política ou fornecedor",
+  alertas_e_avisos: "Alertas e avisos",
   fora_de_escopo: "Fora de escopo",
 };
 const ACOES = {
@@ -23,11 +24,6 @@ const VEREDITOS = {
 const CLASSIFICACOES = { aceito: "Aceito", conflitante: "Conflitante", descartado: "Descartado" };
 const CITACAO_NAO_CONFIRMADA = /\[[^[\]\n]*? - (?:não confirmada|o trecho diz o contrário|trecho inexistente)[^[\]\n]*\]/;
 const MARCACAO = new RegExp(`\\*\\*([^*\\n]+?)\\*\\*|${CITACAO_NAO_CONFIRMADA.source}`, "g");
-
-const formulario = document.getElementById("pergunta-form");
-const campoPergunta = document.getElementById("pergunta");
-const botao = document.getElementById("perguntar");
-const respostas = document.getElementById("respostas");
 
 function textoComMarcas(texto) {
   const partes = [];
@@ -157,38 +153,222 @@ function trechos(lista, conflitos) {
   );
 }
 
+const SUGESTOES = [
+  "Algum vendedor pediu algum item?",
+  "O que vai faltar antes da compra chegar?",
+  "A Katrina costuma atrasar as entregas?",
+];
+const SUGESTOES_DO_SKU = ["Como está o estoque deste produto?", "Quanto devo comprar?", "Algum vendedor pediu algum item?"];
+
 function resposta(r) {
   const temMarcas = r.resposta.search(CITACAO_NAO_CONFIRMADA) >= 0;
   return [
     textoComMarcas(r.resposta),
     temMarcas ? el("p", { class: "suave" }, "Em vermelho, citações que o Jev não confirmou no trecho citado.") : null,
-    secao("Entendimento", entendimento(r)),
-    fichas(r.fichas),
-    r.sugestoes.length ? secao("Sugestões", sugestoes(r.sugestoes)) : null,
-    citacoes(r.citacoes),
-    trechos(r.trechos, r.conflitos),
-    el("p", { class: "suave" }, "Registro de decisão: ", el("code", {}, r.registro_id)),
+    el(
+      "details",
+      {},
+      el("summary", {}, "Como o Copilot chegou nisso"),
+      secao("Entendimento", entendimento(r)),
+      fichas(r.fichas),
+      r.sugestoes.length ? secao("Sugestões", sugestoes(r.sugestoes)) : null,
+      citacoes(r.citacoes),
+      trechos(r.trechos, r.conflitos),
+      el("p", { class: "suave" }, "Registro de decisão: ", el("code", {}, r.registro_id)),
+    ),
   ];
 }
 
-async function perguntar(evento) {
-  evento.preventDefault();
-  const pergunta = campoPergunta.value.trim();
-  if (!pergunta) return;
-  const corpo = el("div", {}, mensagem("aviso", "O Copilot está consultando os dados e o corpus. Pode levar alguns segundos."));
-  respostas.prepend(el("article", { class: "card" }, el("p", { class: "suave" }, "Você perguntou: ", el("strong", {}, pergunta)), corpo));
-  botao.disabled = true;
-  try {
-    corpo.replaceChildren(el("div", {}, resposta(await api("POST", "/chat", { pergunta }))));
+function digitando() {
+  return el("div", { class: "digitando", "aria-label": "O Copilot está respondendo" }, el("span"), el("span"), el("span"));
+}
+
+function painelDoChat(skuEmContexto) {
+  const respostas = el("div", { class: "chat-respostas", "aria-live": "polite" });
+  const campoPergunta = el("textarea", {
+    id: "chat-pergunta",
+    required: true,
+    rows: 1,
+    maxlength: 1000,
+    "aria-label": "Pergunta",
+    placeholder: skuEmContexto ? "Pergunte sobre este produto..." : "Pergunte ao Copilot...",
+  });
+  const botao = el("button", { type: "submit", class: "primario" }, "Enviar");
+  const contexto = el(
+    "p",
+    { class: "chat-contexto" },
+    skuEmContexto
+      ? ["Falando sobre ", el("code", {}, skuEmContexto), ". Cite outro produto para mudar de assunto."]
+      : "Cite o produto ou o código do SKU na pergunta.",
+  );
+  const boasVindas = el(
+    "div",
+    { class: "chat-boas-vindas" },
+    el("p", {}, "Pergunte sobre estoque, quanto comprar, fornecedores, a política de compra ou os avisos das vendedoras."),
+    el(
+      "div",
+      { class: "sugestoes-de-pergunta" },
+      (skuEmContexto ? SUGESTOES_DO_SKU : SUGESTOES).map((texto) =>
+        el("button", { type: "button", onclick: () => enviar(texto) }, texto),
+      ),
+    ),
+  );
+  respostas.append(boasVindas);
+
+  async function enviar(pergunta) {
+    boasVindas.remove();
+    const bolha = el("div", { class: "bolha copilot" }, digitando());
+    respostas.append(el("div", { class: "bolha minha" }, pergunta), bolha);
+    bolha.scrollIntoView({ block: "end", behavior: "smooth" });
+    botao.disabled = true;
+    try {
+      const enviado = skuEmContexto ? { pergunta, sku_code: skuEmContexto } : { pergunta };
+      bolha.replaceChildren(el("div", {}, resposta(await api("POST", "/chat", enviado))));
+    } catch (e) {
+      bolha.replaceChildren(mensagem("erro", e.message));
+    } finally {
+      botao.disabled = false;
+      bolha.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+  }
+
+  function ajustarAltura() {
+    campoPergunta.style.height = "auto";
+    campoPergunta.style.height = `${campoPergunta.scrollHeight + 2}px`;
+  }
+
+  async function perguntar(evento) {
+    evento.preventDefault();
+    const pergunta = campoPergunta.value.trim();
+    if (!pergunta || botao.disabled) return;
     campoPergunta.value = "";
-  } catch (e) {
-    corpo.replaceChildren(mensagem("erro", e.message));
-  } finally {
-    botao.disabled = false;
+    ajustarAltura();
+    await enviar(pergunta);
+  }
+
+  const formulario = el("form", { class: "chat-formulario", onsubmit: perguntar }, campoPergunta, botao);
+  campoPergunta.addEventListener("input", ajustarAltura);
+  campoPergunta.addEventListener("keydown", (evento) => {
+    if (evento.key === "Enter" && !evento.shiftKey) {
+      evento.preventDefault();
+      formulario.requestSubmit();
+    }
+  });
+  return { contexto, respostas, formulario, campoPergunta };
+}
+
+const CHAVE_LARGURA = "copilot.largura-chat";
+const LARGURA_MINIMA = 360;
+const ESPACO_MINIMO_DA_PAGINA = 480;
+
+function limitarLargura(largura) {
+  const maxima = Math.max(LARGURA_MINIMA, window.innerWidth - ESPACO_MINIMO_DA_PAGINA);
+  return Math.round(Math.min(Math.max(largura, LARGURA_MINIMA), maxima));
+}
+
+function aplicarLargura(largura) {
+  document.documentElement.style.setProperty("--largura-chat", `${limitarLargura(largura)}px`);
+}
+
+function larguraGuardada() {
+  try {
+    return Number(localStorage.getItem(CHAVE_LARGURA)) || null;
+  } catch {
+    return null;
   }
 }
 
-formulario.addEventListener("submit", perguntar);
-campoPergunta.addEventListener("keydown", (evento) => {
-  if (evento.key === "Enter" && (evento.ctrlKey || evento.metaKey)) formulario.requestSubmit();
-});
+function guardarLargura(largura) {
+  try {
+    localStorage.setItem(CHAVE_LARGURA, String(largura));
+  } catch {}
+}
+
+function alcaDeRedimensionar(lateral) {
+  const alca = el("div", {
+    class: "chat-alca",
+    role: "separator",
+    "aria-orientation": "vertical",
+    "aria-label": "Arraste para ajustar a largura do chat",
+    tabindex: 0,
+  });
+
+  function larguraAtual() {
+    return lateral.getBoundingClientRect().width;
+  }
+
+  alca.addEventListener("pointerdown", (evento) => {
+    evento.preventDefault();
+    alca.setPointerCapture(evento.pointerId);
+    document.body.classList.add("redimensionando-chat");
+  });
+  alca.addEventListener("pointermove", (evento) => {
+    if (alca.hasPointerCapture(evento.pointerId)) aplicarLargura(window.innerWidth - evento.clientX);
+  });
+  alca.addEventListener("pointerup", (evento) => {
+    alca.releasePointerCapture(evento.pointerId);
+    document.body.classList.remove("redimensionando-chat");
+    guardarLargura(larguraAtual());
+  });
+  alca.addEventListener("dblclick", () => {
+    document.documentElement.style.removeProperty("--largura-chat");
+    guardarLargura("");
+  });
+  alca.addEventListener("keydown", (evento) => {
+    const passo = { ArrowLeft: 24, ArrowRight: -24 }[evento.key];
+    if (!passo) return;
+    evento.preventDefault();
+    aplicarLargura(larguraAtual() + passo);
+    guardarLargura(larguraAtual());
+  });
+  return alca;
+}
+
+export function montarChat(skuEmContexto = null) {
+  const abrir = document.getElementById("abrir-chat");
+  const { contexto, respostas, formulario, campoPergunta } = painelDoChat(skuEmContexto);
+  const fechar = el("button", { type: "button", class: "chat-fechar", "aria-label": "Fechar o chat" }, "Fechar");
+  const maximizar = el("button", { type: "button", class: "chat-maximizar", "aria-pressed": "false" }, "Tela cheia");
+  const lateral = el(
+    "aside",
+    { id: "chat-lateral", class: "chat-lateral", "aria-label": "Chat do Copilot", hidden: true },
+    el("div", { class: "chat-topo" }, el("strong", {}, "Copilot"), el("div", { class: "chat-controles" }, maximizar, fechar)),
+    contexto,
+    respostas,
+    formulario,
+  );
+  lateral.prepend(alcaDeRedimensionar(lateral));
+  document.body.append(lateral);
+
+  const guardada = larguraGuardada();
+  if (guardada) aplicarLargura(guardada);
+  window.addEventListener("resize", () => {
+    const atual = larguraGuardada();
+    if (atual) aplicarLargura(atual);
+  });
+
+  function alternarMaximizado(maximizado) {
+    lateral.classList.toggle("maximizado", maximizado);
+    document.body.classList.toggle("chat-maximizado", maximizado);
+    maximizar.setAttribute("aria-pressed", String(maximizado));
+    maximizar.textContent = maximizado ? "Restaurar" : "Tela cheia";
+  }
+
+  function alternar(aberto) {
+    lateral.hidden = !aberto;
+    abrir.setAttribute("aria-expanded", String(aberto));
+    document.body.classList.toggle("com-chat", aberto);
+    if (!aberto) alternarMaximizado(false);
+    if (aberto) campoPergunta.focus();
+    else abrir.focus();
+  }
+
+  abrir.addEventListener("click", () => alternar(lateral.hidden));
+  fechar.addEventListener("click", () => alternar(false));
+  maximizar.addEventListener("click", () => alternarMaximizado(!lateral.classList.contains("maximizado")));
+  lateral.addEventListener("keydown", (evento) => {
+    if (evento.key !== "Escape") return;
+    if (lateral.classList.contains("maximizado")) alternarMaximizado(false);
+    else alternar(false);
+  });
+}

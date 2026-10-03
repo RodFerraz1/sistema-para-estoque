@@ -28,7 +28,7 @@ from tests.fakes import make_sku, make_trecho
 RAIZ = Path(__file__).resolve().parents[3]
 EVALS = RAIZ / "evals"
 SPIKE_R2 = EVALS / "resultados" / "spike-2026-09-30-r2.json"
-ENTENDIMENTO_M8 = EVALS / "resultados" / "entendimento-2026-10-01-depois.json"
+ENTENDIMENTO_MEDIDO = EVALS / "resultados" / "entendimento-2026-10-02-alertas-e-avisos.json"
 CONFLITOS_M8 = EVALS / "resultados" / "conflitos-2026-10-01-depois.json"
 
 
@@ -96,9 +96,9 @@ def test_entendimento_vai_num_request_com_a_pergunta_no_state() -> None:
     ]
 
 
-def test_intencao_e_a_medida_na_calibracao_do_m8() -> None:
+def test_intencao_e_a_medida_na_ultima_calibracao() -> None:
     cliente = ClienteFalso()
-    medida = json.loads(ENTENDIMENTO_M8.read_text(encoding="utf-8"))["perguntas"]["intencao"]
+    medida = json.loads(ENTENDIMENTO_MEDIDO.read_text(encoding="utf-8"))["perguntas"]["intencao"]
 
     JevDecisionModel(cliente).entender_pergunta("como tá a toalha conforto?", PRODUTOS)
 

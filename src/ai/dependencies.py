@@ -21,6 +21,8 @@ from src.db.config import Settings, get_settings
 from src.db.engine import get_engine
 from src.ficha_sku.dependencies import get_ficha_sku
 from src.ficha_sku.service import FichaSKU
+from src.painel.dependencies import get_painel
+from src.painel.service import Painel
 from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.purchasing.dependencies import get_purchasing
@@ -97,9 +99,10 @@ def get_copilot(
     ficha_sku: FichaSKU = Depends(get_ficha_sku),
     purchasing: Purchasing = Depends(get_purchasing),
     politicas: PoliticaCompraRepositorio = Depends(get_politica_compra_repositorio),
+    painel: Painel = Depends(get_painel),
     busca: BuscaContexto = Depends(get_busca_contexto),
     sinais: SinaisCorpus = Depends(get_sinais_corpus),
     redator: Redator = Depends(get_redator),
     registros: RegistrosDecisao = Depends(get_registros_decisao),
 ) -> Copilot:
-    return Copilot(decisao, catalog, ficha_sku, purchasing, politicas, busca, sinais, redator, registros)
+    return Copilot(decisao, catalog, ficha_sku, purchasing, politicas, painel, busca, sinais, redator, registros)

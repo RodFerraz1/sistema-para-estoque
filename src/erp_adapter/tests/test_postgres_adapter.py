@@ -424,3 +424,35 @@ def test_itens_em_transito_de_contra_o_seed(adapter: PostgresERPAdapter) -> None
 
 def test_itens_em_transito_de_sku_inexistente(adapter: PostgresERPAdapter) -> None:
     assert adapter.itens_em_transito_de("NAO-EXISTE-XYZ") == []
+
+
+def test_itens_de_pedido_de_contra_o_seed(adapter: PostgresERPAdapter) -> None:
+    with get_engine().connect() as conn:
+        code, quantos = conn.execute(
+            text(
+                """
+                SELECT s.sku_code, count(*)
+                FROM erp.pedidos_compra_itens i JOIN erp.skus s ON s.id = i.sku_id
+                GROUP BY s.sku_code ORDER BY count(*) DESC, s.sku_code LIMIT 1
+                """
+            )
+        ).one()
+
+    itens = adapter.itens_de_pedido_de(code)
+
+    assert len(itens) == quantos
+    assert [i.criado_em for i in itens] == sorted((i.criado_em for i in itens), reverse=True)
+    assert all(i.fornecedor_nome and i.preco_unitario_centavos > 0 and i.quantidade > 0 for i in itens)
+
+
+def test_itens_de_pedido_de_traz_todos_os_status(
+    adapter: PostgresERPAdapter, fornecedor_com_pedidos_em_transito: UUID
+) -> None:
+    itens = adapter.itens_de_pedido_de(_SKU_TRANSITO_CODE)
+
+    assert {i.status for i in itens} == {s for s, _, _ in _PEDIDOS_TESTE_TRANSITO}
+    assert all(i.fornecedor_id == fornecedor_com_pedidos_em_transito for i in itens)
+
+
+def test_itens_de_pedido_de_sku_inexistente(adapter: PostgresERPAdapter) -> None:
+    assert adapter.itens_de_pedido_de("NAO-EXISTE-XYZ") == []

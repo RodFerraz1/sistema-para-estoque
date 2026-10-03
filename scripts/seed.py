@@ -21,6 +21,7 @@ from src.db.engine import get_engine
 
 SEED = 42
 NOW = datetime(2026, 9, 1, tzinfo=UTC)
+PRECO_SOBE_POR_MES = 0.01
 HISTORY_MONTHS = 24
 HISTORY_START = NOW - timedelta(days=HISTORY_MONTHS * 30)
 
@@ -593,7 +594,10 @@ def _seed_pedidos_compra(
         valor_total = 0
         for item_idx, rel in enumerate(item_rels):
             qtd = rel["moq_unidades"] * rng.randint(1, 3)
-            preco = rel["preco_unitario_atual"]
+            # Pedido mais antigo saiu mais barato (1% por mês até hoje), para o histórico
+            # de preço ter o que mostrar na negociação com o representante.
+            meses_atras = (NOW - criado_em).days / 30
+            preco = round(rel["preco_unitario_atual"] * (1 - PRECO_SOBE_POR_MES * meses_atras))
             quantidade_recebida = 0
             if status == "recebido_total":
                 quantidade_recebida = qtd

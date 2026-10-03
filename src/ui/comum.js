@@ -72,6 +72,44 @@ export function dataHora(iso) {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+const formatoRelativo = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
+
+export function quando(iso) {
+  const minutos = Math.round((new Date(iso) - Date.now()) / 60000);
+  if (Math.abs(minutos) < 1) return "agora";
+  if (Math.abs(minutos) < 60) return formatoRelativo.format(minutos, "minute");
+  const horas = Math.round(minutos / 60);
+  if (Math.abs(horas) < 24) return formatoRelativo.format(horas, "hour");
+  const dias = Math.round(horas / 24);
+  if (Math.abs(dias) < 7) return formatoRelativo.format(dias, "day");
+  return dataHora(iso);
+}
+
+export const MOTIVOS = {
+  ruptura_antes_da_chegada: "Ruptura antes da chegada",
+  abaixo_do_piso_alerta: "Abaixo do piso de alerta",
+  viola_teto: "Compra acima do teto",
+  lead_time_observado_acima_do_contratado: "Fornecedor atrasando",
+  abaixo_pedido_minimo: "Abaixo do pedido mínimo",
+  periodo_sazonal: "Chega em data forte",
+};
+
+export function selosDeMotivo(motivos) {
+  return motivos.map((m) =>
+    el("span", { class: m === "ruptura_antes_da_chegada" ? "selo urgente" : "selo destaque" }, MOTIVOS[m] ?? m),
+  );
+}
+
+export function coberturaAtual(meses) {
+  return meses === null ? "sem giro" : `${numero(meses, 1)} meses`;
+}
+
+export function coberturaNaChegada(meses) {
+  if (meses === null) return "sem cálculo";
+  const texto = `${numero(meses, 1)} meses`;
+  return meses < 0 ? `${texto} (acaba antes)` : texto;
+}
+
 const TIPOS_DE_SINAL = {
   atraso_do_fornecedor: "Atraso do fornecedor",
   demanda_sazonal: "Demanda sazonal",
@@ -108,16 +146,32 @@ export function sinais(lista) {
   ];
 }
 
-export function lerNome() {
+export function lerNome(chave = "copilot.nome") {
   try {
-    return localStorage.getItem("copilot.nome") ?? "";
+    return localStorage.getItem(chave) ?? "";
   } catch {
     return "";
   }
 }
 
-export function guardarNome(nome) {
+export function guardarNome(nome, chave = "copilot.nome") {
   try {
-    localStorage.setItem("copilot.nome", nome);
+    localStorage.setItem(chave, nome);
   } catch {}
+}
+
+export const TIPOS_DE_AVISO = { acabou: "Acabou", vendendo_muito: "Vendendo muito" };
+
+export const TIPOS_DE_DECISAO = {
+  vou_comprar: "Vou comprar",
+  negociando: "Negociando",
+  nao_comprar_agora: "Não comprar agora",
+};
+
+export function resumoDaDecisao(d) {
+  const partes = [`${TIPOS_DE_DECISAO[d.tipo] ?? d.tipo}`];
+  if (d.quantidade !== null) partes.push(`${numero(d.quantidade)} un. (sugestão: ${numero(d.quantidade_sugerida)} un.)`);
+  if (d.motivo) partes.push(`motivo: ${d.motivo}`);
+  if (d.comentario) partes.push(d.comentario);
+  return partes.join(" · ");
 }

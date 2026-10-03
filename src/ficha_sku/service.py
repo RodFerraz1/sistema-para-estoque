@@ -33,6 +33,7 @@ class FichaSKU:
         return Ficha(
             sku=sku,
             estoque=estoque,
+            em_transito=self._inventory.em_transito(sku_code).total_unidades,
             giro=self._sales.giro_medio_mensal(sku_code),
             cobertura=self._inventory.cobertura_meses(sku_code),
             fornecedores=self._catalog.fornecedores_de(sku_code),

@@ -10,18 +10,22 @@
 <body>
   <header>
     <div class="conteudo">
-      <strong>Copilot de Compras</strong>
+      <strong class="marca">Copilot de Compras</strong>
       <nav>
-        <a href="index.html">Fila</a>
-        <a href="chat.html">Chat</a>
+        <a href="index.html">Painel</a>
         <a href="politica.html" aria-current="page">Política</a>
       </nav>
+      <button id="abrir-chat" type="button" class="abrir-chat" aria-expanded="false" aria-controls="chat-lateral">Perguntar ao Copilot</button>
     </div>
   </header>
   <main class="conteudo">
-    <h1>Política de compra</h1>
-    <p class="suave">O Copilot sugere quanto comprar de cada produto seguindo as suas regras. Responda do jeito que você faz na prática, não do jeito "certo". Cada resposta já vem preenchida com o valor que o sistema usa hoje; salvar cria uma versão nova da política.</p>
-    <p id="versao" class="suave">Carregando a política ativa...</p>
+    <div class="cabecalho-pagina">
+      <div>
+        <h1>Política de compra</h1>
+        <p class="suave">As suas regras de compra. Responda do jeito que você faz na prática: o Copilot usa estas respostas para sugerir quanto comprar.</p>
+      </div>
+      <span id="versao" class="selo">Carregando...</span>
+    </div>
     <div id="carregamento"></div>
 
     <form id="politica" hidden>
@@ -86,53 +90,39 @@
         <div class="unidade"><input id="dias_historico_minimo" name="dias_historico_minimo" type="number" min="0" step="1" required> dias</div>
       </div>
 
-      <h2>Aprovação de pedidos</h2>
-      <div class="card pergunta">
-        <p><strong>Até que valor um pedido fica em cada faixa de aprovação?</strong></p>
-        <p class="suave">Quanto mais alta a faixa, mais gente precisa aprovar, e da faixa 2 em diante o pedido exige justificativa. Acima do limite da faixa 3, o pedido é da faixa 4.</p>
-        <div class="campo">
-          <label for="faixa_1_ate_reais">Faixa 1 até</label>
-          <div class="unidade">R$ <input id="faixa_1_ate_reais" name="faixa_1_ate_reais" type="number" min="1" step="1" required></div>
-        </div>
-        <div class="campo">
-          <label for="faixa_2_ate_reais">Faixa 2 até</label>
-          <div class="unidade">R$ <input id="faixa_2_ate_reais" name="faixa_2_ate_reais" type="number" min="1" step="1" required></div>
-        </div>
-        <div class="campo">
-          <label for="faixa_3_ate_reais">Faixa 3 até</label>
-          <div class="unidade">R$ <input id="faixa_3_ate_reais" name="faixa_3_ate_reais" type="number" min="1" step="1" required></div>
-        </div>
-      </div>
-
-      <h2>Fila de aprovação</h2>
+      <h2>Painel de alertas</h2>
       <fieldset class="card pergunta opcoes">
-        <legend><strong>O que faz uma sugestão de compra ir para o topo da fila, para você olhar primeiro?</strong></legend>
-        <p class="suave">As marcadas ganham destaque; as outras seguem pela urgência (quem acaba antes vem primeiro). O destaque só muda a ordem, nunca aprova nada. Marcar muitas faz quase tudo ficar em destaque.</p>
-        <label><input type="checkbox" name="motivos_de_destaque" value="ruptura_antes_da_chegada"> O estoque acaba antes da compra chegar</label>
-        <label><input type="checkbox" name="motivos_de_destaque" value="viola_teto"> A compra deixa o estoque acima do máximo (pergunta 1)</label>
-        <label><input type="checkbox" name="motivos_de_destaque" value="lead_time_observado_acima_do_contratado"> O fornecedor tem entregado depois do prazo que promete</label>
-        <label><input type="checkbox" name="motivos_de_destaque" value="abaixo_pedido_minimo"> O pedido fica abaixo do pedido mínimo do fornecedor</label>
-        <label><input type="checkbox" name="motivos_de_destaque" value="periodo_sazonal"> A compra chega numa data forte (pergunta 2)</label>
-        <label><input type="checkbox" name="motivos_de_destaque" value="atraso_do_fornecedor"> Os documentos falam de atraso desse fornecedor</label>
-        <label><input type="checkbox" name="motivos_de_destaque" value="demanda_sazonal"> Os documentos falam de venda forte desse produto em alguma época</label>
-        <label><input type="checkbox" name="motivos_de_destaque" value="encalhe"> Os documentos falam de encalhe desse produto numa compra anterior</label>
+        <legend><strong>10. O que faz um produto aparecer no painel de alertas, para você olhar?</strong></legend>
+        <p class="suave">Os avisos da equipe de vendas sempre aparecem. Marcar muitas opções enche o painel de produtos que não pedem compra agora.</p>
+        <label><input type="checkbox" name="motivos_de_alerta" value="ruptura_antes_da_chegada"> O estoque acaba antes da compra chegar</label>
+        <label><input type="checkbox" name="motivos_de_alerta" value="abaixo_do_piso_alerta"> O estoque já está abaixo do alerta de "está acabando" (pergunta 3)</label>
+        <label><input type="checkbox" name="motivos_de_alerta" value="viola_teto"> A compra sugerida deixa o estoque acima do máximo (pergunta 1)</label>
+        <label><input type="checkbox" name="motivos_de_alerta" value="lead_time_observado_acima_do_contratado"> O fornecedor tem entregado depois do prazo que promete</label>
+        <label><input type="checkbox" name="motivos_de_alerta" value="abaixo_pedido_minimo"> A compra sugerida fica abaixo do pedido mínimo do fornecedor</label>
+        <label><input type="checkbox" name="motivos_de_alerta" value="periodo_sazonal"> A compra chega numa data forte (pergunta 2)</label>
       </fieldset>
 
-      <div class="acoes">
+      <div class="barra-salvar">
         <button id="salvar" type="submit" class="primario">Salvar nova versão</button>
+        <span class="suave">Salvar cria uma versão nova; o painel e as sugestões passam a usá-la na hora.</span>
+        <div id="resultado"></div>
       </div>
-      <div id="resultado"></div>
     </form>
 
     <h2>Como o sistema entende o ERP</h2>
     <p class="suave">Aqui não é preferência: é como o sistema lê os dados do ERP hoje. Se algo estiver errado, avise o desenvolvedor.</p>
-    <div class="card">
-      <p><strong>10. O que é a quantidade "reservada" no estoque? Ela já está vendida e não pode contar como disponível?</strong><br>O sistema usa só a quantidade disponível e ignora a reservada.</p>
-      <p><strong>11. Um pedido de compra aprovado, mas que ainda não foi enviado ao fornecedor, já conta como mercadoria a caminho?</strong><br>Sim. Rascunho não conta.</p>
-      <p><strong>12. O pedido mínimo por produto (MOQ) é uma quantidade mínima, ou tem que ser múltiplo de uma caixa fechada?</strong><br>Quantidade mínima, sem múltiplo.</p>
-      <p><strong>13. Um pedido que já está a caminho sempre chega antes de um pedido novo que eu faço hoje?</strong><br>O sistema assume que sim.</p>
-      <p><strong>14. Para medir quanto um produto vende por mês, a média dos últimos 6 meses faz sentido para vocês?</strong><br>O sistema usa a média dos 6 últimos meses fechados. Esta não é configurável por enquanto.</p>
-    </div>
+    <dl class="card erp">
+      <dt>O que é a quantidade "reservada" no estoque? Ela já está vendida e não pode contar como disponível?</dt>
+      <dd>O sistema usa só a quantidade disponível e ignora a reservada.</dd>
+      <dt>Um pedido de compra aprovado, mas que ainda não foi enviado ao fornecedor, já conta como mercadoria a caminho?</dt>
+      <dd>Sim. Rascunho não conta.</dd>
+      <dt>O pedido mínimo por produto (MOQ) é uma quantidade mínima, ou tem que ser múltiplo de uma caixa fechada?</dt>
+      <dd>Quantidade mínima, sem múltiplo.</dd>
+      <dt>Um pedido que já está a caminho sempre chega antes de um pedido novo que eu faço hoje?</dt>
+      <dd>O sistema assume que sim.</dd>
+      <dt>Para medir quanto um produto vende por mês, a média dos últimos 6 meses faz sentido para vocês?</dt>
+      <dd>O sistema usa a média dos 6 últimos meses fechados. Esta não é configurável por enquanto.</dd>
+    </dl>
   </main>
 </body>
 </html>

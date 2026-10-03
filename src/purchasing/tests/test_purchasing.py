@@ -15,6 +15,7 @@ from src.politica_compra.schemas import (
     PARAMETROS_V1,
     CriterioFornecedor,
     LeadTimeBase,
+    MotivoAlerta,
     SazonalidadeModo,
 )
 from src.purchasing.schemas import LeadTimeOrigem, MotivoSemCompra, TipoAlerta
@@ -102,6 +103,7 @@ def _purchasing(
     sales = Sales(adapter, now=NOW)
     inventory = Inventory(adapter, sales)
     return Purchasing(
+        Catalog(adapter),
         FichaSKU(Catalog(adapter), inventory, sales),
         inventory,
         sales,
@@ -118,11 +120,11 @@ def test_exemplo_da_spec_numero_a_numero() -> None:
 
     assert sugestao is not None
     assert sugestao.sku_code == SKU.sku_code
-    assert sugestao.quantidade == 200
+    assert sugestao.quantidade == 300
     assert sugestao.motivo is None
     assert sugestao.fornecedor is not None
     assert sugestao.fornecedor.fornecedor_nome == "Katrina Têxtil"
-    assert sugestao.valor_estimado_centavos == 200 * 1800
+    assert sugestao.valor_estimado_centavos == 300 * 1800
     assert sugestao.politica_versao == 1
 
     calculo = sugestao.calculo
@@ -134,8 +136,8 @@ def test_exemplo_da_spec_numero_a_numero() -> None:
     assert calculo.lead_time_dias == 62
     assert calculo.lead_time_origem == LeadTimeOrigem.OBSERVADO
     assert calculo.estoque_na_chegada == 0
-    assert calculo.qtd_necessaria == 200
-    assert calculo.cobertura_na_chegada_meses == pytest.approx(2.0)
+    assert calculo.qtd_necessaria == 300
+    assert calculo.cobertura_na_chegada_meses == pytest.approx(3.0)
 
     assert [a.tipo for a in sugestao.alertas] == [
         TipoAlerta.RUPTURA_ANTES_DA_CHEGADA,
@@ -221,9 +223,9 @@ def test_em_transito_entra_na_posicao_e_reduz_a_quantidade() -> None:
     assert sugestao.calculo is not None
     assert sugestao.calculo.em_transito == 100
     assert sugestao.calculo.posicao == 250
-    # 250 - 206,7 = 43,3 na chegada; ceil(200 - 43,3) = 157.
+    # 250 - 206,7 = 43,3 na chegada; ceil(300 - 43,3) = 257.
     assert sugestao.calculo.estoque_na_chegada == pytest.approx(250 - 100 * 62 / 30)
-    assert sugestao.quantidade == 157
+    assert sugestao.quantidade == 257
 
 
 @pytest.mark.parametrize(("disponivel", "esperada"), [(150, 1.5 - 62 / 30), (250, 2.5 - 62 / 30)])
@@ -251,8 +253,8 @@ def test_lead_time_contratado() -> None:
     assert sugestao.calculo is not None
     assert sugestao.calculo.lead_time_dias == 35
     assert sugestao.calculo.lead_time_origem == LeadTimeOrigem.CONTRATADO
-    # 150 - 116,7 = 33,3 na chegada; ceil(200 - 33,3) = 167.
-    assert sugestao.quantidade == 167
+    # 150 - 116,7 = 33,3 na chegada; ceil(300 - 33,3) = 267.
+    assert sugestao.quantidade == 267
 
 
 def test_lead_time_observado_nulo_usa_o_contratado() -> None:
@@ -291,7 +293,10 @@ def test_lead_time_maior(
 
 
 def test_moq_arredonda_a_quantidade_pra_cima() -> None:
-    purchasing = _purchasing(fornecedores_sku=[_katrina(moq_unidades=300)])
+    # Ciclo de 1 mês para o MOQ caber abaixo do teto.
+    purchasing = _purchasing(
+        fornecedores_sku=[_katrina(moq_unidades=300)], politicas=_politica(ciclo_compra_meses=1.0)
+    )
 
     sugestao = purchasing.sugerir_pedido(SKU.sku_code)
 
@@ -301,6 +306,17 @@ def test_moq_arredonda_a_quantidade_pra_cima() -> None:
     assert sugestao.quantidade == 300
     assert sugestao.calculo.cobertura_na_chegada_meses == pytest.approx(3.0)
     assert sugestao.valor_estimado_centavos == 300 * 1800
+
+
+def test_arredondar_para_unidade_inteira_nao_viola_o_teto() -> None:
+    # 150 - 116,7 = 33,3 na chegada; ceil(300 - 33,3) = 267 dá 3,003 meses, no teto de 3.
+    purchasing = _purchasing(politicas=_politica(lead_time_base=LeadTimeBase.CONTRATADO))
+
+    sugestao = purchasing.sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None and sugestao.calculo is not None
+    assert sugestao.calculo.cobertura_na_chegada_meses > 3.0
+    assert TipoAlerta.VIOLA_TETO not in {a.tipo for a in sugestao.alertas}
 
 
 def test_mudar_a_politica_muda_a_sugestao_e_a_versao() -> None:
@@ -324,9 +340,11 @@ def test_quantidade_exata_nao_ganha_unidade_por_erro_de_ponto_flutuante() -> Non
 
 
 def test_cada_candidato_usa_o_proprio_lead_time_e_moq() -> None:
-    # Katrina estoura o teto pelo MOQ. Bravo chega em 20 dias:
+    # Ciclo de 1 mês. Katrina estoura o teto pelo MOQ. Bravo chega em 20 dias:
     # 150 - 66,7 = 83,3 na chegada; ceil(200 - 83,3) = 117, MOQ 120.
-    purchasing = _dois_fornecedores(_katrina(moq_unidades=400), _bravo(moq_unidades=120))
+    purchasing = _dois_fornecedores(
+        _katrina(moq_unidades=400), _bravo(moq_unidades=120), politicas=_politica(ciclo_compra_meses=1.0)
+    )
 
     sugestao = purchasing.sugerir_pedido(SKU.sku_code)
 
@@ -438,7 +456,7 @@ def test_nenhum_cabendo_escolhe_o_primeiro_da_ordem_mesmo_estourando_mais() -> N
 
 
 def _com_pedido_minimo(reais: int) -> Purchasing:
-    # Compra de 200 x R$ 18,00 = R$ 3.600,00.
+    # Compra de 300 x R$ 18,00 = R$ 5.400,00.
     katrina = make_fornecedor(
         "Katrina Têxtil", lead_time_dias_contratado=35, pedido_minimo_reais=reais
     )
@@ -453,8 +471,8 @@ def _com_pedido_minimo(reais: int) -> Purchasing:
 
 
 def test_abaixo_do_pedido_minimo_converte_reais_para_centavos() -> None:
-    assert TipoAlerta.ABAIXO_PEDIDO_MINIMO in _tipos(_com_pedido_minimo(3601))
-    assert TipoAlerta.ABAIXO_PEDIDO_MINIMO not in _tipos(_com_pedido_minimo(3600))
+    assert TipoAlerta.ABAIXO_PEDIDO_MINIMO in _tipos(_com_pedido_minimo(5401))
+    assert TipoAlerta.ABAIXO_PEDIDO_MINIMO not in _tipos(_com_pedido_minimo(5400))
 
 
 def test_mensagem_do_pedido_minimo_mostra_os_valores_em_reais() -> None:
@@ -462,7 +480,7 @@ def test_mensagem_do_pedido_minimo_mostra_os_valores_em_reais() -> None:
 
     assert sugestao is not None
     [alerta] = [a for a in sugestao.alertas if a.tipo == TipoAlerta.ABAIXO_PEDIDO_MINIMO]
-    assert "R$ 3.600,00" in alerta.mensagem
+    assert "R$ 5.400,00" in alerta.mensagem
     assert "R$ 10.000,00" in alerta.mensagem
 
 
@@ -530,7 +548,7 @@ def test_historico_minimo_vem_da_politica() -> None:
 
 
 def test_chegada_em_mes_quente_alerta_citando_meses_e_r2() -> None:
-    # Lead time de 62 dias a partir de 15/09: chega em 16/11, horizonte até 16/12.
+    # Lead time de 62 dias a partir de 15/09: chega em 16/11, horizonte até 15/01.
     sugestao = _purchasing().sugerir_pedido(SKU.sku_code)
 
     assert sugestao is not None
@@ -545,8 +563,8 @@ def test_chegada_em_mes_quente_alerta_citando_meses_e_r2() -> None:
     "meses_quentes",
     [
         (5, 6),
-        # Outubro passa antes da chegada; janeiro fica depois do ciclo.
-        (10, 1),
+        # Outubro passa antes da chegada; fevereiro fica depois do ciclo.
+        (10, 2),
     ],
 )
 def test_sem_alerta_sazonal_fora_do_horizonte(meses_quentes: tuple[int, ...]) -> None:
@@ -575,3 +593,7 @@ def test_modo_ignorar_nunca_alerta_sazonalidade() -> None:
     )
 
     assert TipoAlerta.PERIODO_SAZONAL not in _tipos(purchasing)
+
+
+def test_motivos_de_alerta_sao_os_tipos_de_alerta_mais_o_piso() -> None:
+    assert {m.value for m in MotivoAlerta} == {t.value for t in TipoAlerta} | {"abaixo_do_piso_alerta"}

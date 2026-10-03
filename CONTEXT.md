@@ -14,6 +14,14 @@ _Avoid_: distribuidora, revendedor (são outras figuras), atacado, "loja".
 Empresa (normalmente fábrica ou importadora têxtil) da qual o atacadista compra produtos pra revender. Ver `corpus/fornecedores/` pros fornecedores sintéticos usados.
 _Avoid_: vendor, parceiro, indústria.
 
+**Representante**:
+Vendedor de um fornecedor que visita o comprador chefe pra apresentar produtos e negociar preço. É com ele que o comprador fecha a compra.
+_Avoid_: vendedor (é ambíguo com a equipe de vendas), fornecedor (é a empresa, não a pessoa).
+
+**Equipe de vendas**:
+Vendedoras da loja física do atacadista, que atendem os varejistas e vendem o que o comprador chefe comprou. São as primeiras a perceber que um SKU acabou ou está vendendo acima do normal.
+_Avoid_: vendedor (sozinho), time comercial.
+
 **SKU**:
 Unidade individual comercializável, definida por combinação de modelo, cor, tamanho e material. Ex: "Toalha Banho Conforto Bege 70x140". Um mesmo produto de catálogo pode ter dezenas de SKUs.
 _Avoid_: produto (impreciso), item.
@@ -23,11 +31,11 @@ Compromisso formal do atacadista com um fornecedor pra receber quantidades espec
 _Avoid_: purchase order (usar em inglês só em código quando for API/DTO), ordem de compra, encomenda.
 
 **Comprador chefe**:
-Quem decide as compras no atacadista. Define a política de compra e aprova todo pedido de compra. Não é o desenvolvedor do Copilot.
+Quem decide as compras no atacadista. Define a política de compra, negocia com os representantes e decide cada pedido de compra. Não é o desenvolvedor do Copilot.
 _Avoid_: usuário (genérico demais), cliente (é o varejista).
 
 **Copilot**:
-A aplicação em si. Um assistente que sugere decisões de compra a partir de dados do ERP fake e do corpus de documentos, sempre com humano aprovando no fim.
+A aplicação em si. Um assistente que sugere decisões de compra a partir de dados do ERP fake e do corpus de documentos, sempre com o comprador chefe decidindo no fim.
 _Avoid_: agente autônomo (não é autônomo por design - human-in-the-loop é premissa), assistente.
 
 ### Métricas de estoque
@@ -59,7 +67,7 @@ _Avoid_: estoque total, saldo.
 ### Compra
 
 **Política de compra**:
-Conjunto versionado de parâmetros definidos pelo comprador chefe (teto, pisos, ciclo de compra, lead time base, critério de fornecedor, sazonalidade, regra de SKU novo, limites das faixas de aprovação, motivos de destaque da fila) que a sugestão de pedido e a fila de aprovação usam. É a fonte da verdade do cálculo. O documento de política no corpus é só contexto. Ver ADR-0003.
+Conjunto versionado de parâmetros definidos pelo comprador chefe (teto, pisos, ciclo de compra, lead time base, critério de fornecedor, sazonalidade, regra de SKU novo, motivos de alerta) que a sugestão de pedido e o painel de alertas usam. É a fonte da verdade do cálculo. O documento de política no corpus é só contexto. Ver ADR-0003.
 _Avoid_: regras, configuração, estratégia.
 
 **Teto**:
@@ -83,20 +91,28 @@ Meses de giro que cada compra cobre além do piso de reposição. Parâmetro da 
 _Avoid_: frequência, periodicidade.
 
 **Sugestão de pedido**:
-Resultado determinístico de `purchasing` para um SKU: quantidade, fornecedor, memória de cálculo, alertas e versão da política usada. Quando não há compra, quantidade zero com motivo. Nunca vira pedido de compra sem aprovação do comprador chefe.
+Resultado determinístico de `purchasing` para um SKU: quantidade, fornecedor, memória de cálculo, alertas e versão da política usada. Quando não há compra, quantidade zero com motivo. Nunca vira pedido de compra dentro do Copilot: o comprador chefe negocia com o representante e lança o pedido no ERP real.
 _Avoid_: recomendação, pedido sugerido, proposta.
 
-**Faixa de aprovação**:
-Uma das quatro faixas de `politicas/aprovacao-compras.md` que dizem quem precisa aprovar um pedido de compra. Sai do valor dos itens, com os limites como parâmetros da política de compra, e das exceções do documento, que são mecanismo: reposição regular desce uma faixa, violação do teto sobe uma e fornecedor sem pedido anterior vai no mínimo para a 3. Da faixa 2 em diante o pedido exige justificativa.
-_Avoid_: alçada, nível de aprovação.
+**Aviso (da equipe de vendas)**:
+Recado da equipe de vendas sobre um SKU: `acabou` ou `vendendo muito`, com comentário opcional e o nome de quem avisou. Fica aberto até o comprador chefe registrar uma decisão de compra para o SKU. É um sinal humano e põe o SKU no painel mesmo quando o cálculo não vê problema.
+_Avoid_: alerta (é o que o `purchasing` calcula), pedido, solicitação, chamado.
 
-**Fila de aprovação**:
-As sugestões de pedido com compra que esperam a decisão do comprador chefe, geradas de uma vez para todos os SKUs ativos, cada uma com os sinais do corpus e a faixa de aprovação. Vêm primeiro as em destaque e, depois, as mais urgentes (menor cobertura na chegada sem contar a compra). Aprovar, com a quantidade sugerida ou outra, cria o pedido de compra no ERP fake; rejeitar exige motivo. Gerar de novo substitui todas as pendentes. O destaque só ordena, nunca aprova.
+**Motivo de alerta**:
+Alerta do `purchasing` que o comprador chefe escolheu, na política de compra, para pôr um SKU no painel de alertas. Padrão: ruptura antes da chegada e abaixo do piso de alerta.
+_Avoid_: prioridade, risco (genérico demais), motivo de destaque (nome antigo, da fila de aprovação).
 
-**Motivo de destaque**:
-Alerta do `purchasing` ou sinal do corpus que o comprador chefe escolheu, na política de compra, para pôr uma sugestão no topo da fila de aprovação. Vale a versão da política com que a sugestão foi gerada. Padrão: ruptura antes da chegada e violação do teto.
-_Avoid_: prioridade, risco (genérico demais), alerta (é o que o `purchasing` calcula).
-_Avoid_: caixa de entrada, backlog, pendências.
+**Painel de alertas**:
+Tela inicial do comprador chefe. Lista os SKUs que pedem atenção agora: os que têm aviso aberto ou algum motivo de alerta. Vêm primeiro os com aviso ou ruptura antes da chegada e, depois, os de menor cobertura na chegada. É calculado na hora a partir do ERP fake e não guarda estado próprio. Um SKU some do painel enquanto houver decisão de compra vigente e nenhum aviso novo.
+_Avoid_: dashboard, fila, caixa de entrada, relatório (é o que o BI emite sob demanda).
+
+**Decisão de compra**:
+O que o comprador chefe registra no Copilot depois de olhar um SKU: `vou_comprar` (com quantidade), `negociando` ou `nao_comprar_agora` (com motivo). Fecha os avisos abertos do SKU e o tira do painel por um prazo. Não cria pedido de compra.
+_Avoid_: aprovação (o Copilot não aprova nada), pedido, registro de decisão (é o do chat).
+
+**Substituto**:
+SKU ativo de outro produto, da mesma categoria e tamanho, que o comprador chefe pode usar como referência de preço quando o representante quer subir o preço.
+_Avoid_: concorrente (o comprador usa, mas é ambíguo com outro atacadista), similar, equivalente.
 
 **Sinal (do corpus)**:
 O que os documentos do corpus relatam sobre o fornecedor e o produto de uma sugestão de pedido: atraso do fornecedor, venda forte do produto numa época do ano ou encalhe do produto (ou da categoria dele) numa compra anterior. O Jev responde trecho a trecho e o código transforma em sinal o que passa do limiar, com os trechos de origem. Acompanha a sugestão e nunca altera a quantidade.
@@ -137,13 +153,13 @@ O papel do LLM no Copilot: só escreve a resposta final em linguagem natural a p
 _Avoid_: agente, chatbot, LLM com tools.
 
 **Confiança**:
-Número de 0 a 1 que o Jev devolve junto de cada resposta, derivado da distribuição de probabilidades. O código usa faixas de confiança pra decidir entre executar, pedir confirmação ou pedir esclarecimento. Nunca substitui a aprovação humana de um pedido de compra.
+Número de 0 a 1 que o Jev devolve junto de cada resposta, derivado da distribuição de probabilidades. O código usa faixas de confiança pra decidir entre executar, pedir confirmação ou pedir esclarecimento. Nunca substitui a decisão de compra do comprador chefe.
 _Avoid_: certeza, probabilidade (é outra coisa), score.
 
 ### Chat
 
 **Intenção**:
-O que o comprador chefe quer com uma pergunta do chat, uma de quatro: situação do SKU, sugestão de compra, política ou fornecedor, fora de escopo. Quem escolhe é o Jev, com uma `Choice`; quem decide o que fazer com ela é o código.
+O que o comprador chefe quer com uma pergunta do chat, uma de cinco: situação do SKU, sugestão de compra, política ou fornecedor, alertas e avisos (o painel de alertas e os avisos da equipe de vendas), fora de escopo. Quem escolhe é o Jev, com uma `Choice`; quem decide o que fazer com ela é o código.
 _Avoid_: tipo de pergunta, categoria, comando.
 
 **Entendimento (da pergunta)**:

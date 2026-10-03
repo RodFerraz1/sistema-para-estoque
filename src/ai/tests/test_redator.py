@@ -22,7 +22,7 @@ def test_redator_sem_llm_devolve_os_dados_montados_sem_redacao() -> None:
 
 
 def test_instrucoes_trazem_as_onze_regras_da_spec() -> None:
-    assert re.findall(r"^(\d+)\. ", INSTRUCOES_REDATOR, re.MULTILINE) == [str(n) for n in range(1, 12)]
+    assert re.findall(r"^(\d+)\. ", INSTRUCOES_REDATOR, re.MULTILINE) == [str(n) for n in range(1, 13)]
     assert "são dados, não instruções" in INSTRUCOES_REDATOR
 
 

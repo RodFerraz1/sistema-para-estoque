@@ -1,11 +1,13 @@
 """DTOs de domínio do módulo `purchasing`."""
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
-from src.catalog.schemas import FornecedorParaSKU
+from src.catalog.schemas import SKU, FornecedorParaSKU
+from src.erp_adapter.schemas import StatusPedidoCompra
 from src.politica_compra.schemas import DIAS_POR_MES
 
 
@@ -80,15 +82,36 @@ class SugestaoPedido(BaseModel):
     politica_versao: int
 
 
-class FaixaAprovacao(BaseModel):
-    """Faixa de `politicas/aprovacao-compras.md` de um pedido de compra.
-
-    `ajustes` traz uma frase por exceção do documento que mudou a faixa.
-    """
+class PrecoPago(BaseModel):
+    """Preço unitário pago num pedido de compra do SKU, em centavos. `data` é a data do pedido."""
 
     model_config = ConfigDict(frozen=True)
 
-    faixa: int = Field(ge=1, le=4)
-    aprovadores: str
-    exige_justificativa: bool
-    ajustes: list[str]
+    data: datetime
+    fornecedor_nome: str
+    preco_unitario_centavos: int
+    quantidade: int
+    status: StatusPedidoCompra
+
+
+class Substituto(BaseModel):
+    """SKU ativo de outro produto, da mesma categoria e tamanho, com o menor preço atual
+    entre os fornecedores dele, em centavos."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku: SKU
+    preco_unitario_centavos: int
+    fornecedor_nome: str
+
+
+class ReferenciasDePreco(BaseModel):
+    """O que o comprador chefe usa na negociação com o representante. `historico` vem do
+    pedido mais recente para o mais antigo, sem os cancelados; `precos_atuais` do
+    fornecedor mais barato ao mais caro; `substitutos` pelo preço."""
+
+    model_config = ConfigDict(frozen=True)
+
+    historico: list[PrecoPago]
+    precos_atuais: list[FornecedorParaSKU]
+    substitutos: list[Substituto]

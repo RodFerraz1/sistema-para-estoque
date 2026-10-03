@@ -4,12 +4,12 @@ módulos superiores.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
-from src.erp_adapter.schemas import ItemNovoPedido
+from src.erp_adapter.schemas import ItemDePedido
 from src.inventory.schemas import Estoque, ItemEmTransito, Movimentacao
 from src.sales.schemas import Venda
 
@@ -45,18 +45,7 @@ class ERPAdapter(Protocol):
         (sem data por último)."""
         ...
 
-    def fornecedor_tem_pedido(self, fornecedor_id: UUID) -> bool:
-        """Se há pedido de compra do fornecedor fora de `rascunho` e `cancelado`."""
-        ...
-
-    def criar_pedido_compra(
-        self,
-        fornecedor_id: UUID,
-        itens: list[ItemNovoPedido],
-        data_prevista_entrega: date,
-        observacao: str,
-    ) -> UUID:
-        """Única escrita do Copilot no ERP: cria o pedido já `aprovado`, com
-        `aprovado_em` agora e o valor total somado dos itens, numa transação.
-        `ValueError` sem itens, com fornecedor ou SKU inexistente."""
+    def itens_de_pedido_de(self, sku_code: str) -> list[ItemDePedido]:
+        """Itens de pedido de compra do SKU, de todos os status, do pedido mais recente
+        para o mais antigo."""
         ...

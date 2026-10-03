@@ -52,8 +52,8 @@ PERGUNTA_INTENCAO = Choice(
     instructions="Qual é a intenção do comprador na `pergunta`?",
     criteria={
         "situacao_sku": {
-            "cobre": "Estoque, giro, vendas, cobertura ou ruptura de um produto ou SKU: quanto tem, quanto vende, para quantos dias dá.",
-            "nao_cobre": "Prazo de entrega, lead time, atraso, contrato ou condições de um fornecedor, mesmo quando a pergunta cita um produto dele, é politica_ou_fornecedor. Quanto comprar é sugestao_compra.",
+            "cobre": "Estoque, giro, vendas, cobertura ou ruptura de um produto ou SKU citado: quanto tem, quanto vende, para quantos dias dá.",
+            "nao_cobre": "Prazo de entrega, lead time, atraso, contrato ou condições de um fornecedor, mesmo quando a pergunta cita um produto dele, é politica_ou_fornecedor. Quanto comprar é sugestao_compra. Avisos da equipe de vendas, o que está no painel de alertas e quais produtos, entre todos, estão faltando ou vão faltar são alertas_e_avisos.",
             "exemplos": [
                 "Quanto vendeu a toalha de mesa redonda no último mês?",
                 "Estou com ruptura de jogo de cama queen?",
@@ -76,9 +76,18 @@ PERGUNTA_INTENCAO = Choice(
                 "Quem aprova uma compra acima do teto de estoque?",
             ],
         },
+        "alertas_e_avisos": {
+            "cobre": "O que pede atenção agora: avisos ou pedidos da equipe de vendas (vendedor ou vendedora avisou que um produto acabou ou está vendendo muito), quem avisou, e os produtos no painel de alertas, que vão faltar ou estão em alerta.",
+            "nao_cobre": "Estoque, giro ou cobertura de um produto específico, sem falar de aviso nem de alerta, é situacao_sku. Quanto comprar é sugestao_compra.",
+            "exemplos": [
+                "A equipe de vendas reclamou de algum produto em falta?",
+                "O que eu preciso olhar primeiro hoje?",
+                "Alguém da loja avisou sobre o edredom?",
+            ],
+        },
         "fora_de_escopo": {
             "cobre": "Assuntos sem relação com as compras do atacadista de cama, mesa e banho, como clima, esporte, receitas e pedidos pessoais.",
-            "nao_cobre": "Qualquer pergunta sobre produtos, estoque, compras, fornecedores ou política de compra.",
+            "nao_cobre": "Qualquer pergunta sobre produtos, estoque, compras, fornecedores, política de compra, alertas ou avisos da equipe de vendas.",
             "exemplos": [
                 "Qual a capital da Austrália?",
                 "Me recomenda um restaurante no centro?",

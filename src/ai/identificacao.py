@@ -2,7 +2,9 @@
 
 O código de SKU escrito na pergunta ganha sempre. Sem código, o produto escolhido
 pelo Jev, com confiança de pelo menos `LIMIAR_PRODUTO`, vira a lista dos SKUs
-dele, estreitada pelas cores e pelos tamanhos citados.
+dele, estreitada pelas cores e pelos tamanhos citados. Quando a pergunta não leva a
+nenhum SKU e o comprador pergunta da tela de um SKU, o chat usa esse SKU
+(`do_contexto`): a regra é do código, não do Jev.
 """
 from __future__ import annotations
 
@@ -73,6 +75,17 @@ def identificar_skus(
         reverse=True,
     )
     return _identificacao([], "nenhum", None, [nome for nome, _ in candidatos[:MAX_CANDIDATOS]])
+
+
+def do_contexto(sku_em_contexto: str) -> Identificacao:
+    return _identificacao([sku_em_contexto], "contexto", None, [])
+
+
+def observacao_do_contexto(sku_em_contexto: str) -> str:
+    return (
+        f"A pergunta não cita produto e o comprador está na tela do SKU {sku_em_contexto}: "
+        "os dados abaixo são desse SKU."
+    )
 
 
 def _identificacao(

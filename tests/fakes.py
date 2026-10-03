@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from src.ai.embeddings import Embedder
@@ -16,11 +16,8 @@ from src.ai.in_memory import InMemoryTrechosRepositorio
 from src.ai.redator import Redator, RedatorIndisponivel
 from src.ai.schemas import NENHUM_PRODUTO, Entendimento, Escolha, Intencao, Relacao, Trecho, TrechoIndexado
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
-from src.erp_adapter.in_memory import (
-    ItemPedidoCompra,
-    PedidoCompra,
-    StatusPedidoCompra,
-)
+from src.erp_adapter.in_memory import ItemPedidoCompra, PedidoCompra
+from src.erp_adapter.schemas import StatusPedidoCompra
 from src.inventory.schemas import Estoque, Movimentacao
 from src.sales.schemas import Venda
 
@@ -154,12 +151,14 @@ def make_pedido_compra(
     *,
     key: str | None = None,
     data_prevista_entrega: date | None = None,
+    criado_em: datetime | None = None,
 ) -> PedidoCompra:
     return PedidoCompra(
         id=uid("pedido", key or f"{fornecedor.nome}|{status}"),
         fornecedor_id=fornecedor.id,
         status=status,
         data_prevista_entrega=data_prevista_entrega,
+        criado_em=criado_em or datetime(2026, 6, 1, tzinfo=UTC),
     )
 
 
@@ -169,12 +168,14 @@ def make_item_pedido_compra(
     *,
     quantidade: int,
     quantidade_recebida: int = 0,
+    preco_unitario_centavos: int = 0,
 ) -> ItemPedidoCompra:
     return ItemPedidoCompra(
         pedido_id=pedido.id,
         sku_id=sku.id,
         quantidade=quantidade,
         quantidade_recebida=quantidade_recebida,
+        preco_unitario_centavos=preco_unitario_centavos,
     )
 
 
@@ -260,3 +261,16 @@ class RedatorGravador(Redator):
         if self._falhar:
             raise RedatorIndisponivel(f"{self.nome} configurado para falhar")
         return self._texto
+
+
+class RelogioFake:
+    """Relógio controlado pelo teste, para a hora dos avisos e das decisões de compra."""
+
+    def __init__(self, agora: datetime) -> None:
+        self.agora = agora
+
+    def __call__(self) -> datetime:
+        return self.agora
+
+    def avancar(self, **duracao: float) -> None:
+        self.agora += timedelta(**duracao)

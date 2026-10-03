@@ -15,8 +15,12 @@ from src.api.conversores import (
 from src.api.schemas import (
     AnaliseSKUResponse,
     FornecedorResponse,
+    PrecoPagoResponse,
+    PrecosResponse,
     SinalCorpusResponse,
     SKUAbaixoDoPisoResponse,
+    SKUResumoResponse,
+    SubstitutoResponse,
     SugestaoPedidoResponse,
     VendaMensalResponse,
 )
@@ -52,11 +56,24 @@ def _sku_nao_encontrado(sku_code: str) -> HTTPException:
     )
 
 
-def _sku_ou_404(catalog: Catalog, sku_code: str) -> SKU:
+def sku_ou_404(catalog: Catalog, sku_code: str) -> SKU:
     sku = catalog.carregar_sku(sku_code)
     if sku is None:
         raise _sku_nao_encontrado(sku_code)
     return sku
+
+
+@router.get("", response_model=list[SKUResumoResponse])
+def buscar_skus(
+    busca: str = Query(..., min_length=2, max_length=100),
+    catalog: Catalog = Depends(get_catalog),
+) -> list[SKUResumoResponse]:
+    """Busca da página de aviso: até 20 SKUs ativos com todas as palavras no código, no
+    nome do produto, na cor ou no tamanho, sem diferenciar acento nem maiúscula."""
+    return [
+        SKUResumoResponse(sku_code=s.sku_code, produto_nome=s.produto_nome, cor=s.cor, tamanho=s.tamanho)
+        for s in catalog.buscar_skus(busca)
+    ]
 
 
 @router.get("/abaixo-do-piso", response_model=list[SKUAbaixoDoPisoResponse])
@@ -112,7 +129,7 @@ def sinais_da_sugestao_compra(
 ) -> list[SinalCorpusResponse]:
     """Sinais do corpus sobre o fornecedor e o produto da sugestão. Lista vazia quando a
     sugestão não tem fornecedor; 503 sem o Jev."""
-    sku = _sku_ou_404(catalog, sku_code)
+    sku = sku_ou_404(catalog, sku_code)
     sugestao = purchasing.sugerir_pedido(sku_code)
     if sugestao is None:
         raise _sku_nao_encontrado(sku_code)
@@ -126,7 +143,7 @@ def historico_vendas(
     catalog: Catalog = Depends(get_catalog),
     sales: Sales = Depends(get_sales),
 ) -> list[VendaMensalResponse]:
-    _sku_ou_404(catalog, sku_code)
+    sku_ou_404(catalog, sku_code)
     return [
         VendaMensalResponse(
             ano=v.ano,
@@ -144,7 +161,7 @@ def sazonalidade(
     catalog: Catalog = Depends(get_catalog),
     sales: Sales = Depends(get_sales),
 ) -> dict[int, float]:
-    _sku_ou_404(catalog, sku_code)
+    sku_ou_404(catalog, sku_code)
     return sales.sazonalidade(sku_code).multiplicadores
 
 
@@ -153,5 +170,39 @@ def fornecedores_do_sku(
     sku_code: str,
     catalog: Catalog = Depends(get_catalog),
 ) -> list[FornecedorResponse]:
-    _sku_ou_404(catalog, sku_code)
+    sku_ou_404(catalog, sku_code)
     return [fornecedor_to_response(f) for f in catalog.fornecedores_de(sku_code)]
+
+
+@router.get("/{sku_code}/precos", response_model=PrecosResponse)
+def precos(sku_code: str, purchasing: Purchasing = Depends(get_purchasing)) -> PrecosResponse:
+    """Referências de preço para negociar com o representante: o que o atacadista pagou
+    em cada pedido de compra, o preço atual de cada fornecedor e os substitutos (outros
+    produtos da mesma categoria e tamanho)."""
+    referencias = purchasing.referencias_de_preco(sku_code)
+    if referencias is None:
+        raise _sku_nao_encontrado(sku_code)
+    return PrecosResponse(
+        historico=[
+            PrecoPagoResponse(
+                data=p.data,
+                fornecedor_nome=p.fornecedor_nome,
+                preco_unitario_centavos=p.preco_unitario_centavos,
+                quantidade=p.quantidade,
+                status=p.status,
+            )
+            for p in referencias.historico
+        ],
+        precos_atuais=[fornecedor_to_response(f) for f in referencias.precos_atuais],
+        substitutos=[
+            SubstitutoResponse(
+                sku_code=s.sku.sku_code,
+                produto_nome=s.sku.produto_nome,
+                cor=s.sku.cor,
+                tamanho=s.sku.tamanho,
+                preco_unitario_centavos=s.preco_unitario_centavos,
+                fornecedor_nome=s.fornecedor_nome,
+            )
+            for s in referencias.substitutos
+        ],
+    )
