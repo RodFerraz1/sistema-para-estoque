@@ -87,7 +87,7 @@ Cobertura máxima, em meses, que o SKU pode ter quando a compra chega. Parâmetr
 _Avoid_: estoque máximo, limite.
 
 **Piso de alerta**:
-Cobertura, em dias, abaixo da qual o SKU aparece na lista de abaixo do piso. Parâmetro da política (R4).
+Cobertura, em dias, abaixo da qual o SKU está em ruptura: os dias de venda que o estoque precisa segurar. Parâmetro da política (R4).
 _Avoid_: piso (sozinho é ambíguo), estoque mínimo.
 
 **Piso de reposição**:
@@ -111,11 +111,11 @@ Recado da equipe de vendas sobre um SKU: `acabou` ou `vendendo muito`, com comen
 _Avoid_: alerta (é o que o `purchasing` calcula), pedido, solicitação, chamado.
 
 **Motivo de alerta**:
-Alerta do `purchasing` que o comprador chefe escolheu, na política de compra, para pôr um SKU no painel de alertas. Padrão: ruptura antes da chegada e abaixo do piso de alerta.
+Alerta do `purchasing` que o comprador chefe escolheu, na política de compra, para pôr um SKU no painel de alertas. Padrão: ruptura (abaixo do piso de alerta). Ruptura antes da chegada só faz sentido com o lead time ligado (ADR-0006).
 _Avoid_: prioridade, risco (genérico demais), motivo de destaque (nome antigo, da fila de aprovação).
 
 **Painel de alertas**:
-Tela inicial do comprador chefe. Lista os SKUs que pedem atenção agora: os que têm aviso aberto ou algum motivo de alerta. Vêm primeiro os com aviso ou ruptura antes da chegada e, depois, os de menor cobertura na chegada. É calculado na hora a partir do ERP fake e não guarda estado próprio. Um SKU some do painel enquanto houver decisão de compra vigente e nenhum aviso novo.
+Tela inicial do comprador chefe. Lista os SKUs que pedem atenção agora: os que têm aviso aberto ou algum motivo de alerta. Vêm primeiro os com aviso, depois os em ruptura (disponível zero no topo e, em seguida, a menor cobertura em dias), os que acabam antes da compra chegar (quando a política usa o lead time) e os outros motivos. É calculado na hora a partir do ERP fake e não guarda estado próprio. Um SKU some do painel enquanto houver decisão de compra vigente e nenhum aviso novo.
 _Avoid_: dashboard, fila, caixa de entrada, relatório (é o que o BI emite sob demanda).
 
 **Decisão de compra**:

@@ -93,6 +93,7 @@ def abaixo_do_piso(
             sku_code=a.sku_code,
             produto_nome=a.produto_nome,
             cobertura_meses=a.cobertura_meses,
+            cobertura_dias=a.cobertura_dias,
         )
         for a in inventory.abaixo_do_piso(dias_piso=dias)
     ]

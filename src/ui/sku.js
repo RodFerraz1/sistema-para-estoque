@@ -3,8 +3,9 @@ import {
   TIPOS_DE_AVISO,
   alertas,
   api,
-  coberturaAtual,
+  coberturaEmDias,
   dataHora,
+  dias,
   el,
   guardarNome,
   lerNome,
@@ -21,7 +22,7 @@ const MOTIVOS_SEM_COMPRA = {
   sku_novo: "SKU novo: ainda não tem o histórico mínimo de vendas que a política pede para sugerir sozinho.",
   sem_giro: "Sem giro: o SKU não vendeu nos últimos meses fechados.",
   sem_fornecedor: "Sem fornecedor ativo para o SKU.",
-  acima_do_ponto_de_reposicao: "Acima do ponto de reposição: quando uma compra feita hoje chegasse, o estoque ainda cobriria a folga da política.",
+  acima_do_ponto_de_reposicao: "Acima do ponto de reposição: o estoque, com o que já está a caminho, ainda cobre a folga da política.",
 };
 const STATUS_DO_PEDIDO = {
   rascunho: "rascunho",
@@ -80,7 +81,7 @@ function situacao(a) {
         ["Em estoque", `${numero(disponivel)} un.`],
         ["A caminho", `${numero(a.em_transito_unidades)} un.`],
         ["Vende por mês", `${numero(a.giro.unidades_por_mes, 1)} un.`],
-        ["O estoque dura", coberturaAtual(a.cobertura.meses)],
+        ["Segura", coberturaEmDias(a.cobertura.dias)],
       ].map(([dt, dd]) => el("div", {}, el("dt", {}, dt), el("dd", {}, dd))),
     ),
     el(
@@ -93,6 +94,7 @@ function situacao(a) {
 }
 
 function memoriaDeCalculo(c) {
+  const ignorado = c.lead_time_origem === "ignorado";
   return el(
     "details",
     {},
@@ -102,11 +104,16 @@ function memoriaDeCalculo(c) {
       ["Disponível", `${numero(c.disponivel)} un.`],
       ["Em trânsito", `${numero(c.em_transito)} un.`],
       ["Posição", `${numero(c.posicao)} un.`],
-      ["Lead time", `${c.lead_time_dias} dias (${c.lead_time_origem})`],
-      ["Estoque na chegada", `${numero(c.estoque_na_chegada, 1)} un.`],
+      ignorado
+        ? ["Lead time", "ignorado"]
+        : ["Lead time", `${c.lead_time_dias} dias (${c.lead_time_origem})`],
+      ignorado ? null : ["Estoque na chegada", `${numero(c.estoque_na_chegada, 1)} un.`],
       ["Quantidade necessária", `${numero(c.qtd_necessaria)} un.`],
-      ["Cobertura na chegada com a compra", `${numero(c.cobertura_na_chegada_meses, 1)} meses`],
-    ]),
+      [ignorado ? "Cobertura com a compra" : "Cobertura na chegada com a compra", dias(c.cobertura_na_chegada_dias)],
+    ].filter(Boolean)),
+    ignorado
+      ? el("p", { class: "suave" }, "A política não usa o prazo do fornecedor: a conta parte da posição de hoje (disponível mais o que está a caminho).")
+      : null,
   );
 }
 

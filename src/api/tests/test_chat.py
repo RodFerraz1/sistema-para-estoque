@@ -76,7 +76,7 @@ def preparar(
         skus=[SKU, DA_TELA],
         fornecedores=[katrina],
         fornecedores_por_sku={s.sku_code: [make_fornecedor_sku(katrina)] for s in (SKU, DA_TELA)},
-        estoques={SKU.sku_code: make_estoque(disponivel=120), DA_TELA.sku_code: make_estoque(disponivel=30)},
+        estoques={SKU.sku_code: make_estoque(disponivel=40), DA_TELA.sku_code: make_estoque(disponivel=30)},
         vendas=[
             make_venda(s, datetime(2026, mes, 5, tzinfo=UTC), 100) for s in (SKU, DA_TELA) for mes in range(3, 9)
         ],
@@ -109,7 +109,7 @@ def test_chat_responde_a_situacao_do_sku(client: TestClient) -> None:
                 modelo="jev-1.13.0",
             )
         ),
-        RedatorGravador("A TBC-BEGE-70140-01 tem 120 unidades."),
+        RedatorGravador("A TBC-BEGE-70140-01 tem 40 unidades."),
     )
 
     response = client.post("/chat", json={"pergunta": PERGUNTA})
@@ -119,9 +119,9 @@ def test_chat_responde_a_situacao_do_sku(client: TestClient) -> None:
     [ficha] = body.pop("fichas")
     registro_id = body.pop("registro_id")
     assert ficha["sku_code"] == "TBC-BEGE-70140-01"
-    assert ficha["estoque"]["quantidade_disponivel"] == 120
+    assert ficha["estoque"]["quantidade_disponivel"] == 40
     assert body == {
-        "resposta": "A TBC-BEGE-70140-01 tem 120 unidades.",
+        "resposta": "A TBC-BEGE-70140-01 tem 40 unidades.",
         "acao": "respondeu",
         "faixa": "alta",
         "entendimento": {
@@ -233,7 +233,7 @@ def test_registros_mostram_as_perguntas_respondidas_da_mais_recente(client: Test
                 modelo="jev-1.13.0",
             )
         ),
-        RedatorGravador("A TBC-BEGE-70140-01 tem 120 unidades."),
+        RedatorGravador("A TBC-BEGE-70140-01 tem 40 unidades."),
     )
     primeira = client.post("/chat", json={"pergunta": PERGUNTA}).json()
     segunda = client.post("/chat", json={"pergunta": "Como tá o estoque?"}).json()
@@ -259,7 +259,7 @@ def test_registros_mostram_as_perguntas_respondidas_da_mais_recente(client: Test
         "entendimento": primeira["entendimento"],
         "trechos": [],
         "redator": "gravador",
-        "resposta": "A TBC-BEGE-70140-01 tem 120 unidades.",
+        "resposta": "A TBC-BEGE-70140-01 tem 40 unidades.",
         "sinais": [],
         "citacoes": [],
         "sku_em_contexto": None,

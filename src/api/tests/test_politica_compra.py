@@ -58,15 +58,23 @@ def test_get_devolve_a_politica_ativa(client: TestClient) -> None:
             "piso_alerta_dias": 20,
             "piso_reposicao_dias": 30,
             "ciclo_compra_meses": 2.0,
-            "lead_time_base": "observado",
+            "lead_time_base": "ignorar",
             "criterio_fornecedor": "menor_preco",
             "sazonalidade_modo": "alertar",
             "meses_quentes": [5, 6, 11, 12],
             "extra_sazonal_meses": 2.0,
             "dias_historico_minimo": 60,
-            "motivos_de_alerta": ["ruptura_antes_da_chegada", "abaixo_do_piso_alerta"],
+            "motivos_de_alerta": ["abaixo_do_piso_alerta"],
         },
     }
+
+
+def test_put_aceita_voltar_a_usar_e_deixar_de_usar_o_lead_time(client: TestClient) -> None:
+    for base in ("observado", "ignorar"):
+        response = client.put("/politica-compra", json=_parametros(lead_time_base=base))
+
+        assert response.status_code == 201
+        assert response.json()["parametros"]["lead_time_base"] == base
 
 
 def test_put_grava_versao_nova_e_devolve_201(

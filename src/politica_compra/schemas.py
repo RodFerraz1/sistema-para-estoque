@@ -15,6 +15,9 @@ DIAS_POR_MES = 30
 
 
 class LeadTimeBase(StrEnum):
+    """`ignorar` deixa o lead time fora do cálculo: as contas partem da posição de hoje (ADR-0006)."""
+
+    IGNORAR = "ignorar"
     OBSERVADO = "observado"
     CONTRATADO = "contratado"
     MAIOR = "maior"
@@ -33,7 +36,8 @@ class SazonalidadeModo(StrEnum):
 class MotivoAlerta(StrEnum):
     """Alertas que o comprador pode escolher para pôr um SKU no painel de alertas. Os
     valores são os de `TipoAlerta`, que fica num módulo acima deste, mais
-    `abaixo_do_piso_alerta` (cobertura atual abaixo de `piso_alerta_dias`)."""
+    `abaixo_do_piso_alerta` (cobertura atual abaixo de `piso_alerta_dias`), que o comprador
+    chama de ruptura (ADR-0006)."""
 
     RUPTURA_ANTES_DA_CHEGADA = "ruptura_antes_da_chegada"
     VIOLA_TETO = "viola_teto"
@@ -82,13 +86,13 @@ PARAMETROS_V1 = ParametrosPolitica(
     piso_alerta_dias=20,
     piso_reposicao_dias=30,
     ciclo_compra_meses=2.0,
-    lead_time_base=LeadTimeBase.OBSERVADO,
+    lead_time_base=LeadTimeBase.IGNORAR,
     criterio_fornecedor=CriterioFornecedor.MENOR_PRECO,
     sazonalidade_modo=SazonalidadeModo.ALERTAR,
     meses_quentes=(5, 6, 11, 12),
     extra_sazonal_meses=2.0,
     dias_historico_minimo=60,
-    motivos_de_alerta=(MotivoAlerta.RUPTURA_ANTES_DA_CHEGADA, MotivoAlerta.ABAIXO_DO_PISO_ALERTA),
+    motivos_de_alerta=(MotivoAlerta.ABAIXO_DO_PISO_ALERTA,),
 )
 
 

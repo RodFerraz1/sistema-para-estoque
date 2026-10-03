@@ -14,7 +14,8 @@ from src.main import app
 
 pytestmark = [pytest.mark.smoke, pytest.mark.externo]
 
-SKU_DA_KATRINA = "TBC-BEGE-70140-01"
+# Com o lead time ignorado (ADR-0006), é um SKU da Katrina que o seed ainda manda comprar.
+SKU_DA_KATRINA = "JDCP-BRAN-CASAL-01"
 ATRASO_DA_KATRINA = "Os documentos relatam atraso de entrega da Katrina Têxtil."
 
 

@@ -76,6 +76,7 @@ class SKUAbaixoDoPisoResponse(BaseModel):
     sku_code: str
     produto_nome: str
     cobertura_meses: float
+    cobertura_dias: float
 
 
 class VendaMensalResponse(BaseModel):
@@ -314,8 +315,8 @@ class RegistrarAvisoRequest(BaseModel):
 
 
 class ItemAlertaResponse(BaseModel):
-    """`cobertura_atual_meses` nula para SKU sem giro; `cobertura_na_chegada_sem_compra_meses`
-    nula quando a sugestão não tem cálculo. Quantidade e fornecedor só com compra.
+    """A cobertura vem em meses e em dias. A atual é nula para SKU sem giro; a na chegada sem
+    a compra, nula quando a sugestão não tem cálculo. Quantidade e fornecedor só com compra.
     `so_por_aviso`: tem aviso aberto e nenhum motivo de alerta calculado."""
 
     model_config = ConfigDict(frozen=True)
@@ -326,7 +327,9 @@ class ItemAlertaResponse(BaseModel):
     tamanho: str
     disponivel: int
     cobertura_atual_meses: float | None
+    cobertura_atual_dias: float | None
     cobertura_na_chegada_sem_compra_meses: float | None
+    cobertura_na_chegada_sem_compra_dias: float | None
     motivos: list[MotivoAlerta]
     quantidade_sugerida: int | None
     fornecedor_sugerido: str | None

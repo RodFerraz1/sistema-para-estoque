@@ -15,6 +15,7 @@ from src.catalog.schemas import SKU, FornecedorParaSKU
 from src.catalog.service import Catalog
 from src.erp_adapter.port import ERPAdapter
 from src.ficha_sku.service import FichaSKU
+from src.inventory.schemas import dias_de_cobertura
 from src.inventory.service import Inventory
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.politica_compra.schemas import (
@@ -42,6 +43,8 @@ from src.sales.service import Sales
 def _lead_time(
     fornecedor: FornecedorParaSKU, base: LeadTimeBase
 ) -> tuple[int, LeadTimeOrigem]:
+    if base == LeadTimeBase.IGNORAR:
+        return 0, LeadTimeOrigem.IGNORADO
     contratado = fornecedor.lead_time_dias_contratado
     observado = fornecedor.lead_time_dias_observado
     if observado is None or base == LeadTimeBase.CONTRATADO:
@@ -61,6 +64,9 @@ class _Candidato:
     calculo: MemoriaCalculo
     quantidade: int
     cabe_no_teto: bool
+    # O critério de fornecedor ordena pelo prazo do fornecedor mesmo quando o cálculo o
+    # ignora: o que ele costuma cumprir, ou o contratado se não houver observado.
+    lead_time_para_escolha: int
 
     @property
     def valor_centavos(self) -> int:
@@ -105,21 +111,25 @@ def _calcular(
     # Com piso + ciclo no limite do teto (o padrão), arredondar a compra para unidades
     # inteiras passa do teto por menos de uma unidade. Isso não conta como violar o teto.
     teto_unidades = giro * parametros.teto_meses
+    base_da_escolha = (
+        LeadTimeBase.OBSERVADO if parametros.lead_time_base == LeadTimeBase.IGNORAR else parametros.lead_time_base
+    )
     return _Candidato(
         fornecedor=fornecedor,
         calculo=calculo,
         quantidade=quantidade,
         cabe_no_teto=quantidade == 0 or estoque_na_chegada + quantidade < teto_unidades + 1,
+        lead_time_para_escolha=_lead_time(fornecedor, base_da_escolha)[0],
     )
 
 
 _CHAVES_DE_ORDEM: dict[CriterioFornecedor, Callable[[_Candidato], tuple[int, int]]] = {
     CriterioFornecedor.MENOR_PRECO: lambda c: (
         c.fornecedor.preco_unitario_reais,
-        c.calculo.lead_time_dias,
+        c.lead_time_para_escolha,
     ),
     CriterioFornecedor.MENOR_LEAD_TIME: lambda c: (
-        c.calculo.lead_time_dias,
+        c.lead_time_para_escolha,
         c.fornecedor.preco_unitario_reais,
     ),
 }
@@ -161,11 +171,11 @@ def _alerta_viola_teto(escolhido: _Candidato, teto_meses: float) -> Alerta | Non
     return Alerta(
         tipo=TipoAlerta.VIOLA_TETO,
         mensagem=(
-            f"Nenhum fornecedor cabe no teto de {_formatar_meses(teto_meses)} "
-            f"meses: comprando {escolhido.quantidade} unidades do fornecedor "
+            f"Nenhum fornecedor cabe no teto de {_formatar_meses(teto_meses)} meses "
+            f"({dias_de_cobertura(teto_meses):.0f} dias): comprando {escolhido.quantidade} unidades do fornecedor "
             f"{fornecedor.fornecedor_nome} (MOQ {fornecedor.moq_unidades}), "
             f"a cobertura na chegada fica em "
-            f"{_formatar_meses(escolhido.calculo.cobertura_na_chegada_meses)} meses."
+            f"{escolhido.calculo.cobertura_na_chegada_dias:.0f} dias."
         ),
     )
 

@@ -1,11 +1,13 @@
 """Cenário dos testes HTTP do painel de alertas, dos avisos e das decisões de compra:
 ERP, política, repositórios do painel e relógio em memória.
 
-Giro de 100 por mês nos seis meses fechados antes do atual e fornecedor Boa Vista com
-lead time de 30 dias, R$ 20,00 a unidade e MOQ 48. Piso de alerta de 20 dias (0,67 mês).
-`URGENTE` e `MAIS_URGENTE` acabam antes da compra chegar, `PISO` está abaixo do piso de
-alerta mas tem compra a caminho, `SEM_FORNECEDOR` está abaixo do piso sem cálculo,
-`REGULAR` compra sem motivo de alerta padrão e `SOBRANDO` não compra.
+Giro de 100 por mês (venda média diária de 3,33) nos seis meses fechados antes do atual e
+fornecedor Boa Vista com lead time de 30 dias, R$ 20,00 a unidade e MOQ 48. Política padrão:
+lead time ignorado, piso de alerta de 20 dias, piso de reposição de 30 dias e ciclo de 2 meses.
+Em ruptura (abaixo de 20 dias): `ZERADO` (0 dias), `SEM_FORNECEDOR` (3 dias, sem cálculo),
+`MAIS_URGENTE` (6 dias), `URGENTE` (15 dias) e `PISO` (15 dias, com 100 a caminho, sem compra).
+`REGULAR` segura 45 dias e `SOBRANDO` 270. Com o lead time observado ligado, `URGENTE` e
+`MAIS_URGENTE` acabam antes da compra chegar.
 """
 from __future__ import annotations
 
@@ -24,7 +26,7 @@ from src.painel.dependencies import get_avisos_repositorio, get_decisoes_reposit
 from src.painel.in_memory import InMemoryAvisosRepositorio, InMemoryDecisoesRepositorio
 from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
-from src.politica_compra.schemas import PARAMETROS_V1, MotivoAlerta
+from src.politica_compra.schemas import PARAMETROS_V1
 from tests.fakes import (
     RelogioFake,
     make_estoque,
@@ -37,6 +39,7 @@ from tests.fakes import (
 )
 
 BOA_VISTA = make_fornecedor("Boa Vista Têxtil", lead_time_dias_contratado=30)
+ZERADO = make_sku("TBC-LILA-70140-01", produto_nome="Toalha Banho Conforto", cor="lilás")
 URGENTE = make_sku("TBC-BRAN-70140-01", produto_nome="Toalha Banho Conforto", cor="branco")
 MAIS_URGENTE = make_sku("TBC-AZUL-70140-01", produto_nome="Toalha Banho Conforto", cor="azul")
 PISO = make_sku("TBC-ROSA-70140-01", produto_nome="Toalha Banho Conforto", cor="rosa")
@@ -46,6 +49,7 @@ SOBRANDO = make_sku("TBC-VERD-70140-01", produto_nome="Toalha Banho Conforto", c
 INATIVO = make_sku("TBC-PRET-70140-01", produto_nome="Toalha Banho Conforto", cor="preto", ativo=False)
 QUEBRADO = make_sku("TBC-CINZ-70140-01", produto_nome="Toalha Banho Conforto", cor="cinza")
 DISPONIVEIS = [
+    (ZERADO, 0),
     (URGENTE, 50),
     (MAIS_URGENTE, 20),
     (PISO, 50),
@@ -112,9 +116,8 @@ class Cenario:
     relogio: RelogioFake
 
 
-def preparar(
-    *, motivos_de_alerta: tuple[MotivoAlerta, ...] | None = None, erp: InMemoryERPAdapter | None = None
-) -> Cenario:
+def preparar(*, erp: InMemoryERPAdapter | None = None, **parametros: object) -> Cenario:
+    """Com `parametros`, grava uma versão da política padrão com eles por cima."""
     cenario = Cenario(
         erp=erp or montar_erp(),
         politicas=InMemoryPoliticaCompraRepositorio(),
@@ -122,10 +125,8 @@ def preparar(
         decisoes=InMemoryDecisoesRepositorio(),
         relogio=RelogioFake(AGORA),
     )
-    if motivos_de_alerta is not None:
-        cenario.politicas.salvar_nova_versao(
-            PARAMETROS_V1.model_copy(update={"motivos_de_alerta": motivos_de_alerta})
-        )
+    if parametros:
+        cenario.politicas.salvar_nova_versao(PARAMETROS_V1.model_copy(update=parametros))
     app.dependency_overrides[get_erp_adapter] = lambda: cenario.erp
     app.dependency_overrides[get_politica_compra_repositorio] = lambda: cenario.politicas
     app.dependency_overrides[get_avisos_repositorio] = lambda: cenario.avisos

@@ -44,11 +44,14 @@
         </fieldset>
       </div>
 
-      <h2>Estoque mínimo</h2>
+      <h2>Ruptura</h2>
       <div class="card pergunta">
-        <label for="piso_alerta_dias">3. Com quantos dias de estoque um produto deve acender o alerta de "está acabando"?</label>
+        <label for="piso_alerta_dias">3. Quantos dias de venda o estoque precisa segurar?</label>
+        <p class="suave">Abaixo disso o produto entra em ruptura e aparece no painel. Exemplo: vende 10 por dia e você quer 20 dias, então abaixo de 200 peças é ruptura.</p>
         <div class="unidade"><input id="piso_alerta_dias" name="piso_alerta_dias" type="number" min="1" step="1" required> dias</div>
       </div>
+
+      <h2>Estoque mínimo na compra</h2>
       <div class="card pergunta">
         <label for="piso_reposicao_dias">4. Quando uma compra chega, quantos dias de estoque você quer ainda ter como folga, antes de começar a vender a mercadoria nova?</label>
         <div class="unidade"><input id="piso_reposicao_dias" name="piso_reposicao_dias" type="number" min="1" step="1" required> dias</div>
@@ -68,11 +71,12 @@
         <label><input type="radio" name="criterio_fornecedor" value="menor_lead_time"> Prazo de entrega</label>
       </fieldset>
       <fieldset class="card pergunta opcoes">
-        <legend><strong>7. Para planejar, você confia no prazo que o fornecedor promete, no prazo que ele costuma cumprir de verdade, ou sempre no mais longo dos dois?</strong></legend>
-        <p class="suave">Exemplo: a Katrina promete 45 dias e tem entregado em 62.</p>
-        <label><input type="radio" name="lead_time_base" value="contratado" required> No prazo que ele promete</label>
-        <label><input type="radio" name="lead_time_base" value="observado"> No prazo que ele costuma cumprir</label>
-        <label><input type="radio" name="lead_time_base" value="maior"> Sempre no mais longo dos dois</label>
+        <legend><strong>7. As contas devem usar o prazo de entrega do fornecedor? Se sim, qual: o que ele promete, o que ele costuma cumprir ou sempre o mais longo dos dois?</strong></legend>
+        <p class="suave">Sem o prazo, o Copilot conta a partir do estoque de hoje e a folga da pergunta 4 cobre o tempo até a mercadoria chegar. Exemplo de prazo: a Katrina promete 45 dias e tem entregado em 62.</p>
+        <label><input type="radio" name="lead_time_base" value="ignorar" required> Não usar o prazo do fornecedor</label>
+        <label><input type="radio" name="lead_time_base" value="contratado"> Usar o prazo que ele promete</label>
+        <label><input type="radio" name="lead_time_base" value="observado"> Usar o prazo que ele costuma cumprir</label>
+        <label><input type="radio" name="lead_time_base" value="maior"> Usar sempre o mais longo dos dois</label>
       </fieldset>
 
       <h2>Épocas do ano</h2>
@@ -94,8 +98,8 @@
       <fieldset class="card pergunta opcoes">
         <legend><strong>10. O que faz um produto aparecer no painel de alertas, para você olhar?</strong></legend>
         <p class="suave">Os avisos da equipe de vendas sempre aparecem. Marcar muitas opções enche o painel de produtos que não pedem compra agora.</p>
-        <label><input type="checkbox" name="motivos_de_alerta" value="ruptura_antes_da_chegada"> O estoque acaba antes da compra chegar</label>
-        <label><input type="checkbox" name="motivos_de_alerta" value="abaixo_do_piso_alerta"> O estoque já está abaixo do alerta de "está acabando" (pergunta 3)</label>
+        <label><input type="checkbox" name="motivos_de_alerta" value="abaixo_do_piso_alerta"> Ruptura: o estoque segura menos dias de venda do que a pergunta 3 pede</label>
+        <label><input type="checkbox" name="motivos_de_alerta" value="ruptura_antes_da_chegada"> O estoque acaba antes da compra chegar (só faz sentido usando o prazo do fornecedor, pergunta 7)</label>
         <label><input type="checkbox" name="motivos_de_alerta" value="viola_teto"> A compra sugerida deixa o estoque acima do máximo (pergunta 1)</label>
         <label><input type="checkbox" name="motivos_de_alerta" value="lead_time_observado_acima_do_contratado"> O fornecedor tem entregado depois do prazo que promete</label>
         <label><input type="checkbox" name="motivos_de_alerta" value="abaixo_pedido_minimo"> A compra sugerida fica abaixo do pedido mínimo do fornecedor</label>

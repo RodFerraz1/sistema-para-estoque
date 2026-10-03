@@ -1,4 +1,4 @@
-import { alertas, api, el, mensagem, numero, numeros, percentual, reais, sinais } from "./comum.js";
+import { alertas, api, coberturaEmDias, el, mensagem, numero, numeros, percentual, reais, sinais } from "./comum.js";
 
 const INTENCOES = {
   situacao_sku: "Situação do SKU",
@@ -81,7 +81,7 @@ function fichas(lista) {
         f.produto_nome,
         `${numero(f.estoque.quantidade_disponivel)} un.`,
         `${numero(f.giro.unidades_por_mes, 1)} un.`,
-        f.cobertura.sem_giro ? "sem giro" : `${numero(f.cobertura.meses, 1)} meses`,
+        coberturaEmDias(f.cobertura.dias),
       ]),
     ),
   );

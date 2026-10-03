@@ -33,6 +33,9 @@ from tests.fakes import (
 
 
 NOW = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
+# A maioria dos testes é de antes da ADR-0006 e usa o lead time observado, como uma
+# versão de política gravada pelo comprador. Os de `ignorar`, o padrão, dizem isso no nome.
+COM_LEAD_TIME_OBSERVADO = PARAMETROS_V1.model_copy(update={"lead_time_base": LeadTimeBase.OBSERVADO})
 SKU = make_sku("TBC-BEG-70140")
 KATRINA = make_fornecedor("Katrina Têxtil", lead_time_dias_contratado=35)
 
@@ -107,7 +110,7 @@ def _purchasing(
         FichaSKU(Catalog(adapter), inventory, sales),
         inventory,
         sales,
-        politicas or InMemoryPoliticaCompraRepositorio(),
+        politicas or InMemoryPoliticaCompraRepositorio(v1=COM_LEAD_TIME_OBSERVADO),
         adapter,
         now=NOW,
     )
@@ -145,6 +148,66 @@ def test_exemplo_da_spec_numero_a_numero() -> None:
         TipoAlerta.LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO,
         TipoAlerta.PERIODO_SAZONAL,
     ]
+
+
+def test_lead_time_ignorado_compra_o_piso_de_reposicao_mais_o_ciclo_a_partir_da_posicao() -> None:
+    # Política padrão (ADR-0006). Giro 100/mês, 50 disponíveis e 40 a caminho: posição 90,
+    # abaixo do piso de reposição de 100 (30 dias). Compra 100 * (30 / 30 + 2) - 90 = 210.
+    pedido = make_pedido_compra(KATRINA, "enviado")
+    purchasing = _purchasing(
+        disponivel=50,
+        politicas=InMemoryPoliticaCompraRepositorio(),
+        pedidos_compra=[pedido],
+        itens_pedido_compra=[make_item_pedido_compra(pedido, SKU, quantidade=40)],
+    )
+
+    sugestao = purchasing.sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None and sugestao.calculo is not None
+    assert sugestao.quantidade == 210
+    assert sugestao.calculo.lead_time_dias == 0
+    assert sugestao.calculo.lead_time_origem == LeadTimeOrigem.IGNORADO
+    assert sugestao.calculo.estoque_na_chegada == 90
+    assert sugestao.calculo.cobertura_na_chegada_dias == pytest.approx(90.0)
+    assert TipoAlerta.RUPTURA_ANTES_DA_CHEGADA not in {a.tipo for a in sugestao.alertas}
+
+
+def test_lead_time_ignorado_nao_compra_com_a_posicao_no_piso_de_reposicao() -> None:
+    purchasing = _purchasing(disponivel=100, politicas=InMemoryPoliticaCompraRepositorio())
+
+    sugestao = purchasing.sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None
+    assert sugestao.quantidade == 0
+    assert sugestao.motivo == MotivoSemCompra.ACIMA_DO_PONTO_DE_REPOSICAO
+
+
+def test_menor_lead_time_ordena_pelo_prazo_do_fornecedor_mesmo_com_o_lead_time_ignorado() -> None:
+    # Katrina costuma entregar em 62 dias e Bravo em 20; a Katrina é mais barata.
+    purchasing = _dois_fornecedores(
+        _katrina(),
+        _bravo(),
+        disponivel=50,
+        politicas=_politica(
+            lead_time_base=LeadTimeBase.IGNORAR, criterio_fornecedor=CriterioFornecedor.MENOR_LEAD_TIME
+        ),
+    )
+
+    assert _escolhido(purchasing) == "Bravo Malhas"
+
+
+def test_viola_teto_fala_da_cobertura_em_dias() -> None:
+    purchasing = _purchasing(
+        disponivel=50, fornecedores_sku=[_katrina(moq_unidades=400)], politicas=InMemoryPoliticaCompraRepositorio()
+    )
+
+    sugestao = purchasing.sugerir_pedido(SKU.sku_code)
+
+    assert sugestao is not None
+    [alerta] = [a for a in sugestao.alertas if a.tipo == TipoAlerta.VIOLA_TETO]
+    # 50 + 400 = 4,5 meses de giro, 135 dias, acima do teto de 3 meses (90 dias).
+    assert "135 dias" in alerta.mensagem
+    assert "90 dias" in alerta.mensagem
 
 
 def test_sku_inexistente_retorna_none() -> None:
@@ -205,8 +268,8 @@ def test_acima_do_ponto_de_reposicao_sai_com_calculo_e_sem_fornecedor() -> None:
 
 
 def _politica(**parametros) -> InMemoryPoliticaCompraRepositorio:
-    repo = InMemoryPoliticaCompraRepositorio()
-    repo.salvar_nova_versao(PARAMETROS_V1.model_copy(update=parametros))
+    repo = InMemoryPoliticaCompraRepositorio(v1=COM_LEAD_TIME_OBSERVADO)
+    repo.salvar_nova_versao(COM_LEAD_TIME_OBSERVADO.model_copy(update=parametros))
     return repo
 
 
@@ -443,8 +506,8 @@ def test_nenhum_cabendo_no_teto_escolhe_o_primeiro_e_alerta() -> None:
     assert sugestao.quantidade == 400
     viola_teto = [a for a in sugestao.alertas if a.tipo == TipoAlerta.VIOLA_TETO]
     assert len(viola_teto) == 1
-    assert "4,0 meses" in viola_teto[0].mensagem
-    assert "3,0 meses" in viola_teto[0].mensagem
+    assert "120 dias" in viola_teto[0].mensagem
+    assert "3,0 meses (90 dias)" in viola_teto[0].mensagem
 
 
 def test_nenhum_cabendo_escolhe_o_primeiro_da_ordem_mesmo_estourando_mais() -> None:
@@ -488,7 +551,8 @@ def test_mensagem_do_pedido_minimo_mostra_os_valores_em_reais() -> None:
 def test_lead_time_observado_acima_do_contratado_independe_da_base(
     base: LeadTimeBase,
 ) -> None:
-    purchasing = _purchasing(politicas=_politica(lead_time_base=base))
+    # Com 50 disponíveis, todas as bases compram.
+    purchasing = _purchasing(disponivel=50, politicas=_politica(lead_time_base=base))
 
     assert TipoAlerta.LEAD_TIME_OBSERVADO_ACIMA_DO_CONTRATADO in _tipos(purchasing)
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.erp_adapter.dependencies import get_erp_adapter
@@ -88,6 +89,8 @@ def test_analise_sku_retorna_shape_esperado() -> None:
     assert body["giro"]["unidades_por_mes"] > 0
     assert body["cobertura"]["sem_giro"] is False
     assert body["cobertura"]["meses"] is not None
+    venda_media_diaria = body["giro"]["unidades_por_mes"] / 30
+    assert body["cobertura"]["dias"] == pytest.approx(120 / venda_media_diaria)
     fornecedores = body["fornecedores"]
     assert len(fornecedores) == 2
     assert fornecedores[0]["fornecedor_nome"] == "Katrina Têxtil"
@@ -159,8 +162,9 @@ def test_abaixo_do_piso_retorna_apenas_skus_em_alerta() -> None:
     assert len(body) == 1
     assert body[0]["sku_code"] == "URG"
     assert body[0]["produto_nome"] == "Urgente"
-    assert body[0]["cobertura_meses"] > 0
-    assert set(body[0].keys()) == {"sku_code", "produto_nome", "cobertura_meses"}
+    assert body[0]["cobertura_dias"] == pytest.approx(body[0]["cobertura_meses"] * 30)
+    assert body[0]["cobertura_dias"] > 0
+    assert set(body[0].keys()) == {"sku_code", "produto_nome", "cobertura_meses", "cobertura_dias"}
 
 
 def test_abaixo_do_piso_dias_parametrizavel() -> None:
@@ -343,7 +347,7 @@ def test_fornecedores_sku_sem_fornecedores_retorna_lista_vazia() -> None:
     assert response.json() == []
 
 
-def _adapter_precisa_comprar() -> InMemoryERPAdapter:
+def _adapter_precisa_comprar(disponivel: int = 150) -> InMemoryERPAdapter:
     sku = make_sku("TBC-BEG-70140")
     katrina = make_fornecedor("Katrina Têxtil", lead_time_dias_contratado=35)
     vendas = [
@@ -360,13 +364,13 @@ def _adapter_precisa_comprar() -> InMemoryERPAdapter:
                 )
             ]
         },
-        estoques={sku.sku_code: make_estoque(disponivel=150)},
+        estoques={sku.sku_code: make_estoque(disponivel=disponivel)},
         vendas=vendas,
     )
 
 
 def test_sugestao_compra_retorna_quantidade_fornecedor_e_calculo() -> None:
-    client = _client(_adapter_precisa_comprar())
+    client = _client(_adapter_precisa_comprar(disponivel=20))
     try:
         response = client.get("/skus/TBC-BEG-70140/sugestao-compra")
     finally:
@@ -380,7 +384,9 @@ def test_sugestao_compra_retorna_quantidade_fornecedor_e_calculo() -> None:
     assert body["fornecedor"]["fornecedor_nome"] == "Katrina Têxtil"
     assert body["valor_estimado_centavos"] == body["quantidade"] * 1800
     assert body["politica_versao"] == 1
-    assert body["calculo"]["lead_time_origem"] == "observado"
+    assert body["calculo"]["lead_time_origem"] == "ignorado"
+    assert body["calculo"]["lead_time_dias"] == 0
+    assert body["calculo"]["estoque_na_chegada"] == 20
     assert set(body["calculo"].keys()) == {
         "giro_mensal",
         "disponivel",
@@ -391,8 +397,9 @@ def test_sugestao_compra_retorna_quantidade_fornecedor_e_calculo() -> None:
         "estoque_na_chegada",
         "qtd_necessaria",
         "cobertura_na_chegada_meses",
+        "cobertura_na_chegada_dias",
     }
-    assert "ruptura_antes_da_chegada" in {a["tipo"] for a in body["alertas"]}
+    assert "ruptura_antes_da_chegada" not in {a["tipo"] for a in body["alertas"]}
     assert all(a["mensagem"] for a in body["alertas"])
 
 

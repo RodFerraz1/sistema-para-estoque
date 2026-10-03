@@ -4,10 +4,11 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 from src.catalog.schemas import SKU, FornecedorParaSKU
 from src.erp_adapter.schemas import StatusPedidoCompra
+from src.inventory.schemas import dias_de_cobertura
 from src.politica_compra.schemas import DIAS_POR_MES
 
 
@@ -29,6 +30,7 @@ class TipoAlerta(StrEnum):
 class LeadTimeOrigem(StrEnum):
     OBSERVADO = "observado"
     CONTRATADO = "contratado"
+    IGNORADO = "ignorado"
 
 
 class Alerta(BaseModel):
@@ -39,7 +41,8 @@ class Alerta(BaseModel):
 
 
 class MemoriaCalculo(BaseModel):
-    """Números que levaram à quantidade sugerida, em unidades e meses."""
+    """Números que levaram à quantidade sugerida, em unidades e meses. Com o lead time
+    ignorado pela política, `lead_time_dias` é zero e o estoque na chegada é a posição."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -52,6 +55,11 @@ class MemoriaCalculo(BaseModel):
     estoque_na_chegada: float
     qtd_necessaria: int
     cobertura_na_chegada_meses: float
+
+    @computed_field
+    @property
+    def cobertura_na_chegada_dias(self) -> float:
+        return dias_de_cobertura(self.cobertura_na_chegada_meses)
 
     @property
     def cobertura_na_chegada_sem_compra_meses(self) -> float:

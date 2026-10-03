@@ -17,6 +17,7 @@ from src.api.schemas import (
 from src.api.skus import sku_ou_404
 from src.catalog.dependencies import get_catalog
 from src.catalog.service import Catalog
+from src.inventory.schemas import dias_de_cobertura
 from src.painel.dependencies import get_painel
 from src.painel.schemas import ItemAlerta, ItemDecidido
 from src.painel.service import (
@@ -31,6 +32,10 @@ from src.painel.service import (
 router = APIRouter(tags=["painel"])
 
 
+def _dias(meses: float | None) -> float | None:
+    return None if meses is None else dias_de_cobertura(meses)
+
+
 def _item_to_response(item: ItemAlerta) -> ItemAlertaResponse:
     return ItemAlertaResponse(
         sku_code=item.sku.sku_code,
@@ -39,7 +44,9 @@ def _item_to_response(item: ItemAlerta) -> ItemAlertaResponse:
         tamanho=item.sku.tamanho,
         disponivel=item.disponivel,
         cobertura_atual_meses=item.cobertura_atual_meses,
+        cobertura_atual_dias=_dias(item.cobertura_atual_meses),
         cobertura_na_chegada_sem_compra_meses=item.cobertura_na_chegada_sem_compra_meses,
+        cobertura_na_chegada_sem_compra_dias=_dias(item.cobertura_na_chegada_sem_compra_meses),
         motivos=item.motivos,
         quantidade_sugerida=item.quantidade_sugerida,
         fornecedor_sugerido=item.fornecedor_sugerido,

@@ -33,7 +33,7 @@ def test_vou_comprar_responde_201_com_a_sugestao_do_momento(client: TestClient) 
         "motivo": None,
         "comentario": "Fechei com o representante.",
         "decidido_por": "Carlos",
-        "quantidade_sugerida": 300,
+        "quantidade_sugerida": 250,
         "politica_versao": 1,
         "criado_em": "2026-10-01T09:00:00Z",
     }

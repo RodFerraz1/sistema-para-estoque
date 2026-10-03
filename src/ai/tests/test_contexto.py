@@ -17,7 +17,8 @@ from src.ai.schemas import (
 )
 from src.ficha_sku.schemas import Ficha
 from src.inventory.schemas import Cobertura
-from src.politica_compra.schemas import PARAMETROS_V1, PoliticaCompra
+from src.painel.schemas import ItemAlerta
+from src.politica_compra.schemas import PARAMETROS_V1, MotivoAlerta, PoliticaCompra
 from src.purchasing.schemas import (
     Alerta,
     LeadTimeOrigem,
@@ -127,7 +128,7 @@ def test_ficha_traz_os_dados_do_sku_com_numeros_no_formato_brasileiro() -> None:
     assert "- Tamanho: 70x140" in contexto
     assert "- Estoque disponível: 1.234 unidades" in contexto
     assert "- Giro: 45,3 unidades por mês (média de 6 meses)" in contexto
-    assert "- Cobertura: 2,7 meses" in contexto
+    assert "- Cobertura: 81 dias" in contexto
     assert (
         "  - Katrina Têxtil: preço de R$ 1.234,56 por unidade, MOQ de 48 unidades, "
         "lead time contratado de 45 dias e observado de 62 dias"
@@ -137,17 +138,18 @@ def test_ficha_traz_os_dados_do_sku_com_numeros_no_formato_brasileiro() -> None:
 @pytest.mark.parametrize(
     ("meses", "texto"),
     [
-        pytest.param(0.5, "- Cobertura: 0,5 meses, abaixo do piso de alerta da política", id="abaixo-do-piso"),
-        pytest.param(20 / 30, "- Cobertura: 0,7 meses, entre o piso de alerta e o teto da política", id="no-piso"),
-        pytest.param(3.0, "- Cobertura: 3,0 meses, entre o piso de alerta e o teto da política", id="no-teto"),
-        pytest.param(3.2, "- Cobertura: 3,2 meses, acima do teto da política", id="acima-do-teto"),
+        pytest.param(0.5, "- Cobertura: 15 dias, abaixo do piso de alerta da política (em ruptura)", id="abaixo-do-piso"),
+        pytest.param(20 / 30, "- Cobertura: 20 dias, entre o piso de alerta e o teto da política", id="no-piso"),
+        pytest.param(3.0, "- Cobertura: 90 dias, entre o piso de alerta e o teto da política", id="no-teto"),
+        pytest.param(3.2, "- Cobertura: 96 dias, acima do teto da política", id="acima-do-teto"),
+        pytest.param(0.02, "- Cobertura: menos de 1 dia, abaixo do piso", id="menos-de-um-dia"),
     ],
 )
-def test_ficha_com_politica_compara_a_cobertura_com_o_piso_de_alerta_e_o_teto(meses: float, texto: str) -> None:
+def test_ficha_com_politica_compara_a_cobertura_em_dias_com_o_piso_de_alerta_e_o_teto(meses: float, texto: str) -> None:
     contexto = renderizar_contexto(Montagem(fichas=[ficha(cobertura=meses)], politica=POLITICA))
 
     assert texto in contexto
-    assert "dias" not in contexto.split("- Fornecedores:")[0]
+    assert "meses," not in contexto.split("- Fornecedores:")[0]
 
 
 def test_ficha_sem_giro_diz_que_a_cobertura_e_indefinida() -> None:
@@ -179,9 +181,40 @@ def test_sugestao_traz_quantidade_fornecedor_valor_em_reais_calculo_e_versao() -
     assert "  - Posição (disponível mais em trânsito): 1.234 unidades" in contexto
     assert "  - Lead time: 62 dias (observado)" in contexto
     assert "  - Estoque previsto na chegada: 1.140,3 unidades" in contexto
-    assert "  - Cobertura na chegada, com a compra: 25,1 meses" in contexto
+    assert "  - Cobertura na chegada, com a compra: 754 dias" in contexto
     assert "- Alertas:\n  - Nenhum fornecedor cabe no teto." in contexto
     assert "Motivo" not in contexto
+
+
+def test_memoria_com_lead_time_ignorado_diz_que_a_conta_parte_da_posicao_de_hoje() -> None:
+    calculo = CALCULO.model_copy(
+        update={"lead_time_dias": 0, "lead_time_origem": LeadTimeOrigem.IGNORADO, "estoque_na_chegada": 1234}
+    )
+
+    contexto = renderizar_contexto(Montagem(sugestoes=[sugestao(calculo=calculo)]))
+
+    assert "  - Lead time: ignorado pela política, a conta parte da posição de hoje" in contexto
+    assert "Estoque previsto na chegada" not in contexto
+
+
+def test_item_do_painel_traz_a_cobertura_em_dias_e_a_ruptura() -> None:
+    item = ItemAlerta(
+        sku=SKU,
+        disponivel=20,
+        cobertura_atual_meses=0.2,
+        cobertura_na_chegada_sem_compra_meses=-0.5,
+        motivos=[MotivoAlerta.ABAIXO_DO_PISO_ALERTA, MotivoAlerta.RUPTURA_ANTES_DA_CHEGADA],
+        quantidade_sugerida=None,
+        fornecedor_sugerido=None,
+        avisos_abertos=[],
+    )
+
+    contexto = renderizar_contexto(Montagem(alertas=[item]))
+
+    assert "  - em ruptura: a cobertura em dias está abaixo do piso de alerta da política" in contexto
+    assert "- Cobertura atual: 6 dias" in contexto
+    assert "- Sem comprar, o estoque acaba cerca de 15 dias antes de uma compra feita hoje chegar" in contexto
+    assert "depois os em ruptura" in contexto
 
 
 def test_sinais_saem_abaixo_da_sugestao_com_os_ids_de_origem() -> None:
@@ -238,14 +271,17 @@ def test_sugestao_sem_compra_traz_o_motivo_e_nao_traz_fornecedor() -> None:
     assert "Alertas" not in contexto
 
 
-def test_politica_traz_os_parametros_com_meses_em_decimal() -> None:
+def test_politica_traz_os_pisos_em_dias_e_o_lead_time_ignorado() -> None:
     contexto = renderizar_contexto(Montagem(politica=POLITICA))
 
-    assert "- Teto: 3,0 meses de cobertura quando a compra chega" in contexto
-    assert "- Piso de alerta: 0,7 meses de cobertura" in contexto
-    assert "- Piso de reposição: 1,0 mês de cobertura quando a compra chega" in contexto
+    assert "- Teto: 3,0 meses (90 dias) de cobertura quando a compra chega" in contexto
+    assert (
+        "- Piso de alerta: 20 dias de cobertura, os dias de venda que o estoque precisa segurar; "
+        "abaixo disso o SKU está em ruptura"
+    ) in contexto
+    assert "- Piso de reposição: 30 dias de cobertura quando a compra chega" in contexto
     assert "- Ciclo de compra: 2,0 meses de giro por compra" in contexto
-    assert "- Lead time base: observado" in contexto
+    assert "- Lead time base: ignorado, as contas partem da posição de hoje sem o prazo do fornecedor" in contexto
     assert "- Critério de fornecedor: menor preço" in contexto
 
 

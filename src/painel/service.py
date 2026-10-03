@@ -102,12 +102,23 @@ def _vigente(ultima: DecisaoCompra | None, abertos: list[Aviso], agora: datetime
     return ultima
 
 
-def _ordem(item: ItemAlerta) -> tuple[bool, bool, float, str]:
-    """Primeiro os com aviso aberto ou ruptura antes da chegada; em cada grupo, a menor
-    cobertura na chegada sem a compra, os sem cálculo no fim e o código para desempatar."""
-    urgente = bool(item.avisos_abertos) or MotivoAlerta.RUPTURA_ANTES_DA_CHEGADA in item.motivos
-    cobertura = item.cobertura_na_chegada_sem_compra_meses
-    return (not urgente, cobertura is None, cobertura or 0.0, item.sku.sku_code)
+def _grupo(item: ItemAlerta) -> int:
+    """Os grupos do painel, na ordem: aviso aberto, ruptura, ruptura antes da chegada e
+    os outros motivos."""
+    if item.avisos_abertos:
+        return 0
+    if MotivoAlerta.ABAIXO_DO_PISO_ALERTA in item.motivos:
+        return 1
+    if MotivoAlerta.RUPTURA_ANTES_DA_CHEGADA in item.motivos:
+        return 2
+    return 3
+
+
+def _ordem(item: ItemAlerta) -> tuple[int, bool, bool, float, str]:
+    """Pelo grupo; em cada grupo, disponível zero no topo, depois a menor cobertura atual,
+    os sem giro no fim e o código para desempatar."""
+    cobertura = item.cobertura_atual_meses
+    return (_grupo(item), item.disponivel > 0, cobertura is None, cobertura or 0.0, item.sku.sku_code)
 
 
 class Painel:

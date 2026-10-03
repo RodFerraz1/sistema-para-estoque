@@ -86,28 +86,29 @@ export function quando(iso) {
 }
 
 export const MOTIVOS = {
-  ruptura_antes_da_chegada: "Ruptura antes da chegada",
-  abaixo_do_piso_alerta: "Abaixo do piso de alerta",
+  abaixo_do_piso_alerta: "Em ruptura",
+  ruptura_antes_da_chegada: "Acaba antes da compra chegar",
   viola_teto: "Compra acima do teto",
   lead_time_observado_acima_do_contratado: "Fornecedor atrasando",
   abaixo_pedido_minimo: "Abaixo do pedido mínimo",
   periodo_sazonal: "Chega em data forte",
 };
 
+const MOTIVOS_URGENTES = ["abaixo_do_piso_alerta", "ruptura_antes_da_chegada"];
+
 export function selosDeMotivo(motivos) {
-  return motivos.map((m) =>
-    el("span", { class: m === "ruptura_antes_da_chegada" ? "selo urgente" : "selo destaque" }, MOTIVOS[m] ?? m),
-  );
+  return motivos.map((m) => el("span", { class: MOTIVOS_URGENTES.includes(m) ? "selo urgente" : "selo destaque" }, MOTIVOS[m] ?? m));
 }
 
-export function coberturaAtual(meses) {
-  return meses === null ? "sem giro" : `${numero(meses, 1)} meses`;
+export function dias(valor) {
+  const arredondado = Math.round(valor * 1e6) / 1e6;
+  if (arredondado > 0 && arredondado < 1) return "menos de 1 dia";
+  const inteiros = Math.floor(arredondado);
+  return inteiros === 1 ? "1 dia" : `${numero(inteiros)} dias`;
 }
 
-export function coberturaNaChegada(meses) {
-  if (meses === null) return "sem cálculo";
-  const texto = `${numero(meses, 1)} meses`;
-  return meses < 0 ? `${texto} (acaba antes)` : texto;
+export function coberturaEmDias(valor) {
+  return valor === null ? "sem giro" : dias(valor);
 }
 
 const TIPOS_DE_SINAL = {

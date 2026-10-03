@@ -58,7 +58,7 @@ def preparar(decisao: InMemoryDecisionModel | None = None) -> None:
             for sku in (PRECISA_COMPRAR, SEM_COMPRA)
         },
         estoques={
-            PRECISA_COMPRAR.sku_code: make_estoque(disponivel=150),
+            PRECISA_COMPRAR.sku_code: make_estoque(disponivel=50),
             SEM_COMPRA.sku_code: make_estoque(disponivel=900),
         },
         vendas=[

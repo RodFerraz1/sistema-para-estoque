@@ -2,8 +2,9 @@ import { montarChat } from "./chat.js";
 import {
   TIPOS_DE_AVISO,
   api,
-  coberturaAtual,
+  coberturaEmDias,
   dataHora,
+  dias,
   el,
   mensagem,
   numero,
@@ -21,19 +22,28 @@ const GRUPOS = [
   {
     id: "pedidos-de-vendas",
     titulo: "Pedidos da equipe de vendas",
-    descricao: "Avisos que as vendedoras mandaram e ainda não têm decisão.",
+    descricao: () => "Avisos que as vendedoras mandaram e ainda não têm decisão.",
     cor: "var(--vendas)",
+  },
+  {
+    id: "em-ruptura",
+    titulo: "Em ruptura",
+    descricao: (piso) =>
+      `O estoque segura menos de ${dias(piso)} de venda, o mínimo da sua política. Os zerados vêm primeiro, depois o que acaba antes.`,
+    cor: "var(--urgente)",
+    motivo: "abaixo_do_piso_alerta",
   },
   {
     id: "vao-faltar",
     titulo: "Vão faltar antes da compra chegar",
-    descricao: "Mesmo comprando hoje, o estoque acaba antes da mercadoria chegar.",
+    descricao: () => "Pelo prazo do fornecedor, mesmo comprando hoje o estoque acaba antes da mercadoria chegar.",
     cor: "var(--urgente)",
+    motivo: "ruptura_antes_da_chegada",
   },
   {
     id: "outros-alertas",
     titulo: "Outros alertas",
-    descricao: "Outros motivos de alerta que você escolheu na política de compra.",
+    descricao: () => "Outros motivos de alerta que você escolheu na política de compra.",
     cor: "var(--destaque)",
   },
 ];
@@ -62,15 +72,20 @@ function linkDoSku(codigo) {
 
 function grupoDo(item) {
   if (item.avisos_abertos > 0) return "pedidos-de-vendas";
+  if (item.motivos.includes("abaixo_do_piso_alerta")) return "em-ruptura";
   if (item.motivos.includes("ruptura_antes_da_chegada")) return "vao-faltar";
   return "outros-alertas";
 }
 
-function frase(item) {
-  const naChegada = item.cobertura_na_chegada_sem_compra_meses;
-  if (naChegada === null) return "Sem cálculo de cobertura para este produto.";
-  if (naChegada < 0) return `Acaba cerca de ${numero(-naChegada * 30)} dias antes de uma compra feita hoje chegar.`;
-  return `Quando uma compra feita hoje chegar, ainda sobra estoque para ${numero(naChegada, 1)} meses.`;
+function frase(item, grupo, piso) {
+  if (grupo === "vao-faltar") {
+    const naChegada = item.cobertura_na_chegada_sem_compra_dias;
+    if (naChegada < 0) return `Acaba cerca de ${dias(-naChegada)} antes de uma compra feita hoje chegar.`;
+    return `Quando uma compra feita hoje chegar, ainda sobram ${dias(naChegada)} de estoque.`;
+  }
+  if (item.disponivel === 0 && item.cobertura_atual_dias !== null) return "Zerado: já está faltando na loja.";
+  if (item.motivos.includes("abaixo_do_piso_alerta")) return `Abaixo dos ${dias(piso)} de venda que o estoque precisa segurar.`;
+  return null;
 }
 
 function recado(item) {
@@ -99,12 +114,15 @@ function sugestao(item) {
   );
 }
 
+const MOTIVO_DO_GRUPO = { "em-ruptura": "abaixo_do_piso_alerta", "vao-faltar": "ruptura_antes_da_chegada" };
+
 function motivosAlemDoGrupo(item, grupo) {
-  return grupo === "vao-faltar" ? item.motivos.filter((m) => m !== "ruptura_antes_da_chegada") : item.motivos;
+  return item.motivos.filter((m) => m !== MOTIVO_DO_GRUPO[grupo]);
 }
 
-function cartao(item, { id, cor }) {
+function cartao(item, { id, cor }, piso) {
   const motivos = motivosAlemDoGrupo(item, id);
+  const zerado = item.disponivel === 0;
   return el(
     "a",
     { class: "item", href: linkDoSku(item.sku_code), style: `--cor: ${cor}` },
@@ -119,22 +137,24 @@ function cartao(item, { id, cor }) {
       "div",
       { class: "item-situacao" },
       recado(item),
-      el("div", { class: "frase" }, frase(item)),
+      frase(item, id, piso) ? el("div", { class: "frase" }, frase(item, id, piso)) : null,
       el(
         "div",
         { class: "item-numeros" },
         el("span", {}, "Em estoque ", el("b", {}, `${numero(item.disponivel)} un.`)),
-        item.cobertura_atual_meses === null
+        item.cobertura_atual_dias === null
           ? el("span", {}, "Sem vendas recentes")
-          : el("span", {}, "O estoque dura ", el("b", {}, coberturaAtual(item.cobertura_atual_meses))),
+          : el("span", {}, "Segura ", el("b", {}, coberturaEmDias(item.cobertura_atual_dias))),
       ),
-      motivos.length ? el("div", { class: "selos" }, selosDeMotivo(motivos)) : null,
+      zerado || motivos.length
+        ? el("div", { class: "selos" }, zerado ? el("span", { class: "selo urgente" }, "Zerado") : null, selosDeMotivo(motivos))
+        : null,
     ),
     sugestao(item),
   );
 }
 
-function grupo({ id, titulo, descricao, cor }, itens) {
+function grupo({ id, titulo, descricao, cor }, itens, piso) {
   const doGrupo = { id, cor };
   if (itens.length === 0) return null;
   return el(
@@ -145,17 +165,17 @@ function grupo({ id, titulo, descricao, cor }, itens) {
       {},
       el("h2", { id: `t-${id}` }, titulo),
       el("span", { class: "contagem" }, String(itens.length)),
-      el("p", { class: "suave" }, descricao),
+      el("p", { class: "suave" }, descricao(piso)),
     ),
-    el("div", { class: "itens" }, itens.map((item) => cartao(item, doGrupo))),
+    el("div", { class: "itens" }, itens.map((item) => cartao(item, doGrupo, piso))),
   );
 }
 
-function resumo(porGrupo, decididos) {
+function resumo(grupos, porGrupo, decididos) {
   return el(
     "div",
     { class: "resumo" },
-    GRUPOS.map((g) =>
+    grupos.map((g) =>
       el(
         "a",
         { href: `#${g.id}`, style: `--cor: ${porGrupo[g.id].length ? g.cor : "var(--borda-forte)"}` },
@@ -210,7 +230,9 @@ function tudoEmDia() {
   );
 }
 
-function mostrar(painel) {
+function mostrar(painel, politica) {
+  const { motivos_de_alerta: motivos, piso_alerta_dias: piso } = politica.parametros;
+  const grupos = GRUPOS.filter((g) => !g.motivo || motivos.includes(g.motivo));
   const porGrupo = Object.fromEntries(GRUPOS.map((g) => [g.id, []]));
   for (const item of painel.alertas) porGrupo[grupoDo(item)].push(item);
   porGrupo["pedidos-de-vendas"].sort((a, b) => b.ultimo_aviso.criado_em.localeCompare(a.ultimo_aviso.criado_em));
@@ -219,15 +241,16 @@ function mostrar(painel) {
       "div",
       {},
       skusComErro(painel.skus_com_erro),
-      resumo(porGrupo, painel.decididos),
-      painel.alertas.length ? GRUPOS.map((g) => grupo(g, porGrupo[g.id])) : tudoEmDia(),
+      resumo(grupos, porGrupo, painel.decididos),
+      painel.alertas.length ? grupos.map((g) => grupo(g, porGrupo[g.id], piso)) : tudoEmDia(),
       decididos(painel.decididos),
     ),
   );
 }
 
 try {
-  mostrar(await api("GET", "/painel"));
+  const [painel, politica] = await Promise.all([api("GET", "/painel"), api("GET", "/politica-compra")]);
+  mostrar(painel, politica);
 } catch (e) {
   conteudo.replaceChildren(mensagem("erro", e.status === 503 ? e.message : `Não foi possível calcular o painel: ${e.message}`));
 } finally {

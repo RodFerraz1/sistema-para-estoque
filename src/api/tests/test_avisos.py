@@ -14,6 +14,7 @@ from src.api.tests.cenario_painel import (
     SEM_FORNECEDOR,
     SOBRANDO,
     URGENTE,
+    ZERADO,
     avisar,
     client,  # noqa: F401 (fixture)
     codigos,
@@ -102,15 +103,16 @@ def test_sku_com_aviso_e_sem_motivo_entra_no_primeiro_grupo_do_painel(client: Te
 
     alertas = painel(client)["alertas"]
 
-    # Os com aviso ou ruptura, pela cobertura na chegada sem a compra: -0,8, -0,5 e 8,0.
+    # Primeiro os com aviso; depois os em ruptura, do zerado ao que segura mais dias.
     assert codigos(alertas) == [
+        SOBRANDO.sku_code,
+        ZERADO.sku_code,
+        SEM_FORNECEDOR.sku_code,
         MAIS_URGENTE.sku_code,
         URGENTE.sku_code,
-        SOBRANDO.sku_code,
         PISO.sku_code,
-        SEM_FORNECEDOR.sku_code,
     ]
-    sobrando = alertas[2]
+    sobrando = alertas[0]
     assert sobrando["motivos"] == []
     assert sobrando["so_por_aviso"] is True
     assert sobrando["avisos_abertos"] == 1
@@ -126,9 +128,8 @@ def test_aviso_de_sku_com_motivo_sobe_para_o_primeiro_grupo_e_conta_os_avisos(cl
 
     alertas = painel(client)["alertas"]
 
-    # PISO tem 0,5 mês na chegada sem a compra: vai depois das rupturas, mas no primeiro grupo.
-    assert codigos(alertas)[:3] == [MAIS_URGENTE.sku_code, URGENTE.sku_code, PISO.sku_code]
-    piso = alertas[2]
+    assert codigos(alertas)[:2] == [PISO.sku_code, ZERADO.sku_code]
+    piso = alertas[0]
     assert piso["so_por_aviso"] is False
     assert piso["avisos_abertos"] == 2
     assert piso["ultimo_aviso"]["avisado_por"] == "Bia"
@@ -151,7 +152,7 @@ def test_busca_exige_todas_as_palavras_e_ordena_por_produto_cor_e_tamanho(client
     encontrados = client.get("/skus", params={"busca": "toalha 70x140"}).json()
 
     assert [(s["produto_nome"], s["cor"]) for s in encontrados] == [
-        ("Toalha Banho Conforto", cor) for cor in ["azul", "bege", "branco", "cinza", "rosa", "verde"]
+        ("Toalha Banho Conforto", cor) for cor in ["azul", "bege", "branco", "cinza", "lilás", "rosa", "verde"]
     ]
     assert client.get("/skus", params={"busca": "toalha casal"}).json() == []
 
