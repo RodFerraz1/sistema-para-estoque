@@ -18,10 +18,11 @@ from src.api.tests.cenario_painel import (
     preparar,
 )
 from src.politica_compra.schemas import PARAMETROS_V1
+from src.usuarios.schemas import Usuario
 
 
-def test_vou_comprar_responde_201_com_a_sugestao_do_momento(client: TestClient) -> None:
-    preparar()
+def test_vou_comprar_responde_201_com_a_sugestao_do_momento(client: TestClient, usuario_logado: Usuario) -> None:
+    cenario = preparar()
 
     decisao = decidir(client, URGENTE, "vou_comprar", quantidade=280, comentario=" Fechei com o representante. ")
 
@@ -32,11 +33,12 @@ def test_vou_comprar_responde_201_com_a_sugestao_do_momento(client: TestClient) 
         "quantidade": 280,
         "motivo": None,
         "comentario": "Fechei com o representante.",
-        "decidido_por": "Carlos",
+        "decidido_por": usuario_logado.nome,
         "quantidade_sugerida": 250,
         "politica_versao": 1,
         "criado_em": "2026-10-01T09:00:00Z",
     }
+    assert [d.usuario_id for d in cenario.decisoes.listar(URGENTE.sku_code)] == [usuario_logado.id]
 
 
 def test_decisao_guarda_a_versao_da_politica_ativa(client: TestClient) -> None:
@@ -106,7 +108,7 @@ def test_aviso_posterior_a_decisao_traz_o_sku_de_volta(client: TestClient) -> No
     decidir(client, URGENTE)
     cenario.relogio.avancar(days=2)
 
-    aviso = avisar(client, URGENTE, avisado_por="Bia")
+    aviso = avisar(client, URGENTE)
 
     resultado = painel(client)
     assert URGENTE.sku_code not in codigos(resultado["decididos"])
@@ -174,24 +176,24 @@ def test_sku_decidido_aparece_em_decididos_mesmo_sem_motivo(client: TestClient) 
 def test_validacoes_de_cada_tipo_respondem_422_e_nao_gravam(client: TestClient, corpo: dict) -> None:
     cenario = preparar()
 
-    response = client.post(f"/skus/{URGENTE.sku_code}/decisoes", json={"decidido_por": "Carlos", **corpo})
+    response = client.post(f"/skus/{URGENTE.sku_code}/decisoes", json=corpo)
 
     assert response.status_code == 422
     assert cenario.decisoes.listar(URGENTE.sku_code) == []
 
 
-def test_decisao_sem_nome_responde_422(client: TestClient) -> None:
+def test_decisao_ignora_nome_no_corpo(client: TestClient, usuario_logado: Usuario) -> None:
     preparar()
 
-    response = client.post(f"/skus/{URGENTE.sku_code}/decisoes", json={"tipo": "negociando", "decidido_por": " "})
+    decisao = decidir(client, URGENTE, decidido_por="Outra Pessoa")
 
-    assert response.status_code == 422
+    assert decisao["decidido_por"] == usuario_logado.nome
 
 
 def test_decisao_de_sku_inexistente_responde_404(client: TestClient) -> None:
     preparar()
 
-    response = client.post("/skus/NAO-EXISTE/decisoes", json={"tipo": "negociando", "decidido_por": "Carlos"})
+    response = client.post("/skus/NAO-EXISTE/decisoes", json={"tipo": "negociando"})
 
     assert response.status_code == 404
     assert client.get("/skus/NAO-EXISTE/decisoes").status_code == 404

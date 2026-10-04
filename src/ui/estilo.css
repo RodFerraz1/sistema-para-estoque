@@ -132,6 +132,12 @@ nav a[aria-current="page"] {
 .sessao-nome {
   color: var(--texto-suave);
   font-size: 0.9rem;
+  padding: 6px 4px;
+}
+
+a.sessao-nome:hover,
+a.sessao-nome[aria-current="page"] {
+  color: var(--texto);
 }
 
 @media (max-width: 760px) {
@@ -145,6 +151,7 @@ nav a[aria-current="page"] {
   .sessao,
   .abrir-chat ~ .sessao {
     order: 1;
+    gap: 8px;
     margin-left: auto;
   }
 
@@ -168,7 +175,9 @@ nav a[aria-current="page"] {
   }
 
   .sessao-nome {
-    display: none;
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
@@ -224,6 +233,10 @@ main.conteudo {
 
 .conteudo.estreito {
   max-width: 560px;
+}
+
+.conteudo.medio {
+  max-width: 880px;
 }
 
 .cabecalho-pagina {
@@ -1093,6 +1106,124 @@ input[type="search"],
 
 .tipos button[aria-pressed="true"] small {
   color: rgba(255, 255, 255, 0.85);
+}
+
+/* Usuários e conta */
+
+button.perigo {
+  color: var(--erro);
+  border-color: #fecaca;
+}
+
+button.perigo:hover {
+  background: var(--erro-fundo);
+}
+
+.campos-lado-a-lado {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0 16px;
+}
+
+form.card > h2 {
+  margin-top: 0;
+}
+
+#cadastro input:not([type="checkbox"]),
+.pessoa-edicao input[type="text"],
+#senha-form input {
+  width: 100%;
+  padding: 9px 12px;
+}
+
+.escolhas.papeis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.escolhas.papeis label span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.escolhas.papeis small {
+  font-weight: 400;
+}
+
+.pessoas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pessoa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 360px;
+  gap: 8px 20px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--borda);
+}
+
+.pessoa:last-child {
+  border-bottom: 0;
+}
+
+.pessoa-quem,
+.pessoa-situacao {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pessoa-situacao > .suave {
+  font-size: 0.85rem;
+}
+
+.pessoa > .acoes {
+  justify-content: flex-end;
+}
+
+.pessoa > .acoes button {
+  padding: 6px 12px;
+  font-size: 0.9rem;
+}
+
+.pessoa.desativada .pessoa-quem strong {
+  color: var(--texto-suave);
+}
+
+.pessoa-edicao {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  padding: 14px;
+}
+
+.pessoa-edicao .campo {
+  margin: 0;
+}
+
+.conta-nome {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 10px;
+}
+
+@media (max-width: 760px) {
+  .pessoa,
+  .escolhas.papeis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pessoa > .acoes {
+    justify-content: flex-start;
+  }
 }
 
 /* Chat lateral */

@@ -34,6 +34,7 @@ from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.politica_compra.schemas import DIAS_POR_MES, MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import SugestaoPedido
 from src.purchasing.service import Purchasing
+from src.usuarios.schemas import Usuario
 
 Relogio = Callable[[], datetime]
 
@@ -69,13 +70,6 @@ class QuantidadeSoParaComprar(ValueError):
 class MotivoObrigatorio(ValueError):
     def __init__(self) -> None:
         super().__init__("nao_comprar_agora exige o motivo.")
-
-
-def _obrigatorio(valor: str, campo: str) -> str:
-    valor = valor.strip()
-    if not valor:
-        raise ValueError(f"{campo} não pode ser vazio")
-    return valor
 
 
 def _opcional(valor: str | None) -> str | None:
@@ -147,11 +141,8 @@ class Painel:
             raise SKUNaoEncontrado(sku_code)
         return sku
 
-    def registrar_aviso(
-        self, sku_code: str, tipo: TipoAviso, avisado_por: str, comentario: str | None = None
-    ) -> Aviso:
-        """Lança `SKUNaoEncontrado`, `SKUInativo` e `ValueError` sem `avisado_por`."""
-        avisado_por = _obrigatorio(avisado_por, "avisado_por")
+    def registrar_aviso(self, sku_code: str, tipo: TipoAviso, autor: Usuario, comentario: str | None = None) -> Aviso:
+        """Lança `SKUNaoEncontrado` e `SKUInativo`."""
         sku = self._sku(sku_code)
         if not sku.ativo:
             raise SKUInativo(sku_code)
@@ -160,7 +151,8 @@ class Painel:
             sku_code=sku_code,
             tipo=tipo,
             comentario=_opcional(comentario),
-            avisado_por=avisado_por,
+            avisado_por=autor.nome,
+            usuario_id=autor.id,
             criado_em=self._relogio(),
         )
         self._avisos.gravar(aviso)
@@ -170,7 +162,7 @@ class Painel:
         self,
         sku_code: str,
         tipo: TipoDecisao,
-        decidido_por: str,
+        autor: Usuario,
         quantidade: int | None = None,
         motivo: str | None = None,
         comentario: str | None = None,
@@ -178,9 +170,7 @@ class Painel:
         """Guarda a sugestão de pedido do momento (quantidade e versão da política). Fecha
         os avisos abertos do SKU e o tira do painel por `PRAZO_DA_DECISAO`. Não cria pedido
         de compra. Lança `SKUNaoEncontrado`, `QuantidadeObrigatoria`,
-        `QuantidadeSoParaComprar`, `MotivoObrigatorio` e `ValueError` sem `decidido_por`.
-        Propaga `SKUSemEstoque`."""
-        decidido_por = _obrigatorio(decidido_por, "decidido_por")
+        `QuantidadeSoParaComprar` e `MotivoObrigatorio`. Propaga `SKUSemEstoque`."""
         motivo = _opcional(motivo)
         if tipo == "vou_comprar" and (quantidade is None or quantidade <= 0):
             raise QuantidadeObrigatoria()
@@ -199,7 +189,8 @@ class Painel:
             quantidade=quantidade,
             motivo=motivo,
             comentario=_opcional(comentario),
-            decidido_por=decidido_por,
+            decidido_por=autor.nome,
+            usuario_id=autor.id,
             quantidade_sugerida=sugestao.quantidade,
             politica_versao=sugestao.politica_versao,
             criado_em=self._relogio(),

@@ -112,11 +112,11 @@ uv run pytest
 | ------ | ---- | ------------- |
 | `GET` | `/health` | Saúde do app e do banco. |
 | `GET` | `/painel` | Painel de alertas calculado na hora: `alertas` (SKUs com aviso aberto ou motivo de alerta, na ordem de urgência), `decididos` (com decisão de compra vigente) e `skus_com_erro`. 503 com o banco fora do ar. |
-| `POST` | `/avisos` | Aviso da equipe de vendas (`sku_code`, `tipo` `acabou` ou `vendendo_muito`, `avisado_por`, `comentario` opcional). 201; 404 sem o SKU; 422 com o SKU inativo. |
+| `POST` | `/avisos` | Aviso da equipe de vendas (`sku_code`, `tipo` `acabou` ou `vendendo_muito`, `comentario` opcional), em nome do usuário logado. 201; 404 sem o SKU; 422 com o SKU inativo. |
 | `GET` | `/skus?busca=...` | Busca da página de aviso: até 20 SKUs ativos com todas as palavras no código, nome, cor ou tamanho, sem diferenciar acento nem maiúscula (mínimo de 2 caracteres). |
 | `GET` | `/skus/{sku_code}/avisos` | Avisos abertos do SKU (sem decisão de compra posterior), do mais recente para o mais antigo. |
 | `GET` | `/skus/{sku_code}/decisoes` | Decisões de compra do SKU, da mais recente para a mais antiga. |
-| `POST` | `/skus/{sku_code}/decisoes` | Registra a decisão de compra (`tipo`, `decidido_por`, `quantidade` em `vou_comprar`, `motivo` em `nao_comprar_agora`, `comentario` opcional), com a sugestão e a versão da política do momento. 201; 404 sem o SKU; 422 nas validações. Não cria pedido de compra. |
+| `POST` | `/skus/{sku_code}/decisoes` | Registra a decisão de compra em nome do usuário logado (`tipo`, `quantidade` em `vou_comprar`, `motivo` em `nao_comprar_agora`, `comentario` opcional), com a sugestão e a versão da política do momento. 201; 404 sem o SKU; 422 nas validações. Não cria pedido de compra. |
 | `GET` | `/skus/{sku_code}/precos` | Referências para negociar: preço pago em cada pedido de compra (sem os cancelados), preço atual por fornecedor e até 10 substitutos (outro produto da mesma categoria e tamanho) pelo menor preço. |
 | `GET` | `/skus/{sku_code}/analise` | Análise composta: nome, categoria, cor, tamanho, estoque, em trânsito, giro, cobertura, fornecedores. |
 | `GET` | `/skus/abaixo-do-piso?dias=20` | SKUs com cobertura abaixo do piso de alerta. Sem `dias`, usa o `piso_alerta_dias` da política ativa. |

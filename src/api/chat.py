@@ -26,8 +26,10 @@ from src.api.skus import sku_ou_404
 from src.catalog.dependencies import get_catalog
 from src.catalog.service import Catalog
 from src.usuarios.dependencies import exige_papel
+from src.usuarios.schemas import Usuario
 
-router = APIRouter(prefix="/chat", tags=["chat"], dependencies=[Depends(exige_papel("comprador"))])
+COMPRADOR = exige_papel("comprador")
+router = APIRouter(prefix="/chat", tags=["chat"], dependencies=[Depends(COMPRADOR)])
 
 
 def _escolha_to_response(escolha: Escolha[str]) -> EscolhaResponse:
@@ -101,6 +103,7 @@ def _registro_to_response(registro: RegistroDecisao) -> RegistroDecisaoResponse:
 @router.post("", response_model=RespostaChatResponse)
 def chat(
     corpo: PerguntaChatRequest,
+    usuario: Usuario = Depends(COMPRADOR),
     catalog: Catalog = Depends(get_catalog),
     copilot: Copilot = Depends(get_copilot),
 ) -> RespostaChatResponse:
@@ -108,7 +111,7 @@ def chat(
     para esse SKU. 404 com SKU desconhecido."""
     if corpo.sku_code is not None:
         sku_ou_404(catalog, corpo.sku_code)
-    return _to_response(copilot.responder(corpo.pergunta, corpo.sku_code))
+    return _to_response(copilot.responder(corpo.pergunta, corpo.sku_code, usuario.id))
 
 
 @router.get("/registros", response_model=list[RegistroDecisaoResponse])

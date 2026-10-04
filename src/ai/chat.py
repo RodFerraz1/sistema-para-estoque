@@ -135,15 +135,17 @@ class Copilot:
         self._redator = redator
         self._registros = registros
 
-    def responder(self, pergunta: str, sku_em_contexto: str | None = None) -> RespostaCopilot:
-        """Grava um registro de decisão por resposta. `sku_em_contexto` é o SKU da tela de
-        onde o comprador perguntou: vale para situação e sugestão quando a pergunta não
-        cita produto. Propaga `DecisaoIndisponivel` (sem entendimento não há roteamento
+    def responder(
+        self, pergunta: str, sku_em_contexto: str | None = None, usuario_id: UUID | None = None
+    ) -> RespostaCopilot:
+        """Grava um registro de decisão por resposta, com `usuario_id` de quem perguntou.
+        `sku_em_contexto` é o SKU da tela de onde o comprador perguntou: vale para situação
+        e sugestão quando a pergunta não cita produto. Propaga `DecisaoIndisponivel` (sem entendimento não há roteamento
         nem registro) e a falha ao gravar (o registro é requisito de auditoria)."""
         inicio = time.perf_counter()
         resposta = self._decidir(pergunta, uuid4(), sku_em_contexto)
         duracao_ms = round((time.perf_counter() - inicio) * 1000)
-        self._registros.gravar(_registro(pergunta, resposta, duracao_ms, sku_em_contexto))
+        self._registros.gravar(_registro(pergunta, resposta, duracao_ms, sku_em_contexto, usuario_id))
         return resposta
 
     def _decidir(self, pergunta: str, registro_id: UUID, sku_em_contexto: str | None) -> RespostaCopilot:
@@ -304,7 +306,11 @@ class Copilot:
 
 
 def _registro(
-    pergunta: str, resposta: RespostaCopilot, duracao_ms: int, sku_em_contexto: str | None
+    pergunta: str,
+    resposta: RespostaCopilot,
+    duracao_ms: int,
+    sku_em_contexto: str | None,
+    usuario_id: UUID | None,
 ) -> RegistroDecisao:
     return RegistroDecisao(
         id=resposta.registro_id,
@@ -323,6 +329,7 @@ def _registro(
         sinais=[SinaisDoSKU(sku_code=s.sugestao.sku_code, sinais=s.sinais) for s in resposta.sugestoes],
         citacoes=resposta.citacoes,
         sku_em_contexto=sku_em_contexto,
+        usuario_id=usuario_id,
     )
 
 

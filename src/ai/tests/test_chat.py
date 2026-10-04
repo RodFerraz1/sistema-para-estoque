@@ -329,7 +329,13 @@ def test_politica_ou_fornecedor_redige_so_com_a_busca() -> None:
 
 def aviso(sku: SKU, tipo: TipoAviso = "vendendo_muito", comentario: str | None = None) -> Aviso:
     return Aviso(
-        id=uuid4(), sku_code=sku.sku_code, tipo=tipo, comentario=comentario, avisado_por="Rodrigo", criado_em=NOW
+        id=uuid4(),
+        sku_code=sku.sku_code,
+        tipo=tipo,
+        comentario=comentario,
+        avisado_por="Rodrigo",
+        usuario_id=None,
+        criado_em=NOW,
     )
 
 
@@ -566,6 +572,7 @@ def test_resposta_redigida_grava_o_registro_e_devolve_o_id() -> None:
         "sinais": [],
         "citacoes": [],
         "sku_em_contexto": None,
+        "usuario_id": None,
     }
     assert registro.criado_em.tzinfo is not None
     assert registro.duracao_ms >= 0

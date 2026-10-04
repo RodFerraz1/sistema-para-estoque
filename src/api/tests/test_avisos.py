@@ -3,6 +3,8 @@ busca de SKUs da página de aviso e do efeito do aviso no painel. Cenário em
 `cenario_painel.py`."""
 from __future__ import annotations
 
+from uuid import uuid4
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -22,10 +24,12 @@ from src.api.tests.cenario_painel import (
     painel,
     preparar,
 )
+from src.painel.schemas import Aviso
+from src.usuarios.schemas import Usuario
 from tests.fakes import make_sku
 
 
-def test_aviso_valido_responde_201_e_fica_aberto(client: TestClient) -> None:
+def test_aviso_valido_responde_201_e_fica_aberto(client: TestClient, usuario_logado: Usuario) -> None:
     cenario = preparar()
 
     aviso = avisar(client, SOBRANDO, "vendendo_muito", comentario="  Cliente X quer 200 peças. ")
@@ -35,10 +39,11 @@ def test_aviso_valido_responde_201_e_fica_aberto(client: TestClient) -> None:
         "sku_code": SOBRANDO.sku_code,
         "tipo": "vendendo_muito",
         "comentario": "Cliente X quer 200 peças.",
-        "avisado_por": "Joana",
+        "avisado_por": usuario_logado.nome,
         "criado_em": "2026-10-01T09:00:00Z",
     }
-    assert [str(a.id) for a in cenario.avisos.listar()] == [aviso["id"]]
+    [gravado] = cenario.avisos.listar()
+    assert (str(gravado.id), gravado.usuario_id) == (aviso["id"], usuario_logado.id)
     assert client.get(f"/skus/{SOBRANDO.sku_code}/avisos").json() == [aviso]
 
 
@@ -46,7 +51,7 @@ def test_avisos_abertos_vem_do_mais_recente_para_o_mais_antigo(client: TestClien
     cenario = preparar()
     primeiro = avisar(client, URGENTE)
     cenario.relogio.avancar(hours=2)
-    segundo = avisar(client, URGENTE, "vendendo_muito", avisado_por="Bia")
+    segundo = avisar(client, URGENTE, "vendendo_muito")
 
     abertos = client.get(f"/skus/{URGENTE.sku_code}/avisos").json()
 
@@ -63,7 +68,7 @@ def test_comentario_em_branco_vira_nulo(client: TestClient) -> None:
 def test_aviso_de_sku_inexistente_responde_404(client: TestClient) -> None:
     preparar()
 
-    response = client.post("/avisos", json={"sku_code": "NAO-EXISTE", "tipo": "acabou", "avisado_por": "Joana"})
+    response = client.post("/avisos", json={"sku_code": "NAO-EXISTE", "tipo": "acabou"})
 
     assert response.status_code == 404
     assert client.get("/skus/NAO-EXISTE/avisos").status_code == 404
@@ -72,22 +77,45 @@ def test_aviso_de_sku_inexistente_responde_404(client: TestClient) -> None:
 def test_aviso_de_sku_inativo_responde_422_e_nao_grava(client: TestClient) -> None:
     cenario = preparar()
 
-    response = client.post("/avisos", json={"sku_code": INATIVO.sku_code, "tipo": "acabou", "avisado_por": "Joana"})
+    response = client.post("/avisos", json={"sku_code": INATIVO.sku_code, "tipo": "acabou"})
 
     assert response.status_code == 422
     assert "inativo" in response.json()["detail"]
     assert cenario.avisos.listar() == []
 
 
-@pytest.mark.parametrize(
-    "corpo",
-    [
-        {"tipo": "faltando", "avisado_por": "Joana"},
-        {"tipo": "acabou", "avisado_por": "   "},
-        {"tipo": "acabou"},
-    ],
-    ids=["tipo-invalido", "nome-em-branco", "sem-nome"],
-)
+def test_aviso_grava_o_usuario_logado_e_ignora_nome_no_corpo(client: TestClient, usuario_logado: Usuario) -> None:
+    cenario = preparar()
+
+    aviso = avisar(client, URGENTE, avisado_por="Outra Pessoa")
+
+    assert aviso["avisado_por"] == usuario_logado.nome
+    assert [a.usuario_id for a in cenario.avisos.listar()] == [usuario_logado.id]
+
+
+def test_aviso_antigo_continua_com_o_nome_digitado(client: TestClient) -> None:
+    cenario = preparar()
+    antigo = Aviso(
+        id=uuid4(),
+        sku_code=URGENTE.sku_code,
+        tipo="acabou",
+        comentario=None,
+        avisado_por="Joana digitou",
+        usuario_id=None,
+        criado_em=AGORA.replace(hour=8),
+    )
+    cenario.avisos.gravar(antigo)
+    novo = avisar(client, URGENTE, "vendendo_muito")
+
+    abertos = client.get(f"/skus/{URGENTE.sku_code}/avisos").json()
+
+    assert [(a["id"], a["avisado_por"]) for a in abertos] == [
+        (novo["id"], "Pessoa Teste"),
+        (str(antigo.id), "Joana digitou"),
+    ]
+
+
+@pytest.mark.parametrize("corpo", [{"tipo": "faltando"}, {}], ids=["tipo-invalido", "sem-tipo"])
 def test_aviso_invalido_responde_422(client: TestClient, corpo: dict) -> None:
     cenario = preparar()
 
@@ -99,7 +127,7 @@ def test_aviso_invalido_responde_422(client: TestClient, corpo: dict) -> None:
 
 def test_sku_com_aviso_e_sem_motivo_entra_no_primeiro_grupo_do_painel(client: TestClient) -> None:
     preparar()
-    avisar(client, SOBRANDO, "vendendo_muito", avisado_por="Bia")
+    aviso = avisar(client, SOBRANDO, "vendendo_muito")
 
     alertas = painel(client)["alertas"]
 
@@ -116,15 +144,14 @@ def test_sku_com_aviso_e_sem_motivo_entra_no_primeiro_grupo_do_painel(client: Te
     assert sobrando["motivos"] == []
     assert sobrando["so_por_aviso"] is True
     assert sobrando["avisos_abertos"] == 1
-    assert sobrando["ultimo_aviso"]["tipo"] == "vendendo_muito"
-    assert sobrando["ultimo_aviso"]["avisado_por"] == "Bia"
+    assert sobrando["ultimo_aviso"] == aviso
 
 
 def test_aviso_de_sku_com_motivo_sobe_para_o_primeiro_grupo_e_conta_os_avisos(client: TestClient) -> None:
     cenario = preparar()
     avisar(client, PISO)
     cenario.relogio.avancar(minutes=5)
-    avisar(client, PISO, "vendendo_muito", avisado_por="Bia")
+    ultimo = avisar(client, PISO, "vendendo_muito")
 
     alertas = painel(client)["alertas"]
 
@@ -132,7 +159,7 @@ def test_aviso_de_sku_com_motivo_sobe_para_o_primeiro_grupo_e_conta_os_avisos(cl
     piso = alertas[0]
     assert piso["so_por_aviso"] is False
     assert piso["avisos_abertos"] == 2
-    assert piso["ultimo_aviso"]["avisado_por"] == "Bia"
+    assert piso["ultimo_aviso"] == ultimo
 
 
 def test_busca_sem_acento_nem_maiuscula_acha_o_sku(client: TestClient) -> None:

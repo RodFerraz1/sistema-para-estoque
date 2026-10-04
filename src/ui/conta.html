@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minha conta - Copilot de Compras</title>
+  <link rel="stylesheet" href="estilo.css">
+  <script type="module" src="conta.js"></script>
+</head>
+<body>
+  <header>
+    <div class="conteudo">
+      <strong class="marca">Copilot de Compras</strong>
+      <nav aria-label="Telas do Copilot"></nav>
+    </div>
+  </header>
+  <main class="conteudo estreito">
+    <h1>Minha conta</h1>
+    <p class="suave">Os seus dados de acesso ao Copilot.</p>
+    <section class="card" aria-labelledby="t-voce">
+      <h2 id="t-voce">Você</h2>
+      <div id="voce"><p class="carregando">Carregando...</p></div>
+    </section>
+
+    <form id="senha-form" class="card" novalidate aria-labelledby="t-senha">
+      <h2 id="t-senha">Trocar a senha</h2>
+      <input type="text" id="usuario" autocomplete="username" hidden>
+      <div class="campo">
+        <label for="senha-atual">Senha atual</label>
+        <input id="senha-atual" type="password" autocomplete="current-password" maxlength="200">
+      </div>
+      <div class="campo">
+        <label for="nova-senha">Nova senha</label>
+        <input id="nova-senha" type="password" autocomplete="new-password" maxlength="200">
+        <p class="suave">Pelo menos 8 caracteres.</p>
+      </div>
+      <div class="campo">
+        <label for="repetir-senha">Repita a nova senha</label>
+        <input id="repetir-senha" type="password" autocomplete="new-password" maxlength="200">
+      </div>
+      <button id="trocar" type="submit" class="primario grande">Trocar a senha</button>
+      <div id="resultado"></div>
+    </form>
+
+    <section class="card" aria-labelledby="t-sair">
+      <h2 id="t-sair">Sair</h2>
+      <p class="suave">Vai deixar o celular ou o computador com outra pessoa? Saia da conta. Para entrar de novo, use o e-mail e a senha.</p>
+      <button id="sair" type="button" class="grande">Sair da conta</button>
+    </section>
+  </main>
+</body>
+</html>

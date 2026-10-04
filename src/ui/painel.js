@@ -51,15 +51,6 @@ const GRUPOS = [
 ];
 
 document.getElementById("saudacao").textContent = saudacao();
-document.getElementById("copiar-link").addEventListener("click", async (evento) => {
-  const link = new URL("aviso.html", location.href).href;
-  try {
-    await navigator.clipboard.writeText(link);
-    evento.currentTarget.textContent = "Link copiado";
-  } catch {
-    evento.currentTarget.textContent = link;
-  }
-});
 
 function saudacao() {
   const hora = new Date().getHours();

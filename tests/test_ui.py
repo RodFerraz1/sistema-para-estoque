@@ -9,12 +9,13 @@ from fastapi.testclient import TestClient
 from src.main import UI_DIR, app
 from src.politica_compra.schemas import MotivoAlerta
 
-PAGINAS = ["index.html", "sku.html", "aviso.html", "politica.html", "login.html"]
+PAGINAS = ["index.html", "sku.html", "aviso.html", "politica.html", "login.html", "usuarios.html", "conta.html"]
 PAPEL_DAS_PAGINAS = {
     "index.html": "comprador",
     "sku.html": "comprador",
     "politica.html": "comprador",
     "aviso.html": "vendas",
+    "usuarios.html": "admin",
 }
 PAGINAS_DO_COMPRADOR = {"index.html": "painel.js", "sku.html": "sku.js", "politica.html": "politica.js"}
 TIPOS = {".html": "text/html", ".css": "text/css", ".js": "text/javascript"}
@@ -84,7 +85,18 @@ def test_ui_pede_ao_navegador_para_revalidar_sempre(client: TestClient, arquivo:
 
 def test_assets_referenciados_respondem_com_o_tipo_certo(client: TestClient) -> None:
     assets = _assets()
-    assert {"estilo.css", "comum.js", "painel.js", "sku.js", "aviso.js", "chat.js", "politica.js", "login.js"} <= assets
+    assert {
+        "estilo.css",
+        "comum.js",
+        "painel.js",
+        "sku.js",
+        "aviso.js",
+        "chat.js",
+        "politica.js",
+        "login.js",
+        "usuarios.js",
+        "conta.js",
+    } <= assets
 
     for asset in sorted(assets):
         response = client.get(f"/ui/{asset}")
@@ -112,6 +124,15 @@ def test_cada_pagina_chama_a_api() -> None:
     assert {("GET", "/politica-compra"), ("PUT", "/politica-compra")} <= set(chamadas["politica.js"])
     assert chamadas["login.js"] == [("POST", "/login")]
     assert {("GET", "/eu"), ("POST", "/logout")} <= set(chamadas["comum.js"])
+    assert set(chamadas["usuarios.js"]) == {
+        ("GET", "/usuarios"),
+        ("POST", "/usuarios"),
+        ("PUT", "/usuarios/${pessoa.id}/papeis"),
+        ("POST", "/usuarios/${pessoa.id}/desativar"),
+        ("POST", "/usuarios/${pessoa.id}/reativar"),
+        ("PUT", "/usuarios/${pessoa.id}/senha"),
+    }
+    assert chamadas["conta.js"] == [("PUT", "/eu/senha")]
 
 
 def test_endpoints_chamados_pelos_js_existem_no_app() -> None:
@@ -147,8 +168,25 @@ def test_pagina_de_aviso_nao_tem_chat() -> None:
     assert 'name="viewport"' in html
 
 
-def test_painel_tem_link_para_a_pagina_de_aviso() -> None:
-    assert 'href="aviso.html"' in (UI_DIR / "index.html").read_text()
+def test_painel_tem_link_para_a_pagina_de_aviso_e_nao_tem_mais_o_link_publico() -> None:
+    html = (UI_DIR / "index.html").read_text()
+
+    assert 'href="aviso.html"' in html
+    assert "copiar" not in html.lower() + (UI_DIR / "painel.js").read_text().lower()
+
+
+def test_aviso_e_decisao_nao_pedem_mais_o_nome() -> None:
+    for pagina, script, campo in [("aviso.html", "aviso.js", "avisado_por"), ("sku.html", "sku.js", "decidido_por:")]:
+        assert "Seu nome" not in (UI_DIR / pagina).read_text()
+        js = (UI_DIR / script).read_text()
+        assert campo not in js and "lerNome" not in js and "guardarNome" not in js
+    assert "localStorage" not in (UI_DIR / "comum.js").read_text()
+
+
+def test_conta_monta_o_cabecalho_de_qualquer_papel_e_o_nome_leva_a_ela() -> None:
+    assert re.search(r"<nav[^>]*></nav>", (UI_DIR / "conta.html").read_text())
+    assert "cabecalho()" in (UI_DIR / "conta.js").read_text()
+    assert 'href: "conta.html"' in (UI_DIR / "comum.js").read_text()
 
 
 def test_linhas_do_painel_abrem_a_tela_do_sku() -> None:
@@ -186,6 +224,7 @@ def test_o_menu_so_aponta_para_telas_que_existem() -> None:
 
     assert ("comprador", "index.html") == telas[0]
     assert ("vendas", "aviso.html") in telas
+    assert ("admin", "usuarios.html") in telas
     assert all((UI_DIR / href).exists() for _, href in telas)
 
 

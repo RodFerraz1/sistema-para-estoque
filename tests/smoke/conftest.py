@@ -22,6 +22,8 @@ from src.ai.ingestao import ingerir
 from src.db.config import get_settings
 from src.db.engine import get_engine
 from src.main import app
+from src.usuarios.postgres import PostgresUsuariosRepositorio
+from tests.fakes import make_usuario
 
 ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
 
@@ -42,6 +44,18 @@ def _banco_migrado_e_populado() -> None:
     command.upgrade(Config(str(ALEMBIC_INI)), "head")
     run_seed()
     ingerir(get_settings().corpus_dir, get_embedder(), get_trechos_repositorio())
+    _gravar_usuario_fake()
+
+
+def _gravar_usuario_fake() -> None:
+    """Avisos, decisões e registros apontam para `copilot.usuarios`, então o usuário fake do
+    `conftest.py` da raiz precisa existir no banco. Fica desativado: ninguém entra com ele."""
+    repo = PostgresUsuariosRepositorio(get_engine())
+    fake = make_usuario().model_copy(
+        update={"nome": "Testes automáticos", "email": "testes-automaticos@copilot.teste", "ativo": False}
+    )
+    if repo.por_id(fake.id) is None:
+        repo.gravar(fake)
 
 
 @pytest.fixture(scope="session")

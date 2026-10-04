@@ -305,7 +305,8 @@ class RegistroDecisao(BaseModel):
     `confianca` repetem o `entendimento` para o M8 filtrar sem abrir o jsonb.
     `trechos` são os ids que foram ao redator. `sinais` traz um item por sugestão,
     com `sinais` nulo quando não foram calculados. `sku_em_contexto` é o SKU da tela de
-    onde o comprador perguntou, nulo fora da tela do SKU."""
+    onde o comprador perguntou, nulo fora da tela do SKU. `usuario_id` é quem perguntou,
+    nulo nos registros de antes do login."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -325,3 +326,4 @@ class RegistroDecisao(BaseModel):
     sinais: list[SinaisDoSKU]
     citacoes: list[VerificacaoCitacao]
     sku_em_contexto: str | None = None
+    usuario_id: UUID | None = None

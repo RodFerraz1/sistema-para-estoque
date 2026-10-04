@@ -56,6 +56,7 @@ export const TELAS = [
   { papel: "comprador", href: "index.html", rotulo: "Painel" },
   { papel: "comprador", href: "politica.html", rotulo: "Política" },
   { papel: "vendas", href: "aviso.html", rotulo: "Avisar o comprador" },
+  { papel: "admin", href: "usuarios.html", rotulo: "Usuários" },
 ];
 
 export function telaInicial(eu) {
@@ -66,7 +67,7 @@ function paginaAtual() {
   return location.pathname.split("/").pop() || "index.html";
 }
 
-async function sair() {
+export async function sair() {
   try {
     await api("POST", "/logout");
   } finally {
@@ -96,7 +97,12 @@ export async function cabecalho(papelDaTela) {
     elemento.hidden = !eu.papeis.includes(elemento.dataset.papel);
   }
   document.querySelector("header .conteudo").append(
-    el("div", { class: "sessao" }, el("span", { class: "sessao-nome" }, eu.nome), el("button", { type: "button", onclick: sair }, "Sair")),
+    el(
+      "div",
+      { class: "sessao" },
+      el("a", { class: "sessao-nome", href: "conta.html", title: "Minha conta", "aria-current": atual === "conta.html" ? "page" : null }, eu.nome),
+      el("button", { type: "button", onclick: sair }, "Sair"),
+    ),
   );
   return eu;
 }
@@ -213,18 +219,15 @@ export function sinais(lista) {
   ];
 }
 
-export function lerNome(chave = "copilot.nome") {
-  try {
-    return localStorage.getItem(chave) ?? "";
-  } catch {
-    return "";
-  }
-}
+export const PAPEIS = {
+  comprador: { rotulo: "Comprador", descricao: "painel, tela do SKU, política, preços e chat" },
+  vendas: { rotulo: "Vendas", descricao: "busca de produto e avisos ao comprador" },
+  reposicao: { rotulo: "Reposição", descricao: "busca de produto e painel do repositor" },
+  admin: { rotulo: "Admin", descricao: "cadastro das pessoas" },
+};
 
-export function guardarNome(nome, chave = "copilot.nome") {
-  try {
-    localStorage.setItem(chave, nome);
-  } catch {}
+export function selosDePapel(papeis) {
+  return papeis.map((p) => el("span", { class: "selo" }, PAPEIS[p]?.rotulo ?? p));
 }
 
 export const TIPOS_DE_AVISO = { acabou: "Acabou", vendendo_muito: "Vendendo muito" };

@@ -19,6 +19,7 @@ from src.ai.in_memory import InMemoryRegistrosDecisao
 from src.ai.registro import RegistrosDecisao
 from src.ai.schemas import RegistroDecisao, SinaisDoSKU, SinalCorpus, VerificacaoCitacao
 from src.db.engine import get_engine
+from tests.autor_no_banco import AUTOR, autor_no_banco
 from tests.fakes import make_entendimento
 
 INICIO = datetime(2026, 9, 30, 12, 0, tzinfo=UTC)
@@ -41,7 +42,7 @@ _sem_banco = pytest.mark.skipif(
 
 @pytest.fixture
 def postgres() -> Iterator[PostgresRegistrosDecisao]:
-    with get_engine().connect() as conn:
+    with autor_no_banco(), get_engine().connect() as conn:
         conn.execute(
             text("CREATE TEMP TABLE backup_registros AS SELECT * FROM copilot.registros_decisao")
         )
@@ -102,6 +103,14 @@ def test_gravar_e_listar_devolve_o_registro_inteiro(registros: RegistrosDecisao)
     registros.gravar(gravado)
 
     assert registros.listar(10) == [gravado]
+
+
+def test_registro_guarda_quem_perguntou_e_o_antigo_fica_sem_usuario(registros: RegistrosDecisao) -> None:
+    antigo, novo = registro(0), registro(1, usuario_id=AUTOR.id)
+    registros.gravar(antigo)
+    registros.gravar(novo)
+
+    assert registros.listar(10) == [novo, antigo]
 
 
 def test_entendimento_volta_com_as_probabilidades(registros: RegistrosDecisao) -> None:

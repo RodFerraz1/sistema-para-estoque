@@ -30,7 +30,6 @@ from src.politica_compra.schemas import MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
 from src.usuarios.schemas import Papel
 
-Nome = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 TextoLivre = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
 
 
@@ -311,7 +310,6 @@ class AvisoResponse(BaseModel):
 class RegistrarAvisoRequest(BaseModel):
     sku_code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     tipo: TipoAviso
-    avisado_por: Nome
     comentario: TextoLivre | None = None
 
 
@@ -359,7 +357,6 @@ class RegistrarDecisaoRequest(BaseModel):
     `nao_comprar_agora`."""
 
     tipo: TipoDecisao
-    decidido_por: Nome
     quantidade: int | None = None
     motivo: TextoLivre | None = None
     comentario: TextoLivre | None = None
@@ -397,3 +394,41 @@ class UsuarioResponse(BaseModel):
     nome: str
     email: str
     papeis: list[Papel]
+
+
+Senha = Annotated[str, StringConstraints(max_length=200)]
+
+
+class UsuarioAdminResponse(BaseModel):
+    """A pessoa como o admin vê na lista: papéis, situação e último acesso (nulo para
+    quem nunca entrou)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    nome: str
+    email: str
+    papeis: list[Papel]
+    ativo: bool
+    criado_em: datetime
+    ultimo_acesso_em: datetime | None
+
+
+class CriarUsuarioRequest(BaseModel):
+    nome: Annotated[str, StringConstraints(max_length=200)]
+    email: Annotated[str, StringConstraints(max_length=320)]
+    senha: Senha
+    papeis: list[Papel]
+
+
+class PapeisRequest(BaseModel):
+    papeis: list[Papel]
+
+
+class RedefinirSenhaRequest(BaseModel):
+    senha: Senha
+
+
+class TrocarSenhaRequest(BaseModel):
+    senha_atual: Senha
+    nova_senha: Senha

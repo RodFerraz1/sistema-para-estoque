@@ -50,6 +50,21 @@ class PostgresUsuariosRepositorio(UsuariosRepositorio):
     def por_email(self, email: str) -> Usuario | None:
         return self._um("email = :email", {"email": email})
 
+    def listar(self) -> list[Usuario]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(text(f"{_SELECT_USUARIO} ORDER BY lower(nome), id::text")).all()
+        return [Usuario.model_validate(row._asdict()) for row in rows]
+
+    def atualizar(self, usuario: Usuario) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE copilot.usuarios SET papeis = :papeis, ativo = :ativo, senha_hash = :senha_hash "
+                    "WHERE id = :id"
+                ),
+                usuario.model_dump(include={"id", "papeis", "ativo", "senha_hash"}),
+            )
+
     def registrar_acesso(self, usuario_id: UUID, quando: datetime) -> None:
         with self._engine.begin() as conn:
             conn.execute(
@@ -98,6 +113,16 @@ class PostgresSessoesRepositorio(SessoesRepositorio):
                     "WHERE token_hash = :token_hash AND revogada_em IS NULL"
                 ),
                 {"token_hash": token_hash, "quando": quando},
+            )
+
+    def revogar_do_usuario(self, usuario_id: UUID, quando: datetime) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE copilot.sessoes SET revogada_em = :quando "
+                    "WHERE usuario_id = :usuario_id AND revogada_em IS NULL"
+                ),
+                {"usuario_id": usuario_id, "quando": quando},
             )
 
 

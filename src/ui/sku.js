@@ -8,8 +8,6 @@ import {
   dataHora,
   dias,
   el,
-  guardarNome,
-  lerNome,
   mensagem,
   numero,
   numeros,
@@ -247,10 +245,8 @@ function formularioDeDecisao(sugestaoAtual) {
   const formulario = bloco("decisao-form");
   const quantidade = bloco("quantidade");
   const motivo = bloco("motivo");
-  const nome = bloco("decidido-por");
   const resultado = bloco("resultado-decisao");
   const botao = bloco("registrar");
-  nome.value = lerNome();
 
   sugestaoAtual
     .then((s) => {
@@ -276,7 +272,6 @@ function formularioDeDecisao(sugestaoAtual) {
     if (tipo() === null) return "Escolha o que você decidiu.";
     if (tipo() === "vou_comprar" && !(Number(quantidade.value) > 0)) return "Informe a quantidade que vai pedir.";
     if (tipo() === "nao_comprar_agora" && !motivo.value.trim()) return "Diga por que não vai comprar agora.";
-    if (!nome.value.trim()) return "Informe o seu nome.";
     return null;
   }
 
@@ -291,12 +286,10 @@ function formularioDeDecisao(sugestaoAtual) {
     try {
       await api("POST", `/skus/${sku}/decisoes`, {
         tipo: tipo(),
-        decidido_por: nome.value.trim(),
         quantidade: tipo() === "vou_comprar" ? Number(quantidade.value) : null,
         motivo: tipo() === "nao_comprar_agora" ? motivo.value.trim() : null,
         comentario: bloco("comentario-decisao").value.trim() || null,
       });
-      guardarNome(nome.value.trim());
       location.href = "index.html";
     } catch (e) {
       resultado.replaceChildren(mensagem("erro", `A decisão não foi registrada: ${e.message}`));

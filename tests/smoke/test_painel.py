@@ -22,6 +22,7 @@ from src.api.schemas import (
     SKUResumoResponse,
 )
 from src.db.engine import get_engine
+from src.usuarios.schemas import Usuario
 
 pytestmark = pytest.mark.smoke
 
@@ -41,7 +42,9 @@ def _painel(client: TestClient) -> PainelResponse:
     return PainelResponse.model_validate(response.json())
 
 
-def test_aviso_painel_e_decisao_contra_o_seed(client: TestClient, criados: dict[str, list[UUID]]) -> None:
+def test_aviso_painel_e_decisao_contra_o_seed(
+    client: TestClient, criados: dict[str, list[UUID]], usuario_logado: Usuario
+) -> None:
     antes = _painel(client)
     no_painel = {i.sku_code for i in antes.alertas} | {i.sku_code for i in antes.decididos}
     assert antes.alertas, "o seed deve ter SKUs pedindo atenção"
@@ -58,11 +61,12 @@ def test_aviso_painel_e_decisao_contra_o_seed(client: TestClient, criados: dict[
 
     response = client.post(
         "/avisos",
-        json={"sku_code": sku_code, "tipo": "vendendo_muito", "avisado_por": "Smoke do fluxo", "comentario": "Smoke."},
+        json={"sku_code": sku_code, "tipo": "vendendo_muito", "comentario": "Smoke."},
     )
     assert response.status_code == 201
     aviso = AvisoResponse.model_validate(response.json())
     criados["avisos"].append(aviso.id)
+    assert aviso.avisado_por == usuario_logado.nome
 
     item = next(i for i in _painel(client).alertas if i.sku_code == sku_code)
     assert item.so_por_aviso and item.motivos == []
@@ -70,11 +74,12 @@ def test_aviso_painel_e_decisao_contra_o_seed(client: TestClient, criados: dict[
 
     response = client.post(
         f"/skus/{sku_code}/decisoes",
-        json={"tipo": "nao_comprar_agora", "decidido_por": "Smoke do fluxo", "motivo": "Smoke: estoque suficiente."},
+        json={"tipo": "nao_comprar_agora", "motivo": "Smoke: estoque suficiente."},
     )
     assert response.status_code == 201
     decisao = DecisaoCompraResponse.model_validate(response.json())
     criados["decisoes_compra"].append(decisao.id)
+    assert decisao.decidido_por == usuario_logado.nome
     assert decisao.politica_versao >= 1
 
     depois = _painel(client)

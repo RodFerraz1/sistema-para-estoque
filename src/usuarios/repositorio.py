@@ -23,6 +23,14 @@ class UsuariosRepositorio(Protocol):
 
     def por_email(self, email: str) -> Usuario | None: ...
 
+    def listar(self) -> list[Usuario]:
+        """Todos, ativos ou não, pelo nome sem diferenciar maiúsculas (o `id` desempata)."""
+        ...
+
+    def atualizar(self, usuario: Usuario) -> None:
+        """Grava os papéis, a situação e o hash da senha do usuário com o mesmo `id`."""
+        ...
+
     def registrar_acesso(self, usuario_id: UUID, quando: datetime) -> None: ...
 
 
@@ -35,6 +43,10 @@ class SessoesRepositorio(Protocol):
 
     def revogar(self, token_hash: str, quando: datetime) -> None:
         """Não muda uma sessão já revogada."""
+        ...
+
+    def revogar_do_usuario(self, usuario_id: UUID, quando: datetime) -> None:
+        """Revoga as sessões abertas do usuário, sem mudar as já revogadas."""
         ...
 
 

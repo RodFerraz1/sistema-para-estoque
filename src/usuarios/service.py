@@ -12,7 +12,7 @@ import hashlib
 import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
@@ -60,6 +60,16 @@ class DadosInvalidos(ValueError):
     pass
 
 
+class UsuarioNaoEncontrado(LookupError):
+    def __init__(self) -> None:
+        super().__init__("Pessoa não encontrada.")
+
+
+class SenhaAtualErrada(ValueError):
+    def __init__(self) -> None:
+        super().__init__("A senha atual não confere.")
+
+
 class Usuarios:
     def __init__(
         self,
@@ -82,22 +92,63 @@ class Usuarios:
             raise DadosInvalidos("Informe o nome.")
         if "@" not in email:
             raise DadosInvalidos("Informe um e-mail válido.")
-        if len(senha) < TAMANHO_MINIMO_DA_SENHA:
-            raise DadosInvalidos(f"A senha precisa ter pelo menos {TAMANHO_MINIMO_DA_SENHA} caracteres.")
-        if not papeis:
-            raise DadosInvalidos("Escolha pelo menos um papel.")
         usuario = Usuario(
             id=uuid4(),
             nome=nome,
             email=email,
-            senha_hash=_hasher.hash(senha),
-            papeis=[p for p in PAPEIS if p in papeis],
+            senha_hash=_hash_da_senha(senha),
+            papeis=_papeis(papeis),
             ativo=True,
             criado_em=self._relogio(),
             ultimo_acesso_em=None,
         )
         self._usuarios.gravar(usuario)
         return usuario
+
+    def listar(self) -> list[Usuario]:
+        return self._usuarios.listar()
+
+    def mudar_papeis(self, admin: Usuario, usuario_id: UUID, papeis: list[Papel]) -> Usuario:
+        """Lança `UsuarioNaoEncontrado` e `DadosInvalidos` sem papel ou quando o admin tira
+        o próprio papel de admin."""
+        usuario = self._por_id(usuario_id)
+        if usuario.id == admin.id and "admin" not in papeis:
+            raise DadosInvalidos("Você não pode tirar o seu próprio papel de admin.")
+        return self._atualizar(usuario, papeis=_papeis(papeis))
+
+    def desativar(self, admin: Usuario, usuario_id: UUID) -> Usuario:
+        """A pessoa não entra mais e todas as sessões dela são revogadas. O que ela
+        registrou fica. Lança `UsuarioNaoEncontrado` e `DadosInvalidos` para o próprio admin."""
+        usuario = self._por_id(usuario_id)
+        if usuario.id == admin.id:
+            raise DadosInvalidos("Você não pode desativar a sua própria conta.")
+        self._sessoes.revogar_do_usuario(usuario.id, self._relogio())
+        return self._atualizar(usuario, ativo=False)
+
+    def reativar(self, usuario_id: UUID) -> Usuario:
+        return self._atualizar(self._por_id(usuario_id), ativo=True)
+
+    def redefinir_senha(self, usuario_id: UUID, senha: str) -> Usuario:
+        """Para quem esqueceu a senha. Lança `UsuarioNaoEncontrado` e `DadosInvalidos`
+        com senha curta."""
+        return self._atualizar(self._por_id(usuario_id), senha_hash=_hash_da_senha(senha))
+
+    def trocar_senha(self, usuario: Usuario, senha_atual: str, nova_senha: str) -> Usuario:
+        """Lança `SenhaAtualErrada` e `DadosInvalidos` com a nova senha curta."""
+        if not _senha_confere(usuario.senha_hash, senha_atual):
+            raise SenhaAtualErrada()
+        return self._atualizar(usuario, senha_hash=_hash_da_senha(nova_senha))
+
+    def _por_id(self, usuario_id: UUID) -> Usuario:
+        usuario = self._usuarios.por_id(usuario_id)
+        if usuario is None:
+            raise UsuarioNaoEncontrado()
+        return usuario
+
+    def _atualizar(self, usuario: Usuario, **mudancas: object) -> Usuario:
+        atualizado = usuario.model_copy(update=mudancas)
+        self._usuarios.atualizar(atualizado)
+        return atualizado
 
     def entrar(self, email: str, senha: str) -> tuple[Usuario, str]:
         """Abre uma sessão e devolve o usuário e o token do cookie. Lança `LoginBloqueado`
@@ -152,6 +203,18 @@ class Usuarios:
             if falhas[i] - falhas[i - MAXIMO_DE_FALHAS + 1] <= JANELA_DE_FALHAS
         ]
         return max((f for f in fins if f > agora), default=None)
+
+
+def _hash_da_senha(senha: str) -> str:
+    if len(senha) < TAMANHO_MINIMO_DA_SENHA:
+        raise DadosInvalidos(f"A senha precisa ter pelo menos {TAMANHO_MINIMO_DA_SENHA} caracteres.")
+    return _hasher.hash(senha)
+
+
+def _papeis(papeis: list[Papel]) -> list[Papel]:
+    if not papeis:
+        raise DadosInvalidos("Escolha pelo menos um papel.")
+    return [p for p in PAPEIS if p in papeis]
 
 
 def _senha_confere(senha_hash: str, senha: str) -> bool:

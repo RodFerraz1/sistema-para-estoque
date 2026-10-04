@@ -28,6 +28,15 @@ class InMemoryUsuariosRepositorio(UsuariosRepositorio):
     def por_email(self, email: str) -> Usuario | None:
         return next((u for u in self._usuarios.values() if u.email == email), None)
 
+    def listar(self) -> list[Usuario]:
+        return sorted(self._usuarios.values(), key=lambda u: (u.nome.lower(), str(u.id)))
+
+    def atualizar(self, usuario: Usuario) -> None:
+        atual = self._usuarios[usuario.id]
+        self._usuarios[usuario.id] = atual.model_copy(
+            update={"papeis": usuario.papeis, "ativo": usuario.ativo, "senha_hash": usuario.senha_hash}
+        )
+
     def registrar_acesso(self, usuario_id: UUID, quando: datetime) -> None:
         usuario = self._usuarios[usuario_id]
         self._usuarios[usuario_id] = usuario.model_copy(update={"ultimo_acesso_em": quando})
@@ -51,6 +60,11 @@ class InMemorySessoesRepositorio(SessoesRepositorio):
         sessao = self._sessoes.get(token_hash)
         if sessao is not None and sessao.revogada_em is None:
             self._sessoes[token_hash] = sessao.model_copy(update={"revogada_em": quando})
+
+    def revogar_do_usuario(self, usuario_id: UUID, quando: datetime) -> None:
+        for sessao in list(self._sessoes.values()):
+            if sessao.usuario_id == usuario_id:
+                self.revogar(sessao.token_hash, quando)
 
 
 class InMemoryTentativasLoginRepositorio(TentativasLoginRepositorio):

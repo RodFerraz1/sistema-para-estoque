@@ -1,8 +1,7 @@
-import { TIPOS_DE_AVISO, api, cabecalho, el, guardarNome, lerNome, mensagem } from "./comum.js";
+import { TIPOS_DE_AVISO, api, cabecalho, el, mensagem } from "./comum.js";
 
 cabecalho("vendas");
 
-const CHAVE_DO_NOME = "copilot.vendedora";
 const ESPERA_DA_BUSCA_MS = 300;
 
 const formulario = document.getElementById("aviso-form");
@@ -12,7 +11,6 @@ const resultados = document.getElementById("resultados");
 const escolhido = document.getElementById("escolhido");
 const botoesTipo = document.querySelectorAll(".tipos button");
 const comentario = document.getElementById("comentario");
-const nome = document.getElementById("nome");
 const enviar = document.getElementById("enviar");
 const resultado = document.getElementById("resultado");
 
@@ -20,8 +18,6 @@ let sku = null;
 let tipo = null;
 let espera = null;
 let ultimaBusca = 0;
-
-nome.value = lerNome(CHAVE_DO_NOME);
 
 function descricao(s) {
   return `${s.produto_nome}, ${s.cor}, ${s.tamanho}`;
@@ -96,7 +92,6 @@ for (const botao of botoesTipo) {
 function faltando() {
   if (sku === null) return "Escolha o produto.";
   if (tipo === null) return "Diga se acabou ou se está vendendo muito.";
-  if (!nome.value.trim()) return "Informe o seu nome.";
   return null;
 }
 
@@ -119,10 +114,8 @@ formulario.addEventListener("submit", async (evento) => {
     const aviso = await api("POST", "/avisos", {
       sku_code: sku.sku_code,
       tipo,
-      avisado_por: nome.value.trim(),
       comentario: comentario.value.trim() || null,
     });
-    guardarNome(aviso.avisado_por, CHAVE_DO_NOME);
     resultado.replaceChildren(
       mensagem("sucesso", `Aviso enviado ao comprador: ${descricao(sku)}, ${TIPOS_DE_AVISO[aviso.tipo].toLowerCase()}. Pode mandar o próximo.`),
     );

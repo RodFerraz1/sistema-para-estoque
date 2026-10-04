@@ -147,7 +147,7 @@ def codigos(itens: list[dict]) -> list[str]:
 
 def avisar(client: TestClient, sku: SKU, tipo: str = "acabou", **campos: str) -> dict:
     response = client.post(
-        "/avisos", json={"sku_code": sku.sku_code, "tipo": tipo, "avisado_por": "Joana", **campos}
+        "/avisos", json={"sku_code": sku.sku_code, "tipo": tipo, **campos}
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -155,7 +155,7 @@ def avisar(client: TestClient, sku: SKU, tipo: str = "acabou", **campos: str) ->
 
 def decidir(client: TestClient, sku: SKU, tipo: str = "negociando", **campos: object) -> dict:
     response = client.post(
-        f"/skus/{sku.sku_code}/decisoes", json={"tipo": tipo, "decidido_por": "Carlos", **campos}
+        f"/skus/{sku.sku_code}/decisoes", json={"tipo": tipo, **campos}
     )
     assert response.status_code == 201, response.text
     return response.json()

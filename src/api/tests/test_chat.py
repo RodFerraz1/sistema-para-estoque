@@ -23,6 +23,7 @@ from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.main import app
 from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
+from src.usuarios.schemas import Usuario
 from tests.fakes import (
     RedatorGravador,
     make_entendimento,
@@ -444,3 +445,11 @@ def test_sku_da_tela_desconhecido_responde_404_sem_registro(client: TestClient) 
 
     assert response.status_code == 404
     assert registros.listar(10) == []
+
+
+def test_registro_grava_quem_perguntou(client: TestClient, usuario_logado: Usuario) -> None:
+    registros = preparar(jev(make_entendimento("situacao_sku", 0.93)))
+
+    client.post("/chat", json={"pergunta": PERGUNTA})
+
+    assert [r.usuario_id for r in registros.listar(10)] == [usuario_logado.id]

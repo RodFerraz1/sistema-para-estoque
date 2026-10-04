@@ -4,80 +4,27 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Iterator
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
+from src.api.tests.cenario_usuarios import (  # noqa: F401 (fixtures)
+    SENHA,
+    XRW,
+    Cenario,
+    cenario,
+    client,
+    entrar,
+)
 from src.erp_adapter.dependencies import get_erp_adapter
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.main import app
-from src.usuarios.dependencies import (
-    NOME_DO_COOKIE,
-    get_relogio,
-    get_sessoes_repositorio,
-    get_tentativas_login_repositorio,
-    get_usuarios_repositorio,
-)
-from src.usuarios.in_memory import (
-    InMemorySessoesRepositorio,
-    InMemoryTentativasLoginRepositorio,
-    InMemoryUsuariosRepositorio,
-)
+from src.usuarios.dependencies import NOME_DO_COOKIE
 from src.usuarios.schemas import PAPEIS, Papel
-from src.usuarios.service import Usuarios
-from tests.fakes import RelogioFake, make_sku
+from tests.fakes import make_sku
 
 pytestmark = pytest.mark.login_de_verdade
-
-AGORA = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
-SENHA = "girassol-azul"
-XRW = {"X-Requested-With": "fetch"}
-DEPENDENCIAS = (get_usuarios_repositorio, get_sessoes_repositorio, get_tentativas_login_repositorio, get_relogio)
-
-
-@dataclass
-class Cenario:
-    usuarios: Usuarios
-    repo: InMemoryUsuariosRepositorio
-    sessoes: InMemorySessoesRepositorio
-    relogio: RelogioFake
-
-    def pessoa(self, nome: str, *papeis: Papel) -> str:
-        email = f"{nome.lower()}@loja.com"
-        self.usuarios.criar(nome, email, SENHA, list(papeis))
-        return email
-
-
-@pytest.fixture
-def cenario() -> Iterator[Cenario]:
-    usuarios, sessoes, tentativas = (
-        InMemoryUsuariosRepositorio(),
-        InMemorySessoesRepositorio(),
-        InMemoryTentativasLoginRepositorio(),
-    )
-    relogio = RelogioFake(AGORA)
-    app.dependency_overrides[get_usuarios_repositorio] = lambda: usuarios
-    app.dependency_overrides[get_sessoes_repositorio] = lambda: sessoes
-    app.dependency_overrides[get_tentativas_login_repositorio] = lambda: tentativas
-    app.dependency_overrides[get_relogio] = lambda: relogio
-    yield Cenario(Usuarios(usuarios, sessoes, tentativas, relogio=relogio), usuarios, sessoes, relogio)
-    for dependencia in DEPENDENCIAS:
-        app.dependency_overrides.pop(dependencia, None)
-
-
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
-
-
-def entrar(client: TestClient, email: str, senha: str = SENHA) -> dict:
-    response = client.post("/login", json={"email": email, "senha": senha}, headers=XRW)
-    assert response.status_code == 200, response.text
-    return response.json()
 
 
 def test_login_abre_sessao_em_cookie_e_eu_devolve_os_papeis(client: TestClient, cenario: Cenario) -> None:
@@ -247,8 +194,14 @@ def test_toda_rota_exige_login_menos_o_health_e_o_login(client: TestClient, cena
 PAPEIS_POR_ROTA: dict[tuple[str, str], set[Papel]] = {
     ("GET", "/skus"): {"comprador", "vendas", "reposicao"},
     ("POST", "/avisos"): {"vendas"},
+    ("GET", "/usuarios"): {"admin"},
+    ("POST", "/usuarios"): {"admin"},
+    ("PUT", "/usuarios/{usuario_id}/papeis"): {"admin"},
+    ("POST", "/usuarios/{usuario_id}/desativar"): {"admin"},
+    ("POST", "/usuarios/{usuario_id}/reativar"): {"admin"},
+    ("PUT", "/usuarios/{usuario_id}/senha"): {"admin"},
 }
-DE_QUALQUER_UM = {("GET", "/eu"), ("POST", "/logout")}
+DE_QUALQUER_UM = {("GET", "/eu"), ("POST", "/logout"), ("PUT", "/eu/senha")}
 
 
 def test_cada_rota_recusa_quem_nao_tem_o_papel_do_mapa(cenario: Cenario) -> None:

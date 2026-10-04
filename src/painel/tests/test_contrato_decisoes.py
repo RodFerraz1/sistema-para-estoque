@@ -22,6 +22,7 @@ from src.painel.in_memory import InMemoryDecisoesRepositorio
 from src.painel.postgres import PostgresDecisoesRepositorio
 from src.painel.repositorio import DecisoesRepositorio
 from src.painel.schemas import DecisaoCompra
+from tests.autor_no_banco import AUTOR, autor_no_banco
 
 INICIO = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
 BEGE = "TBC-BEGE-70140-01"
@@ -44,7 +45,7 @@ _sem_banco = pytest.mark.skipif(
 
 @pytest.fixture
 def postgres() -> Iterator[PostgresDecisoesRepositorio]:
-    with get_engine().connect() as conn:
+    with autor_no_banco(), get_engine().connect() as conn:
         conn.execute(text("CREATE TEMP TABLE backup_decisoes AS SELECT * FROM copilot.decisoes_compra"))
         conn.execute(text("DELETE FROM copilot.decisoes_compra"))
         conn.commit()
@@ -71,6 +72,7 @@ def decisao(sku_code: str = BEGE, *, minutos: int = 0, id: UUID | None = None, *
         "motivo": None,
         "comentario": None,
         "decidido_por": "Carlos",
+        "usuario_id": None,
         "quantidade_sugerida": 300,
         "politica_versao": 1,
     }
@@ -92,6 +94,14 @@ def test_gravar_e_listar_devolve_a_decisao_igual(decisoes: DecisoesRepositorio) 
         decisoes.gravar(d)
 
     assert decisoes.listar(BEGE) == list(reversed(gravadas))
+
+
+def test_autor_volta_igual_e_decisao_antiga_fica_sem_usuario(decisoes: DecisoesRepositorio) -> None:
+    antiga, nova = decisao(minutos=0), decisao(minutos=1, usuario_id=AUTOR.id)
+    decisoes.gravar(antiga)
+    decisoes.gravar(nova)
+
+    assert decisoes.listar(BEGE) == [nova, antiga]
 
 
 def test_listar_filtra_pelo_sku(decisoes: DecisoesRepositorio) -> None:

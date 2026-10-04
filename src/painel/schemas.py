@@ -16,7 +16,8 @@ TipoDecisao = Literal["vou_comprar", "negociando", "nao_comprar_agora"]
 
 class Aviso(BaseModel):
     """Recado da equipe de vendas sobre um SKU. Fica aberto até uma decisão de compra
-    do mesmo SKU registrada depois dele: não há coluna de status."""
+    do mesmo SKU registrada depois dele: não há coluna de status. `avisado_por` é o nome
+    de quem avisou no momento; `usuario_id` é nulo nos avisos de antes do login."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -25,6 +26,7 @@ class Aviso(BaseModel):
     tipo: TipoAviso
     comentario: str | None
     avisado_por: str
+    usuario_id: UUID | None
     criado_em: datetime
 
 
@@ -32,7 +34,8 @@ class DecisaoCompra(BaseModel):
     """O que o comprador chefe decidiu sobre um SKU. `quantidade` só em `vou_comprar` e
     `motivo` obrigatório em `nao_comprar_agora`. `quantidade_sugerida` (zero sem compra)
     e `politica_versao` são os da sugestão de pedido no momento da decisão, para comparar
-    depois o que o Copilot sugeriu com o que o comprador decidiu."""
+    depois o que o Copilot sugeriu com o que o comprador decidiu. `usuario_id` é nulo nas
+    decisões de antes do login."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -43,6 +46,7 @@ class DecisaoCompra(BaseModel):
     motivo: str | None
     comentario: str | None
     decidido_por: str
+    usuario_id: UUID | None
     quantidade_sugerida: int
     politica_versao: int
     criado_em: datetime

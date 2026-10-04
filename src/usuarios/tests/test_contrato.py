@@ -211,3 +211,45 @@ def test_postgres_recusa_email_com_maiuscula_e_papel_desconhecido(postgres: Repo
     ):
         with pytest.raises(IntegrityError):
             postgres.usuarios.gravar(invalido)
+
+
+def test_listar_vem_pelo_nome(repos: Repositorios) -> None:
+    bia, ana, carla = usuario("bia"), usuario("ana"), usuario("carla")
+    for u in (bia, ana, carla):
+        repos.usuarios.gravar(u)
+
+    listados = [u for u in repos.usuarios.listar() if u.email.endswith(DOMINIO)]
+
+    assert listados == [ana, bia, carla]
+
+
+def test_atualizar_troca_papeis_situacao_e_senha(repos: Repositorios) -> None:
+    gravado, outro = usuario(), usuario("bia")
+    repos.usuarios.gravar(gravado)
+    repos.usuarios.gravar(outro)
+    mudado = gravado.model_copy(
+        update={"papeis": ["comprador", "admin"], "ativo": False, "senha_hash": "$argon2id$nova"}
+    )
+
+    repos.usuarios.atualizar(mudado)
+
+    assert repos.usuarios.por_id(gravado.id) == mudado
+    assert repos.usuarios.por_id(outro.id) == outro
+
+
+def test_revogar_do_usuario_fecha_so_as_abertas_dele(repos: Repositorios) -> None:
+    dono, outro = usuario(), usuario("bia")
+    repos.usuarios.gravar(dono)
+    repos.usuarios.gravar(outro)
+    ja_revogada, aberta, do_outro = sessao(dono), sessao(dono), sessao(outro)
+    for s in (ja_revogada, aberta, do_outro):
+        repos.sessoes.gravar(s)
+    repos.sessoes.revogar(ja_revogada.token_hash, INICIO + timedelta(hours=1))
+
+    repos.sessoes.revogar_do_usuario(dono.id, INICIO + timedelta(hours=3))
+
+    revogada = repos.sessoes.por_token_hash(ja_revogada.token_hash)
+    assert revogada is not None and revogada.revogada_em == INICIO + timedelta(hours=1)
+    fechada = repos.sessoes.por_token_hash(aberta.token_hash)
+    assert fechada is not None and fechada.revogada_em == INICIO + timedelta(hours=3)
+    assert repos.sessoes.por_token_hash(do_outro.token_hash) == do_outro

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Usuários - Copilot de Compras</title>
+  <link rel="stylesheet" href="estilo.css">
+  <script type="module" src="usuarios.js"></script>
+</head>
+<body>
+  <header>
+    <div class="conteudo">
+      <strong class="marca">Copilot de Compras</strong>
+      <nav aria-label="Telas do Copilot"></nav>
+    </div>
+  </header>
+  <main class="conteudo medio">
+    <div class="cabecalho-pagina">
+      <div>
+        <h1>Usuários</h1>
+        <p class="suave">Quem usa o Copilot. Cada pessoa entra com o e-mail e a senha que você cadastrar e cai na tela do seu papel.</p>
+      </div>
+      <button id="abrir-cadastro" type="button" class="primario" aria-expanded="false" aria-controls="cadastro">Cadastrar pessoa</button>
+    </div>
+
+    <form id="cadastro" class="card" novalidate hidden>
+      <h2>Nova pessoa</h2>
+      <div class="campos-lado-a-lado">
+        <div class="campo">
+          <label for="nome">Nome</label>
+          <input id="nome" maxlength="200" autocomplete="off">
+        </div>
+        <div class="campo">
+          <label for="email">E-mail</label>
+          <input id="email" type="email" maxlength="320" autocomplete="off" autocapitalize="none" spellcheck="false">
+        </div>
+      </div>
+      <div class="campo">
+        <label for="senha">Senha inicial</label>
+        <input id="senha" type="text" maxlength="200" autocomplete="off" spellcheck="false">
+        <p class="suave">Pelo menos 8 caracteres. Passe para a pessoa: ela pode trocar depois em "Minha conta".</p>
+      </div>
+      <fieldset class="campo">
+        <legend><strong>Papéis</strong> <span class="suave">(pode marcar mais de um)</span></legend>
+        <div id="papeis-novos" class="escolhas papeis"></div>
+      </fieldset>
+      <div class="acoes">
+        <button id="cadastrar" type="submit" class="primario">Cadastrar</button>
+        <button id="cancelar-cadastro" type="button">Cancelar</button>
+      </div>
+      <div id="resultado-cadastro"></div>
+    </form>
+
+    <div id="aviso"></div>
+    <div id="resumo"></div>
+    <section class="card" aria-labelledby="t-pessoas">
+      <h2 id="t-pessoas">Pessoas</h2>
+      <div id="pessoas"><p class="carregando">Carregando...</p></div>
+    </section>
+  </main>
+</body>
+</html>

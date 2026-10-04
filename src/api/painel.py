@@ -29,6 +29,7 @@ from src.painel.service import (
     SKUNaoEncontrado,
 )
 from src.usuarios.dependencies import exige_papel
+from src.usuarios.schemas import Usuario
 
 router = APIRouter(tags=["painel"])
 
@@ -80,16 +81,16 @@ def painel(painel: Painel = Depends(get_painel)) -> PainelResponse:
     )
 
 
-@router.post(
-    "/avisos",
-    response_model=AvisoResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(exige_papel("vendas"))],
-)
-def registrar_aviso(corpo: RegistrarAvisoRequest, painel: Painel = Depends(get_painel)) -> AvisoResponse:
-    """O SKU entra no painel na hora. 404 sem o SKU, 422 com o SKU inativo."""
+@router.post("/avisos", response_model=AvisoResponse, status_code=status.HTTP_201_CREATED)
+def registrar_aviso(
+    corpo: RegistrarAvisoRequest,
+    usuario: Usuario = Depends(exige_papel("vendas")),
+    painel: Painel = Depends(get_painel),
+) -> AvisoResponse:
+    """Grava quem avisou pelo usuário logado. O SKU entra no painel na hora. 404 sem o SKU,
+    422 com o SKU inativo."""
     try:
-        aviso = painel.registrar_aviso(corpo.sku_code, corpo.tipo, corpo.avisado_por, corpo.comentario)
+        aviso = painel.registrar_aviso(corpo.sku_code, corpo.tipo, usuario, corpo.comentario)
     except SKUNaoEncontrado as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except SKUInativo as e:
@@ -121,21 +122,20 @@ def decisoes(
     return [decisao_to_response(d) for d in painel.decisoes(sku_code)]
 
 
-@router.post(
-    "/skus/{sku_code}/decisoes",
-    response_model=DecisaoCompraResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=COMPRADOR,
-)
+@router.post("/skus/{sku_code}/decisoes", response_model=DecisaoCompraResponse, status_code=status.HTTP_201_CREATED)
 def registrar_decisao(
-    sku_code: str, corpo: RegistrarDecisaoRequest, painel: Painel = Depends(get_painel)
+    sku_code: str,
+    corpo: RegistrarDecisaoRequest,
+    usuario: Usuario = Depends(exige_papel("comprador")),
+    painel: Painel = Depends(get_painel),
 ) -> DecisaoCompraResponse:
-    """Fecha os avisos abertos do SKU e o tira do painel por 7 dias, a não ser que chegue
-    aviso novo. Não cria pedido de compra. 404 sem o SKU, 422 com `vou_comprar` sem
-    quantidade maior que zero, quantidade em outro tipo ou `nao_comprar_agora` sem motivo."""
+    """Grava quem decidiu pelo usuário logado. Fecha os avisos abertos do SKU e o tira do
+    painel por 7 dias, a não ser que chegue aviso novo. Não cria pedido de compra. 404 sem o
+    SKU, 422 com `vou_comprar` sem quantidade maior que zero, quantidade em outro tipo ou
+    `nao_comprar_agora` sem motivo."""
     try:
         decisao = painel.registrar_decisao(
-            sku_code, corpo.tipo, corpo.decidido_por, corpo.quantidade, corpo.motivo, corpo.comentario
+            sku_code, corpo.tipo, usuario, corpo.quantidade, corpo.motivo, corpo.comentario
         )
     except SKUNaoEncontrado as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e

@@ -19,6 +19,7 @@ from src.painel.in_memory import InMemoryAvisosRepositorio
 from src.painel.postgres import PostgresAvisosRepositorio
 from src.painel.repositorio import AvisosRepositorio
 from src.painel.schemas import Aviso
+from tests.autor_no_banco import AUTOR, autor_no_banco
 
 INICIO = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
 
@@ -39,7 +40,7 @@ _sem_banco = pytest.mark.skipif(
 
 @pytest.fixture
 def postgres() -> Iterator[PostgresAvisosRepositorio]:
-    with get_engine().connect() as conn:
+    with autor_no_banco(), get_engine().connect() as conn:
         conn.execute(text("CREATE TEMP TABLE backup_avisos AS SELECT * FROM copilot.avisos"))
         conn.execute(text("DELETE FROM copilot.avisos"))
         conn.commit()
@@ -65,6 +66,7 @@ def aviso(
     minutos: int = 0,
     id: UUID | None = None,
     comentario: str | None = None,
+    usuario_id: UUID | None = None,
 ) -> Aviso:
     return Aviso(
         id=id or uuid4(),
@@ -72,6 +74,7 @@ def aviso(
         tipo="acabou",
         comentario=comentario,
         avisado_por="Joana",
+        usuario_id=usuario_id,
         criado_em=INICIO + timedelta(minutes=minutos),
     )
 
@@ -109,3 +112,11 @@ def test_mesma_hora_desempata_pelo_id(avisos: AvisosRepositorio) -> None:
     avisos.gravar(maior)
 
     assert avisos.listar() == [maior, menor]
+
+
+def test_autor_volta_igual_e_aviso_antigo_fica_sem_usuario(avisos: AvisosRepositorio) -> None:
+    antigo, novo = aviso(minutos=0), aviso(minutos=1, usuario_id=AUTOR.id)
+    avisos.gravar(antigo)
+    avisos.gravar(novo)
+
+    assert avisos.listar() == [novo, antigo]
