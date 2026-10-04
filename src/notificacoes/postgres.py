@@ -6,7 +6,7 @@ import json
 from collections.abc import Collection
 from datetime import datetime
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -20,6 +20,9 @@ _SELECT = f"SELECT {', '.join(_CAMPOS)} FROM copilot.episodios_alerta"
 _INSERT = text(
     f"INSERT INTO copilot.episodios_alerta ({', '.join(_CAMPOS)}) "
     f"VALUES ({', '.join('CAST(:detalhe AS jsonb)' if c == 'detalhe' else f':{c}' for c in _CAMPOS)})"
+)
+_DO_USUARIO = (
+    "(usuario_destino = :usuario_id OR (usuario_destino IS NULL AND papel_destino = ANY(:papeis)))"
 )
 # A varredura inteira roda com esta trava, para duas ao mesmo tempo não abrirem a mesma
 # condição duas vezes. O índice único parcial é a última defesa.
@@ -60,23 +63,20 @@ class PostgresEpisodiosRepositorio(EpisodiosRepositorio):
         with self._engine.begin() as conn:
             conn.execute(_INSERT, _linha(episodio))
 
-    def dos_papeis(self, papeis: Collection[Papel], limite: int) -> list[Episodio]:
+    def do_usuario(self, usuario_id: UUID, papeis: Collection[Papel], limite: int) -> list[Episodio]:
         with self._engine.connect() as conn:
             rows = conn.execute(
-                text(
-                    f"{_SELECT} WHERE papel_destino = ANY(:papeis) "
-                    "ORDER BY aberto_em DESC, id::text DESC LIMIT :limite"
-                ),
-                {"papeis": list(papeis), "limite": limite},
+                text(f"{_SELECT} WHERE {_DO_USUARIO} ORDER BY aberto_em DESC, id::text DESC LIMIT :limite"),
+                {"usuario_id": usuario_id, "papeis": list(papeis), "limite": limite},
             ).all()
         return [Episodio.model_validate(row._asdict()) for row in rows]
 
-    def abertos_depois(self, papeis: Collection[Papel], desde: datetime | None) -> int:
+    def abertos_depois(self, usuario_id: UUID, papeis: Collection[Papel], desde: datetime | None) -> int:
         with self._engine.connect() as conn:
             return conn.execute(
                 text(
-                    "SELECT count(*) FROM copilot.episodios_alerta WHERE papel_destino = ANY(:papeis) "
+                    f"SELECT count(*) FROM copilot.episodios_alerta WHERE {_DO_USUARIO} "
                     "AND (CAST(:desde AS timestamptz) IS NULL OR aberto_em > :desde)"
                 ),
-                {"papeis": list(papeis), "desde": desde},
+                {"usuario_id": usuario_id, "papeis": list(papeis), "desde": desde},
             ).scalar_one()

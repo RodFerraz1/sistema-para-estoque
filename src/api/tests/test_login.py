@@ -194,6 +194,8 @@ def test_toda_rota_exige_login_menos_o_health_e_o_login(client: TestClient, cena
 PAPEIS_POR_ROTA: dict[tuple[str, str], set[Papel]] = {
     ("GET", "/skus"): {"comprador", "vendas", "reposicao"},
     ("POST", "/avisos"): {"vendas"},
+    ("GET", "/avisos/meus"): {"vendas"},
+    ("GET", "/skus/{sku_code}/disponibilidade"): {"comprador", "vendas", "reposicao"},
     ("GET", "/reposicao/painel"): {"reposicao"},
     ("POST", "/skus/{sku_code}/verificacoes"): {"reposicao"},
     ("GET", "/skus/{sku_code}/verificacoes"): {"comprador", "reposicao"},

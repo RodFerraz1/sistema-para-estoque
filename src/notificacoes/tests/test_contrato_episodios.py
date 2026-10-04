@@ -3,7 +3,8 @@
 Roda contra `InMemoryEpisodiosRepositorio` e `PostgresEpisodiosRepositorio`. O Postgres
 requer `docker compose up` + `alembic upgrade head` e é pulado sem banco. Como a varredura
 olha a tabela inteira, a fixture guarda as linhas existentes numa tabela temporária,
-esvazia a tabela e devolve as linhas no teardown.
+esvazia a tabela e devolve as linhas no teardown. O `usuario_destino` aponta para
+`copilot.usuarios`, então o `AUTOR` fica no banco enquanto o teste roda.
 """
 from __future__ import annotations
 
@@ -20,10 +21,12 @@ from src.notificacoes.in_memory import InMemoryEpisodiosRepositorio
 from src.notificacoes.postgres import PostgresEpisodiosRepositorio
 from src.notificacoes.repositorio import EpisodiosRepositorio
 from src.notificacoes.schemas import Condicao, Episodio
+from tests.autor_no_banco import AUTOR, autor_no_banco
 
 INICIO = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
 PEDIDO = UUID("00000000-0000-0000-0000-0000000000a1")
 TIPOS_VARRIDOS = ("ruptura", "entrega_atrasada")
+OUTRA_PESSOA = UUID("00000000-0000-0000-0000-0000000000b2")
 
 
 def _db_disponivel() -> bool:
@@ -42,7 +45,7 @@ _sem_banco = pytest.mark.skipif(
 
 @pytest.fixture
 def postgres() -> Iterator[PostgresEpisodiosRepositorio]:
-    with get_engine().connect() as conn:
+    with autor_no_banco(), get_engine().connect() as conn:
         conn.execute(text("CREATE TEMP TABLE backup_episodios AS SELECT * FROM copilot.episodios_alerta"))
         conn.execute(text("DELETE FROM copilot.episodios_alerta"))
         conn.commit()
@@ -78,9 +81,25 @@ def aviso(minutos: int, sku_code: str = "TBC-AZUL-70140-01") -> Episodio:
         sku_code=sku_code,
         pedido_id=None,
         papel_destino="comprador",
+        usuario_destino=None,
         aberto_em=quando,
         fechado_em=quando,
         detalhe={"tipo": "acabou"},
+    )
+
+
+def decisao_sobre_aviso(minutos: int, sku_code: str = "TBC-AZUL-70140-01") -> Episodio:
+    quando = INICIO + timedelta(minutes=minutos)
+    return Episodio(
+        id=uuid4(),
+        tipo="decisao_sobre_aviso",
+        sku_code=sku_code,
+        pedido_id=None,
+        papel_destino="vendas",
+        usuario_destino=AUTOR.id,
+        aberto_em=quando,
+        fechado_em=quando,
+        detalhe={"tipo": "negociando"},
     )
 
 
@@ -89,7 +108,7 @@ def depois(minutos: int) -> datetime:
 
 
 def do_comprador(episodios: EpisodiosRepositorio) -> list[Episodio]:
-    return episodios.dos_papeis(["comprador"], limite=100)
+    return episodios.do_usuario(OUTRA_PESSOA, ["comprador"], limite=100)
 
 
 def test_varrer_abre_a_condicao_nova_com_o_detalhe_e_varrer_de_novo_nao_duplica(
@@ -130,7 +149,7 @@ def test_varrer_so_fecha_os_tipos_varridos_e_nao_toca_nos_eventos(episodios: Epi
     ]
 
 
-def test_dos_papeis_filtra_pelo_papel_e_vem_do_mais_recente_com_limite(episodios: EpisodiosRepositorio) -> None:
+def test_do_usuario_filtra_pelo_papel_e_vem_do_mais_recente_com_limite(episodios: EpisodiosRepositorio) -> None:
     episodios.gravar(aviso(1, "A"))
     episodios.gravar(aviso(3, "C"))
     episodios.gravar(aviso(2, "B"))
@@ -138,10 +157,11 @@ def test_dos_papeis_filtra_pelo_papel_e_vem_do_mais_recente_com_limite(episodios
         ["queda_de_venda"], [Condicao(tipo="queda_de_venda", sku_code="D", papel_destino="reposicao")], depois(4)
     )
 
-    assert [e.sku_code for e in episodios.dos_papeis(["comprador"], limite=2)] == ["C", "B"]
-    assert [e.sku_code for e in episodios.dos_papeis(["reposicao"], limite=10)] == ["D"]
-    assert [e.sku_code for e in episodios.dos_papeis(["comprador", "reposicao"], limite=10)] == ["D", "C", "B", "A"]
-    assert episodios.dos_papeis(["vendas"], limite=10) == []
+    assert [e.sku_code for e in episodios.do_usuario(OUTRA_PESSOA, ["comprador"], limite=2)] == ["C", "B"]
+    assert [e.sku_code for e in episodios.do_usuario(OUTRA_PESSOA, ["reposicao"], limite=10)] == ["D"]
+    todos = episodios.do_usuario(OUTRA_PESSOA, ["comprador", "reposicao"], limite=10)
+    assert [e.sku_code for e in todos] == ["D", "C", "B", "A"]
+    assert episodios.do_usuario(OUTRA_PESSOA, ["vendas"], limite=10) == []
 
 
 def test_abertos_depois_conta_so_os_do_papel_abertos_depois_do_cursor(episodios: EpisodiosRepositorio) -> None:
@@ -149,10 +169,23 @@ def test_abertos_depois_conta_so_os_do_papel_abertos_depois_do_cursor(episodios:
     episodios.gravar(aviso(2, "B"))
     episodios.gravar(aviso(3, "C"))
 
-    assert episodios.abertos_depois(["comprador"], None) == 3
-    assert episodios.abertos_depois(["comprador"], depois(2)) == 1
-    assert episodios.abertos_depois(["comprador"], depois(3)) == 0
-    assert episodios.abertos_depois(["vendas"], None) == 0
+    assert episodios.abertos_depois(OUTRA_PESSOA, ["comprador"], None) == 3
+    assert episodios.abertos_depois(OUTRA_PESSOA, ["comprador"], depois(2)) == 1
+    assert episodios.abertos_depois(OUTRA_PESSOA, ["comprador"], depois(3)) == 0
+    assert episodios.abertos_depois(OUTRA_PESSOA, ["vendas"], None) == 0
+
+
+def test_a_notificacao_para_uma_pessoa_so_aparece_para_ela(episodios: EpisodiosRepositorio) -> None:
+    episodios.gravar(decisao_sobre_aviso(1, "A"))
+    episodios.gravar(aviso(2, "B"))
+
+    assert [e.sku_code for e in episodios.do_usuario(AUTOR.id, ["vendas"], limite=10)] == ["A"]
+    assert [e.sku_code for e in episodios.do_usuario(AUTOR.id, ["comprador"], limite=10)] == ["B", "A"]
+    assert episodios.do_usuario(OUTRA_PESSOA, ["vendas"], limite=10) == []
+    assert episodios.do_usuario(AUTOR.id, ["vendas"], limite=10)[0].usuario_destino == AUTOR.id
+    assert episodios.abertos_depois(AUTOR.id, ["vendas"], None) == 1
+    assert episodios.abertos_depois(AUTOR.id, ["vendas"], depois(1)) == 0
+    assert episodios.abertos_depois(OUTRA_PESSOA, ["vendas"], None) == 0
 
 
 @_sem_banco

@@ -16,13 +16,17 @@ from src.api.conversores import (
 from src.api.schemas import (
     AvisoResponse,
     DecisaoCompraResponse,
+    DecisaoSobreAvisoResponse,
+    DisponibilidadeResponse,
     EstoqueResponse,
     FornecedorComAtrasoResponse,
     ItemAlertaResponse,
     ItemDecididoResponse,
     ItemEstoqueResponse,
+    MeuAvisoResponse,
     PainelResponse,
     PedidoAtrasadoResponse,
+    PrevisaoDeChegadaResponse,
     RegistrarAvisoRequest,
     RegistrarDecisaoRequest,
     SKUComEntregaAtrasadaResponse,
@@ -40,6 +44,7 @@ from src.painel.schemas import (
     ItemAlerta,
     ItemDecidido,
     ItemEstoque,
+    MeuAviso,
     MotivoDoFiltro,
     OrdemEstoque,
     PedidoAtrasado,
@@ -59,6 +64,7 @@ from src.usuarios.schemas import Usuario
 router = APIRouter(tags=["painel"])
 
 COMPRADOR = [Depends(exige_papel("comprador"))]
+QUEM_CONSULTA_SKU = [Depends(exige_papel("comprador", "vendas", "reposicao"))]
 
 
 def _dias(meses: float | None) -> float | None:
@@ -185,6 +191,59 @@ def registrar_aviso(
     except SKUInativo as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e)) from e
     return aviso_to_response(aviso)
+
+
+def _meu_aviso_to_response(item: MeuAviso) -> MeuAvisoResponse:
+    decisao = item.decisao
+    return MeuAvisoResponse(
+        id=item.aviso.id,
+        para="comprador",
+        sku_code=item.sku.sku_code,
+        produto_nome=item.sku.produto_nome,
+        cor=item.sku.cor,
+        tamanho=item.sku.tamanho,
+        tipo=item.aviso.tipo,
+        comentario=item.aviso.comentario,
+        criado_em=item.aviso.criado_em,
+        decisao=None
+        if decisao is None
+        else DecisaoSobreAvisoResponse(
+            tipo=decisao.tipo, quantidade=decisao.quantidade, motivo=decisao.motivo, criado_em=decisao.criado_em
+        ),
+    )
+
+
+@router.get("/avisos/meus", response_model=list[MeuAvisoResponse])
+def meus_avisos(
+    usuario: Usuario = Depends(exige_papel("vendas")), painel: Painel = Depends(get_painel)
+) -> list[MeuAvisoResponse]:
+    """Os avisos do usuário logado nos últimos 30 dias, do mais recente para o mais antigo,
+    cada um com a decisão de compra que o fechou (tipo, quantidade em `vou_comprar`, motivo
+    em `nao_comprar_agora` e data) ou nula, aguardando o comprador."""
+    return [_meu_aviso_to_response(a) for a in painel.meus_avisos(usuario)]
+
+
+@router.get(
+    "/skus/{sku_code}/disponibilidade", response_model=DisponibilidadeResponse, dependencies=QUEM_CONSULTA_SKU
+)
+def disponibilidade(sku_code: str, painel: Painel = Depends(get_painel)) -> DisponibilidadeResponse:
+    """A consulta da vendedora: o disponível, a situação (`tem`, `pouco` quando está em
+    ruptura, `acabou` com disponível zero) e o que falta chegar dos pedidos de compra, com a
+    previsão (a nova previsão da cobrança, quando houver) e se já está atrasada. Sem preço
+    de compra nem fornecedor. 404 sem o SKU."""
+    try:
+        resultado = painel.disponibilidade(sku_code)
+    except SKUNaoEncontrado as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    return DisponibilidadeResponse(
+        sku_code=resultado.sku.sku_code,
+        produto_nome=resultado.sku.produto_nome,
+        cor=resultado.sku.cor,
+        tamanho=resultado.sku.tamanho,
+        disponivel=resultado.disponivel,
+        situacao=resultado.situacao,
+        entregas=[PrevisaoDeChegadaResponse(**e.model_dump()) for e in resultado.entregas],
+    )
 
 
 @router.get("/skus/{sku_code}/avisos", response_model=list[AvisoResponse], dependencies=COMPRADOR)

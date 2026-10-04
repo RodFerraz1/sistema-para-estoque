@@ -2,6 +2,8 @@
 entrega são append-only."""
 from __future__ import annotations
 
+from collections.abc import Collection
+from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -16,12 +18,22 @@ class AvisosRepositorio(Protocol):
         antigo (o `id` desempata)."""
         ...
 
+    def do_usuario(self, usuario_id: UUID, desde: datetime) -> list[Aviso]:
+        """Os avisos do usuário registrados a partir de `desde`, do mais recente para o
+        mais antigo (o `id` desempata)."""
+        ...
+
 
 class DecisoesRepositorio(Protocol):
     def gravar(self, decisao: DecisaoCompra) -> None: ...
 
     def listar(self, sku_code: str) -> list[DecisaoCompra]:
         """As decisões do SKU, da mais recente para a mais antiga (o `id` desempata)."""
+        ...
+
+    def dos_skus(self, sku_codes: Collection[str], desde: datetime) -> list[DecisaoCompra]:
+        """As decisões dos SKUs registradas a partir de `desde`, da mais recente para a
+        mais antiga (o `id` desempata)."""
         ...
 
     def ultimas(self) -> dict[str, DecisaoCompra]:

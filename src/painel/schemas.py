@@ -28,6 +28,7 @@ GRUPOS: tuple[GrupoDoPainel, ...] = (
 MotivoDoFiltro = Literal["aviso"] | MotivoAlerta
 SituacaoEstoque = Literal["em_ruptura", "sem_venda", "com_transito"]
 OrdemEstoque = Literal["cobertura", "venda_diaria", "nome"]
+SituacaoDisponibilidade = Literal["tem", "pouco", "acabou"]
 POR_PAGINA_MAXIMO = 100
 
 
@@ -67,6 +68,17 @@ class DecisaoCompra(BaseModel):
     quantidade_sugerida: int
     politica_versao: int
     criado_em: datetime
+
+
+class MeuAviso(BaseModel):
+    """Aviso de uma vendedora com a decisão de compra que o fechou: a primeira do SKU
+    registrada depois dele. Sem decisão, o aviso aguarda o comprador."""
+
+    model_config = ConfigDict(frozen=True)
+
+    aviso: Aviso
+    sku: SKU
+    decisao: DecisaoCompra | None
 
 
 class ItemAlerta(BaseModel):
@@ -194,6 +206,30 @@ class EntregaPendente(BaseModel):
     @property
     def atrasada(self) -> bool:
         return self.dias_de_atraso is not None
+
+
+class PrevisaoDeChegada(BaseModel):
+    """O que falta chegar de um pedido de compra, para a vendedora. `previsao` é a nova
+    previsão da cobrança mais recente do pedido, quando houver, se não a data prevista do
+    pedido; nula sem nenhuma das duas. Atrasada quando a previsão já passou."""
+
+    model_config = ConfigDict(frozen=True)
+
+    quantidade: int
+    previsao: date | None
+    atrasada: bool
+
+
+class Disponibilidade(BaseModel):
+    """Se o SKU tem estoque e o que vem de compra, sem preço de compra nem fornecedor.
+    `pouco` é em ruptura (cobertura abaixo do piso de alerta) e `acabou` é disponível zero."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku: SKU
+    disponivel: int
+    situacao: SituacaoDisponibilidade
+    entregas: list[PrevisaoDeChegada]
 
 
 class ItemDecidido(BaseModel):

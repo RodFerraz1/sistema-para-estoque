@@ -7,7 +7,8 @@ enquanto dura e de novo se voltar. Quem sabe as condições é o módulo dono de
 `painel`, para o comprador); este módulo só guarda os episódios. Eventos de uma vez só,
 como o aviso da equipe de vendas, nascem fechados na hora em que acontecem.
 
-Notificação é o episódio visto por um usuário do papel de destino. Não lida é a aberta
+Notificação é o episódio visto por um usuário do papel de destino ou, quando o episódio é
+dirigido a uma pessoa (a decisão sobre o aviso de uma vendedora), só por ela. Não lida é a aberta
 depois do cursor `notificacoes_vistas_ate` do usuário. Não há agendador: as varreduras
 rodam quando alguém abre o Copilot.
 """
@@ -50,15 +51,15 @@ class Notificacoes:
         return episodio
 
     def caixa(self, usuario: Usuario) -> CaixaDeNotificacoes:
-        """As notificações dos papéis do usuário, as mais recentes primeiro (no máximo
-        `TAMANHO_DA_LISTA`), e o total de não lidas."""
+        """As notificações dirigidas ao usuário e as dos papéis dele, as mais recentes
+        primeiro (no máximo `TAMANHO_DA_LISTA`), e o total de não lidas."""
         cursor = usuario.notificacoes_vistas_ate
-        episodios = self._episodios.dos_papeis(usuario.papeis, TAMANHO_DA_LISTA)
+        episodios = self._episodios.do_usuario(usuario.id, usuario.papeis, TAMANHO_DA_LISTA)
         return CaixaDeNotificacoes(
             notificacoes=[
                 Notificacao(episodio=e, lida=cursor is not None and e.aberto_em <= cursor) for e in episodios
             ],
-            nao_lidas=self._episodios.abertos_depois(usuario.papeis, cursor),
+            nao_lidas=self._episodios.abertos_depois(usuario.id, usuario.papeis, cursor),
         )
 
     def marcar_vistas(self, usuario: Usuario) -> None:

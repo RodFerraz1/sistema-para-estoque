@@ -92,6 +92,7 @@ def capturar(
     pagina_inteira: bool,
     espera: float,
     clicar: str | None = None,
+    executar: Sequence[str] = (),
 ) -> None:
     perfil = Path(tempfile.mkdtemp(prefix="capturar-tela-"))
     chrome = subprocess.Popen(
@@ -117,6 +118,9 @@ def capturar(
             if clicar:
                 devtools.chamar("Runtime.evaluate", expression=f"document.querySelector({json.dumps(clicar)}).click()")
                 time.sleep(1)
+            for script in executar:
+                devtools.chamar("Runtime.evaluate", expression=script)
+                time.sleep(1.5)
             if pagina_inteira:
                 conteudo = devtools.chamar("Page.getLayoutMetrics")["cssContentSize"]
                 devtools.chamar(
@@ -146,6 +150,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--pagina-inteira", action="store_true", help="captura a altura toda da página")
     parser.add_argument("--espera", type=float, default=4.0, help="segundos depois do load, para as chamadas da API")
     parser.add_argument("--clicar", help="seletor CSS clicado depois da espera, antes da captura (ex.: button.sino)")
+    parser.add_argument(
+        "--executar",
+        action="append",
+        default=[],
+        help="JavaScript rodado na página depois do clique, um por vez com 1,5 s entre eles (repetível)",
+    )
     args = parser.parse_args(argv)
     if args.email and not args.senha:
         parser.error("--email pede --senha")
@@ -160,6 +170,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         pagina_inteira=args.pagina_inteira,
         espera=args.espera,
         clicar=args.clicar,
+        executar=args.executar,
     )
     print(args.arquivo)
 

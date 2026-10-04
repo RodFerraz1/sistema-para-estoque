@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Avisar o comprador - Copilot de Compras</title>
+  <title>Consultar e avisar - Copilot de Compras</title>
   <link rel="stylesheet" href="estilo.css">
   <script type="module" src="aviso.js"></script>
 </head>
@@ -15,10 +15,10 @@
     </div>
   </header>
   <main class="conteudo estreito">
-    <h1>Avisar o comprador</h1>
-    <p class="suave">Um produto acabou ou está vendendo muito? Avise aqui e o comprador vê na hora.</p>
+    <h1>Consultar e avisar</h1>
+    <p class="suave">Veja se tem, se vem compra e quando chega. Acabou ou está vendendo muito? Avise o comprador.</p>
 
-    <form id="aviso-form" class="card" novalidate>
+    <section class="card consulta" aria-label="Consultar um produto">
       <div class="campo">
         <label for="busca">Produto</label>
         <input id="busca" type="search" autocomplete="off" enterkeyhint="search" maxlength="100" placeholder="Digite o nome, a cor ou o tamanho">
@@ -27,22 +27,39 @@
         <div id="escolhido" class="escolhido" hidden></div>
       </div>
 
-      <fieldset class="campo">
-        <legend><strong>O que está acontecendo?</strong></legend>
-        <div class="tipos" role="group" aria-label="Tipo do aviso">
-          <button type="button" data-tipo="acabou" aria-pressed="false">Acabou<small>não tem na loja</small></button>
-          <button type="button" data-tipo="vendendo_muito" aria-pressed="false">Vendendo muito<small>muita gente pedindo</small></button>
-        </div>
-      </fieldset>
+      <div id="disponibilidade" class="disponibilidade" aria-live="polite" hidden></div>
 
-      <div class="campo">
-        <label for="comentario">Comentário <span class="suave">(opcional)</span></label>
-        <textarea id="comentario" maxlength="2000" placeholder="Ex.: cliente X quer 200 peças"></textarea>
+      <div id="acoes" class="acoes-vendedora" hidden>
+        <button id="abrir-aviso" type="button" class="primario grande" aria-expanded="false" aria-controls="aviso-form">Avisar o comprador</button>
       </div>
 
-      <button id="enviar" type="submit" class="primario grande">Enviar aviso</button>
+      <form id="aviso-form" class="aviso-form" novalidate hidden>
+        <fieldset class="campo">
+          <legend><strong>O que está acontecendo?</strong></legend>
+          <div class="tipos" role="group" aria-label="Tipo do aviso">
+            <button type="button" data-tipo="acabou" aria-pressed="false">Acabou<small>não tem na loja</small></button>
+            <button type="button" data-tipo="vendendo_muito" aria-pressed="false">Vendendo muito<small>muita gente pedindo</small></button>
+          </div>
+        </fieldset>
+
+        <div class="campo">
+          <label for="comentario">Comentário <span class="suave">(opcional)</span></label>
+          <textarea id="comentario" maxlength="2000" placeholder="Ex.: cliente X quer 200 peças"></textarea>
+        </div>
+
+        <button id="enviar" type="submit" class="primario grande">Enviar aviso</button>
+      </form>
       <div id="resultado"></div>
-    </form>
+    </section>
+
+    <section id="meus-avisos" class="grupo" aria-labelledby="t-meus-avisos">
+      <header>
+        <h2 id="t-meus-avisos">Meus avisos</h2>
+        <span id="contagem-meus-avisos" class="contagem" hidden></span>
+        <p class="suave">O que o comprador decidiu sobre o que você avisou nos últimos 30 dias.</p>
+      </header>
+      <div id="lista-meus-avisos"><p class="carregando">Carregando os seus avisos...</p></div>
+    </section>
   </main>
 </body>
 </html>

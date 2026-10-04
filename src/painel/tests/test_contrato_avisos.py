@@ -120,3 +120,17 @@ def test_autor_volta_igual_e_aviso_antigo_fica_sem_usuario(avisos: AvisosReposit
     avisos.gravar(novo)
 
     assert avisos.listar() == [novo, antigo]
+
+
+def test_do_usuario_traz_os_avisos_do_autor_desde_a_data_do_mais_recente_para_o_mais_antigo(
+    avisos: AvisosRepositorio,
+) -> None:
+    velho = aviso(minutos=0, usuario_id=AUTOR.id)
+    no_limite = aviso("TBC-BRAN-70140-01", minutos=10, usuario_id=AUTOR.id)
+    novo = aviso(minutos=20, usuario_id=AUTOR.id)
+    de_antes_do_login = aviso(minutos=30)
+    for a in (velho, no_limite, novo, de_antes_do_login):
+        avisos.gravar(a)
+
+    assert avisos.do_usuario(AUTOR.id, desde=INICIO + timedelta(minutes=10)) == [novo, no_limite]
+    assert avisos.do_usuario(uuid4(), desde=INICIO) == []

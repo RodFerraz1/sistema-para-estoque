@@ -159,3 +159,17 @@ def test_sem_decisao_ultimas_e_vazio(decisoes: DecisoesRepositorio) -> None:
 def test_check_constraints_espelham_as_validacoes(postgres: PostgresDecisoesRepositorio, campos: dict) -> None:
     with pytest.raises(IntegrityError):
         postgres.gravar(decisao(**campos))
+
+
+def test_dos_skus_traz_as_decisoes_desses_skus_desde_a_data_da_mais_recente_para_a_mais_antiga(
+    decisoes: DecisoesRepositorio,
+) -> None:
+    velha = decisao(BEGE, minutos=0)
+    no_limite = decisao(BEGE, minutos=10)
+    nova = decisao(BRANCO, minutos=20)
+    de_outro_sku = decisao("TBC-AZUL-70140-01", minutos=30)
+    for d in (velha, no_limite, nova, de_outro_sku):
+        decisoes.gravar(d)
+
+    assert decisoes.dos_skus([BEGE, BRANCO], desde=INICIO + timedelta(minutes=10)) == [nova, no_limite]
+    assert decisoes.dos_skus([], desde=INICIO) == []

@@ -58,7 +58,7 @@ export const TELAS = [
   { papel: "comprador", href: "index.html", rotulo: "Painel" },
   { papel: "comprador", href: "estoque.html", rotulo: "Estoque" },
   { papel: "comprador", href: "politica.html", rotulo: "Política" },
-  { papel: "vendas", href: "aviso.html", rotulo: "Avisar o comprador" },
+  { papel: "vendas", href: "aviso.html", rotulo: "Consultar e avisar" },
   { papel: "reposicao", href: "reposicao.html", rotulo: "Painel do repositor" },
   { papel: "admin", href: "usuarios.html", rotulo: "Usuários" },
 ];
@@ -238,7 +238,7 @@ export function sinais(lista) {
 
 export const PAPEIS = {
   comprador: { rotulo: "Comprador", descricao: "painel, tela do SKU, política, preços e chat" },
-  vendas: { rotulo: "Vendas", descricao: "busca de produto e avisos ao comprador" },
+  vendas: { rotulo: "Vendas", descricao: "consulta de produto, avisos ao comprador e meus avisos" },
   reposicao: { rotulo: "Reposição", descricao: "busca de produto e painel do repositor" },
   admin: { rotulo: "Admin", descricao: "cadastro das pessoas" },
 };
@@ -336,4 +336,10 @@ export function resumoDaDecisao(d) {
   if (d.motivo) partes.push(`motivo: ${d.motivo}`);
   if (d.comentario) partes.push(d.comentario);
   return partes.join(" · ");
+}
+
+export function decisaoParaVendas(d) {
+  if (d.tipo === "vou_comprar") return { texto: `Vai comprar ${numero(d.quantidade)} ${d.quantidade === 1 ? "peça" : "peças"}`, classe: "bom" };
+  if (d.tipo === "negociando") return { texto: "Está negociando com o fornecedor", classe: "destaque" };
+  return { texto: "Não vai comprar agora", classe: "" };
 }

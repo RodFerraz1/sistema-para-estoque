@@ -4,7 +4,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Collection
 from datetime import datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from src.notificacoes.repositorio import EpisodiosRepositorio, a_abrir_e_a_fechar
 from src.notificacoes.schemas import Condicao, Episodio, TipoEpisodio
@@ -32,11 +32,16 @@ class InMemoryEpisodiosRepositorio(EpisodiosRepositorio):
         with self._trava:
             self._episodios.append(episodio)
 
-    def _dos_papeis(self, papeis: Collection[Papel]) -> list[Episodio]:
-        return [e for e in self._episodios if e.papel_destino in papeis]
+    def _do_usuario(self, usuario_id: UUID, papeis: Collection[Papel]) -> list[Episodio]:
+        return [
+            e
+            for e in self._episodios
+            if e.usuario_destino == usuario_id or (e.usuario_destino is None and e.papel_destino in papeis)
+        ]
 
-    def dos_papeis(self, papeis: Collection[Papel], limite: int) -> list[Episodio]:
-        return sorted(self._dos_papeis(papeis), key=lambda e: (e.aberto_em, str(e.id)), reverse=True)[:limite]
+    def do_usuario(self, usuario_id: UUID, papeis: Collection[Papel], limite: int) -> list[Episodio]:
+        episodios = self._do_usuario(usuario_id, papeis)
+        return sorted(episodios, key=lambda e: (e.aberto_em, str(e.id)), reverse=True)[:limite]
 
-    def abertos_depois(self, papeis: Collection[Papel], desde: datetime | None) -> int:
-        return sum(1 for e in self._dos_papeis(papeis) if desde is None or e.aberto_em > desde)
+    def abertos_depois(self, usuario_id: UUID, papeis: Collection[Papel], desde: datetime | None) -> int:
+        return sum(1 for e in self._do_usuario(usuario_id, papeis) if desde is None or e.aberto_em > desde)

@@ -59,6 +59,13 @@ def criados() -> Iterator[dict[str, list[UUID]]]:
             ),
             {"ids": ids["avisos"]},
         )
+        conn.execute(
+            text(
+                "DELETE FROM copilot.episodios_alerta e USING copilot.decisoes_compra d WHERE d.id = ANY(:ids) "
+                "AND e.tipo = 'decisao_sobre_aviso' AND e.sku_code = d.sku_code AND e.aberto_em = d.criado_em"
+            ),
+            {"ids": ids["decisoes_compra"]},
+        )
         for tabela, lista in ids.items():
             conn.execute(text(f"DELETE FROM copilot.{tabela} WHERE id = ANY(:ids)"), {"ids": lista})
 
@@ -70,7 +77,7 @@ def _painel(client: TestClient) -> PainelResponse:
 
 
 def test_aviso_painel_e_decisao_contra_o_seed(
-    client: TestClient, criados: dict[str, list[UUID]], usuario_logado: Usuario
+    client: TestClient, criados: dict[str, list[UUID]], usuario_logado: Usuario, episodios_restaurados: None
 ) -> None:
     antes = _painel(client)
     no_painel = {i.sku_code for i in antes.alertas} | {i.sku_code for i in antes.decididos}
@@ -114,6 +121,11 @@ def test_aviso_painel_e_decisao_contra_o_seed(
     assert next(d for d in depois.decididos if d.sku_code == sku_code).decisao == decisao
     assert client.get(f"/skus/{sku_code}/avisos").json() == []
     assert client.get(f"/skus/{sku_code}/decisoes").json()[0]["id"] == str(decisao.id)
+    meu = next(a for a in client.get("/avisos/meus").json() if a["id"] == str(aviso.id))
+    assert meu["decisao"]["tipo"] == "nao_comprar_agora"
+    notificacoes = client.get("/notificacoes").json()["notificacoes"]
+    assert any(n["tipo"] == "decisao_sobre_aviso" and n["sku_code"] == sku_code for n in notificacoes)
+    assert client.get(f"/skus/{sku_code}/disponibilidade").json()["situacao"] in {"tem", "pouco", "acabou"}
 
 
 def test_cenarios_de_ruptura_do_seed_no_painel(client: TestClient) -> None:

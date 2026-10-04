@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
@@ -26,7 +26,7 @@ from src.ai.schemas import (
 from src.erp_adapter.schemas import StatusPedidoCompra
 from src.inventory.schemas import Cobertura, Estoque, StatusEmTransito
 from src.notificacoes.schemas import TipoEpisodio
-from src.painel.schemas import GrupoDoPainel, TipoAviso, TipoDecisao
+from src.painel.schemas import GrupoDoPainel, SituacaoDisponibilidade, TipoAviso, TipoDecisao
 from src.politica_compra.schemas import MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
 from src.reposicao.schemas import ResultadoVerificacao
@@ -296,6 +296,56 @@ class SKUResumoResponse(BaseModel):
     produto_nome: str
     cor: str
     tamanho: str
+
+
+class PrevisaoDeChegadaResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    quantidade: int
+    previsao: date | None
+    atrasada: bool
+
+
+class DisponibilidadeResponse(BaseModel):
+    """Sem preço de compra nem fornecedor: a vendedora também lê."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    produto_nome: str
+    cor: str
+    tamanho: str
+    disponivel: int
+    situacao: SituacaoDisponibilidade
+    entregas: list[PrevisaoDeChegadaResponse]
+
+
+class DecisaoSobreAvisoResponse(BaseModel):
+    """O que a vendedora vê da decisão de compra: sem comentário, sugestão nem política."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tipo: TipoDecisao
+    quantidade: int | None
+    motivo: str | None
+    criado_em: datetime
+
+
+class MeuAvisoResponse(BaseModel):
+    """`para` diz quem resolve o aviso. `decisao` nula: aguardando o comprador."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    para: Literal["comprador"]
+    sku_code: str
+    produto_nome: str
+    cor: str
+    tamanho: str
+    tipo: TipoAviso
+    comentario: str | None
+    criado_em: datetime
+    decisao: DecisaoSobreAvisoResponse | None
 
 
 class AvisoResponse(BaseModel):

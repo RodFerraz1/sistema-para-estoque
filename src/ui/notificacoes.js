@@ -1,4 +1,4 @@
-import { api, coberturaEmDias, el, mensagem, numero, quando } from "./comum.js";
+import { api, coberturaEmDias, decisaoParaVendas, el, mensagem, numero, quando } from "./comum.js";
 
 const INTERVALO_MS = 2 * 60 * 1000;
 const POPUP_FECHA_EM_MS = 12 * 1000;
@@ -9,6 +9,11 @@ const TIPOS = {
   entrega_atrasada: { rotulo: "Entrega atrasada", classe: "destaque", grupo: ["entrega atrasou", "entregas atrasaram"] },
   aviso: { rotulo: "Aviso das vendas", classe: "vendas", grupo: ["aviso da equipe de vendas", "avisos da equipe de vendas"] },
   estoque_divergente: { rotulo: "Estoque divergente", classe: "urgente", grupo: ["estoque divergente", "estoques divergentes"] },
+  decisao_sobre_aviso: {
+    rotulo: "Decisão do comprador",
+    classe: "bom",
+    grupo: ["decisão sobre o seu aviso", "decisões sobre os seus avisos"],
+  },
   queda_de_venda: {
     rotulo: "Parou de vender",
     classe: "urgente",
@@ -61,6 +66,13 @@ function conteudoDe(n) {
       href: `reposicao.html?busca=${encodeURIComponent(n.sku_code)}`,
       titulo: `${nomeDoSku(d)} parou de vender. Gôndola vazia?`,
       linha: `Vendia ${numero(d.venda_diaria_base, 1)} por dia, vendeu ${numero(d.vendido_na_janela)} em ${d.dias_observados} dias · ${numero(d.disponivel)} no estoque (ERP)`,
+    };
+  }
+  if (n.tipo === "decisao_sobre_aviso") {
+    return {
+      href: "aviso.html#meus-avisos",
+      titulo: `${d.decidido_por} decidiu sobre ${nomeDoSku(d)}`,
+      linha: `${decisaoParaVendas(d).texto}${d.motivo ? ` · ${d.motivo}` : ""}`,
     };
   }
   return { href: n.sku_code ? `sku.html?sku=${encodeURIComponent(n.sku_code)}` : null, titulo: n.tipo.replaceAll("_", " "), linha: null };

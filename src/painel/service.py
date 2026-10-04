@@ -18,7 +18,8 @@ mesmo da hora da verificação (se mudou, alguém ajustou o estoque).
 O painel também sabe as condições que notificam o comprador: SKU em ruptura sem decisão
 vigente, pedido com entrega atrasada sem cobrança vigente e SKU com estoque divergente,
 cada uma só com o motivo ligado na política. `varrer_episodios` as entrega ao módulo `notificacoes`. O aviso da
-equipe de vendas notifica na hora em que é registrado.
+equipe de vendas notifica na hora em que é registrado, e a decisão de compra que fecha
+avisos notifica cada vendedora autora, só ela.
 """
 from __future__ import annotations
 
@@ -36,7 +37,7 @@ from src.catalog.service import (
     sku_contem_todas,
 )
 from src.ficha_sku.schemas import Ficha
-from src.ficha_sku.service import FichaSKU
+from src.ficha_sku.service import FichaSKU, SKUSemEstoque
 from src.inventory.schemas import Cobertura, EntregaAtrasada, dias_de_atraso, dias_de_cobertura
 from src.inventory.service import Inventory
 from src.notificacoes.schemas import Condicao, TipoEpisodio
@@ -47,6 +48,7 @@ from src.painel.schemas import (
     Aviso,
     CobrancaEntrega,
     DecisaoCompra,
+    Disponibilidade,
     EntregaPendente,
     FiltroEstoque,
     FiltroPainel,
@@ -54,10 +56,13 @@ from src.painel.schemas import (
     ItemAlerta,
     ItemDecidido,
     ItemEstoque,
+    MeuAviso,
     OrdemEstoque,
     PaginaDeEstoque,
     PainelDeAlertas,
     PedidoAtrasado,
+    PrevisaoDeChegada,
+    SituacaoDisponibilidade,
     SKUComEntregaAtrasada,
     TipoAviso,
     TipoDecisao,
@@ -74,6 +79,7 @@ Relogio = Callable[[], datetime]
 
 PRAZO_DA_DECISAO = timedelta(days=7)
 PRAZO_DA_COBRANCA = timedelta(days=7)
+PRAZO_DE_MEUS_AVISOS = timedelta(days=30)
 TIPOS_DE_EPISODIO: tuple[TipoEpisodio, ...] = ("ruptura", "entrega_atrasada", "estoque_divergente")
 
 
@@ -156,6 +162,12 @@ def _cobranca_vigente(cobranca: CobrancaEntrega | None, agora: datetime) -> bool
     if cobranca.nova_previsao is not None:
         return agora.date() <= cobranca.nova_previsao
     return agora - cobranca.criado_em < PRAZO_DA_COBRANCA
+
+
+def _situacao(disponivel: int, cobertura: Cobertura, parametros: ParametrosPolitica) -> SituacaoDisponibilidade:
+    if disponivel <= 0:
+        return "acabou"
+    return "pouco" if _em_ruptura(cobertura, parametros) else "tem"
 
 
 def _abertos(avisos: list[Aviso], ultima: DecisaoCompra | None) -> list[Aviso]:
@@ -378,7 +390,8 @@ class Painel:
         comentario: str | None = None,
     ) -> DecisaoCompra:
         """Guarda a sugestão de pedido do momento (quantidade e versão da política). Fecha
-        os avisos abertos do SKU e o tira do painel por `PRAZO_DA_DECISAO`. Não cria pedido
+        os avisos abertos do SKU, notifica na hora cada vendedora autora de um deles (uma
+        vez por pessoa) e tira o SKU do painel por `PRAZO_DA_DECISAO`. Não cria pedido
         de compra. Lança `SKUNaoEncontrado`, `QuantidadeObrigatoria`,
         `QuantidadeSoParaComprar` e `MotivoObrigatorio`. Propaga `SKUSemEstoque`."""
         motivo = _opcional(motivo)
@@ -388,10 +401,11 @@ class Painel:
             raise QuantidadeSoParaComprar()
         if tipo == "nao_comprar_agora" and motivo is None:
             raise MotivoObrigatorio()
-        self._sku(sku_code)
+        sku = self._sku(sku_code)
         sugestao = self._purchasing.sugerir_pedido(sku_code)
         if sugestao is None:
             raise SKUNaoEncontrado(sku_code)
+        abertos = self.avisos_abertos(sku_code)
         decisao = DecisaoCompra(
             id=uuid4(),
             sku_code=sku_code,
@@ -406,6 +420,23 @@ class Painel:
             criado_em=self._relogio(),
         )
         self._decisoes.gravar(decisao)
+        for usuario_id in dict.fromkeys(a.usuario_id for a in abertos if a.usuario_id is not None):
+            self._notificacoes.registrar(
+                Condicao(
+                    tipo="decisao_sobre_aviso",
+                    sku_code=sku_code,
+                    papel_destino="vendas",
+                    usuario_destino=usuario_id,
+                    detalhe={
+                        **_nome_do_sku(sku),
+                        "tipo": tipo,
+                        "quantidade": quantidade,
+                        "motivo": motivo,
+                        "decidido_por": decisao.decidido_por,
+                    },
+                ),
+                decisao.criado_em,
+            )
         return decisao
 
     def registrar_cobranca(
@@ -455,10 +486,61 @@ class Painel:
             )
         return entregas
 
+    def disponibilidade(self, sku_code: str) -> Disponibilidade:
+        """Para a vendedora: o disponível, a situação pela política ativa e o que falta
+        chegar, pela previsão (sem previsão por último). Lança `SKUNaoEncontrado`. Lança
+        `SKUSemEstoque` para SKU sem a linha de estoque no ERP."""
+        sku = self._sku(sku_code)
+        estoque = self._inventory.estoque_atual(sku_code)
+        if estoque is None:
+            raise SKUSemEstoque(sku_code)
+        hoje = self._relogio().date()
+        entregas: list[PrevisaoDeChegada] = []
+        for item in self._inventory.em_transito(sku_code).itens:
+            cobrancas = self._cobrancas.listar(item.pedido_id)
+            nova = cobrancas[0].nova_previsao if cobrancas else None
+            previsao = nova or item.data_prevista_entrega
+            entregas.append(
+                PrevisaoDeChegada(
+                    quantidade=item.quantidade_pendente,
+                    previsao=previsao,
+                    atrasada=previsao is not None and previsao < hoje,
+                )
+            )
+        entregas.sort(key=lambda e: (e.previsao is None, e.previsao or hoje))
+        disponivel = estoque.quantidade_disponivel
+        parametros = self._politicas.ativa().parametros
+        return Disponibilidade(
+            sku=sku,
+            disponivel=disponivel,
+            situacao=_situacao(disponivel, self._inventory.cobertura_meses(sku_code), parametros),
+            entregas=entregas,
+        )
+
     def avisos_abertos(self, sku_code: str) -> list[Aviso]:
         """Os sem decisão de compra posterior, do mais recente para o mais antigo."""
         decisoes = self._decisoes.listar(sku_code)
         return _abertos(self._avisos.listar(sku_code), decisoes[0] if decisoes else None)
+
+    def meus_avisos(self, autor: Usuario) -> list[MeuAviso]:
+        """Os avisos do usuário nos últimos `PRAZO_DE_MEUS_AVISOS`, do mais recente para o
+        mais antigo, cada um com a decisão de compra que o fechou, se houve."""
+        avisos = self._avisos.do_usuario(autor.id, self._relogio() - PRAZO_DE_MEUS_AVISOS)
+        if not avisos:
+            return []
+        codigos = {a.sku_code for a in avisos}
+        decisoes = self._decisoes.dos_skus(codigos, min(a.criado_em for a in avisos))[::-1]
+        skus = {codigo: self._sku(codigo) for codigo in codigos}
+        return [
+            MeuAviso(
+                aviso=a,
+                sku=skus[a.sku_code],
+                decisao=next(
+                    (d for d in decisoes if d.sku_code == a.sku_code and d.criado_em >= a.criado_em), None
+                ),
+            )
+            for a in avisos
+        ]
 
     def decisoes(self, sku_code: str) -> list[DecisaoCompra]:
         """Da mais recente para a mais antiga."""

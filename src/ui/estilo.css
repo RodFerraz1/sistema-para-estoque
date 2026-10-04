@@ -413,6 +413,10 @@ button.popup-fechar {
   background: var(--vendas);
 }
 
+.popup-marca.bom {
+  background: var(--sucesso);
+}
+
 .pedido-atrasado {
   scroll-margin-top: 80px;
 }
@@ -1788,6 +1792,127 @@ input[type="search"],
 
 .tipos button[aria-pressed="true"] small {
   color: rgba(255, 255, 255, 0.85);
+}
+
+.disponibilidade {
+  margin-top: 14px;
+  padding: 14px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+}
+
+.disponibilidade .carregando {
+  margin: 0;
+}
+
+.disponibilidade-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.disponibilidade-topo .selo {
+  font-size: 0.9rem;
+  padding: 3px 14px;
+}
+
+.disponivel {
+  color: var(--texto-suave);
+}
+
+.disponivel strong {
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+  color: var(--texto);
+}
+
+.chegadas {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--borda);
+  display: grid;
+  gap: 8px;
+}
+
+.chegadas li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.chegadas li > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sem-chegada {
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--borda);
+}
+
+.acoes-vendedora {
+  margin-top: 14px;
+}
+
+.aviso-form {
+  margin-top: 16px;
+}
+
+.card.meu-aviso {
+  margin: 0;
+  padding: 14px 16px;
+  border-left: 4px solid var(--sucesso);
+}
+
+.card.meu-aviso.aguardando {
+  border-left-color: var(--vendas);
+}
+
+.meu-aviso-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.meu-aviso-topo .suave {
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.comentario-do-aviso {
+  margin: 6px 0 0;
+  font-style: italic;
+  color: var(--texto-suave);
+}
+
+.desfecho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 10px;
+}
+
+.desfecho .selo {
+  font-size: 0.85rem;
+  padding: 2px 12px;
+}
+
+.desfecho .suave {
+  font-size: 0.85rem;
+}
+
+.desfecho .motivo {
+  flex-basis: 100%;
+  margin: 2px 0 0;
 }
 
 /* Painel do repositor */

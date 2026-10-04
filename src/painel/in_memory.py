@@ -1,6 +1,8 @@
 """Implementações em memória dos repositórios do módulo `painel`, para testes."""
 from __future__ import annotations
 
+from collections.abc import Collection
+from datetime import datetime
 from uuid import UUID
 
 from src.painel.repositorio import AvisosRepositorio, CobrancasRepositorio, DecisoesRepositorio
@@ -18,6 +20,10 @@ class InMemoryAvisosRepositorio(AvisosRepositorio):
         do_sku = [a for a in self._avisos if sku_code is None or a.sku_code == sku_code]
         return sorted(do_sku, key=lambda a: (a.criado_em, str(a.id)), reverse=True)
 
+    def do_usuario(self, usuario_id: UUID, desde: datetime) -> list[Aviso]:
+        do_usuario = [a for a in self._avisos if a.usuario_id == usuario_id and a.criado_em >= desde]
+        return sorted(do_usuario, key=lambda a: (a.criado_em, str(a.id)), reverse=True)
+
 
 class InMemoryDecisoesRepositorio(DecisoesRepositorio):
     def __init__(self) -> None:
@@ -29,6 +35,10 @@ class InMemoryDecisoesRepositorio(DecisoesRepositorio):
     def listar(self, sku_code: str) -> list[DecisaoCompra]:
         do_sku = [d for d in self._decisoes if d.sku_code == sku_code]
         return sorted(do_sku, key=lambda d: (d.criado_em, str(d.id)), reverse=True)
+
+    def dos_skus(self, sku_codes: Collection[str], desde: datetime) -> list[DecisaoCompra]:
+        dos_skus = [d for d in self._decisoes if d.sku_code in sku_codes and d.criado_em >= desde]
+        return sorted(dos_skus, key=lambda d: (d.criado_em, str(d.id)), reverse=True)
 
     def ultimas(self) -> dict[str, DecisaoCompra]:
         return {sku_code: self.listar(sku_code)[0] for sku_code in {d.sku_code for d in self._decisoes}}

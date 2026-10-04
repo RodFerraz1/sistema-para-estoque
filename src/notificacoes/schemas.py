@@ -23,7 +23,8 @@ TipoEpisodio = Literal[
 
 class Condicao(BaseModel):
     """O que vale agora para um SKU ou para um pedido. A condição é o `tipo` com o
-    `sku_code` e o `pedido_id`; `detalhe` guarda os números do momento, em JSON."""
+    `sku_code` e o `pedido_id`; `detalhe` guarda os números do momento, em JSON. Com
+    `usuario_destino`, só essa pessoa vê a notificação; sem ele, todo o papel de destino."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -31,6 +32,7 @@ class Condicao(BaseModel):
     sku_code: str | None = None
     pedido_id: UUID | None = None
     papel_destino: Papel
+    usuario_destino: UUID | None = None
     detalhe: dict[str, Any] = {}
 
     @property
@@ -49,6 +51,7 @@ class Episodio(BaseModel):
     sku_code: str | None
     pedido_id: UUID | None
     papel_destino: Papel
+    usuario_destino: UUID | None
     aberto_em: datetime
     fechado_em: datetime | None
     detalhe: dict[str, Any]
@@ -59,7 +62,8 @@ class Episodio(BaseModel):
 
 
 class Notificacao(BaseModel):
-    """Um episódio visto por um usuário do papel de destino."""
+    """Um episódio visto pelo usuário de destino ou, sem ele, por um usuário do papel de
+    destino."""
 
     model_config = ConfigDict(frozen=True)
 

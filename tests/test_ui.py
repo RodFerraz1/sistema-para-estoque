@@ -131,6 +131,9 @@ def test_cada_pagina_chama_a_api() -> None:
         chamadas["painel.js"]
     )
     assert {metodo for metodo, _ in chamadas["aviso.js"]} == {"GET", "POST"}
+    assert {("GET", "/skus/${encodeURIComponent(s.sku_code)}/disponibilidade"), ("GET", "/avisos/meus")} <= set(
+        chamadas["aviso.js"]
+    )
     assert ("POST", "/skus/${sku}/decisoes") in chamadas["sku.js"]
     assert {caminho.split("/")[-1].split("?")[0] for _, caminho in chamadas["sku.js"]} >= {
         "analise",

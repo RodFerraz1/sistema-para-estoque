@@ -2,6 +2,8 @@
 `copilot.decisoes_compra` e `copilot.cobrancas_entrega`."""
 from __future__ import annotations
 
+from collections.abc import Collection
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import text
@@ -34,6 +36,14 @@ class PostgresAvisosRepositorio(AvisosRepositorio):
             rows = conn.execute(text(f"{_SELECT_AVISO} {filtro} {_ORDEM}"), {"sku_code": sku_code}).all()
         return [Aviso.model_validate(row._asdict()) for row in rows]
 
+    def do_usuario(self, usuario_id: UUID, desde: datetime) -> list[Aviso]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(f"{_SELECT_AVISO} WHERE usuario_id = :usuario_id AND criado_em >= :desde {_ORDEM}"),
+                {"usuario_id": usuario_id, "desde": desde},
+            ).all()
+        return [Aviso.model_validate(row._asdict()) for row in rows]
+
 
 _CAMPOS_DECISAO = list(DecisaoCompra.model_fields)
 _INSERT_DECISAO = text(
@@ -55,6 +65,14 @@ class PostgresDecisoesRepositorio(DecisoesRepositorio):
         with self._engine.connect() as conn:
             rows = conn.execute(
                 text(f"{_SELECT_DECISAO} WHERE sku_code = :sku_code {_ORDEM}"), {"sku_code": sku_code}
+            ).all()
+        return [DecisaoCompra.model_validate(row._asdict()) for row in rows]
+
+    def dos_skus(self, sku_codes: Collection[str], desde: datetime) -> list[DecisaoCompra]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(f"{_SELECT_DECISAO} WHERE sku_code = ANY(:sku_codes) AND criado_em >= :desde {_ORDEM}"),
+                {"sku_codes": list(sku_codes), "desde": desde},
             ).all()
         return [DecisaoCompra.model_validate(row._asdict()) for row in rows]
 

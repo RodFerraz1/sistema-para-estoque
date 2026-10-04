@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from datetime import datetime
 from typing import Protocol
+from uuid import UUID
 
 from src.notificacoes.schemas import Condicao, Episodio, TipoEpisodio
 from src.usuarios.schemas import Papel
@@ -21,13 +22,14 @@ class EpisodiosRepositorio(Protocol):
         """Grava um evento de uma vez só, já fechado, fora da varredura."""
         ...
 
-    def dos_papeis(self, papeis: Collection[Papel], limite: int) -> list[Episodio]:
-        """Os episódios dos `papeis`, abertos ou fechados, do mais recente para o mais
-        antigo (o `id` desempata), no máximo `limite`."""
+    def do_usuario(self, usuario_id: UUID, papeis: Collection[Papel], limite: int) -> list[Episodio]:
+        """Os episódios que o usuário vê, abertos ou fechados, do mais recente para o mais
+        antigo (o `id` desempata), no máximo `limite`: os dirigidos a ele e os dos `papeis`
+        sem usuário de destino."""
         ...
 
-    def abertos_depois(self, papeis: Collection[Papel], desde: datetime | None) -> int:
-        """Quantos episódios dos `papeis` foram abertos depois de `desde` (todos sem ele)."""
+    def abertos_depois(self, usuario_id: UUID, papeis: Collection[Papel], desde: datetime | None) -> int:
+        """Quantos episódios que o usuário vê foram abertos depois de `desde` (todos sem ele)."""
         ...
 
 
