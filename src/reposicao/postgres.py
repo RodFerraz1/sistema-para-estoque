@@ -1,6 +1,6 @@
 """Implementação Postgres dos repositórios do módulo `reposicao` sobre
-`copilot.verificacoes_gondola`, `copilot.setores`, `copilot.setores_sku` e
-`copilot.avisos_gondola`."""
+`copilot.verificacoes_gondola`, `copilot.setores`, `copilot.setores_sku`,
+`copilot.avisos_gondola` e `copilot.capacidades_gondola`."""
 from __future__ import annotations
 
 from collections.abc import Collection
@@ -13,11 +13,12 @@ from sqlalchemy.exc import IntegrityError
 
 from src.reposicao.repositorio import (
     AvisosGondolaRepositorio,
+    CapacidadesGondolaRepositorio,
     SetoresRepositorio,
     SetorJaExiste,
     VerificacoesRepositorio,
 )
-from src.reposicao.schemas import AvisoGondola, Setor, SetorDoSku, VerificacaoGondola
+from src.reposicao.schemas import AvisoGondola, CapacidadeGondola, Setor, SetorDoSku, VerificacaoGondola
 
 # O id em texto desempata como o `str(id)` das versões em memória.
 _ORDEM = "ORDER BY criado_em DESC, id::text DESC"
@@ -153,3 +154,36 @@ class PostgresAvisosGondolaRepositorio(AvisosGondolaRepositorio):
                 {"usuario_id": usuario_id, "desde": desde},
             ).all()
         return [AvisoGondola.model_validate(row._asdict()) for row in rows]
+
+
+_CAMPOS_CAPACIDADE = list(CapacidadeGondola.model_fields)
+_SELECT_CAPACIDADE = f"SELECT {', '.join(_CAMPOS_CAPACIDADE)} FROM copilot.capacidades_gondola"
+
+
+class PostgresCapacidadesGondolaRepositorio(CapacidadesGondolaRepositorio):
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+
+    def gravar(self, capacidade: CapacidadeGondola) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                text(
+                    f"INSERT INTO copilot.capacidades_gondola ({', '.join(_CAMPOS_CAPACIDADE)}) "
+                    f"VALUES ({', '.join(f':{c}' for c in _CAMPOS_CAPACIDADE)}) "
+                    "ON CONFLICT (produto_id) DO UPDATE SET capacidade = EXCLUDED.capacidade, "
+                    "usuario_id = EXCLUDED.usuario_id, atualizado_em = EXCLUDED.atualizado_em"
+                ),
+                capacidade.model_dump(),
+            )
+
+    def do_produto(self, produto_id: UUID) -> CapacidadeGondola | None:
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                text(f"{_SELECT_CAPACIDADE} WHERE produto_id = :produto_id"), {"produto_id": produto_id}
+            ).one_or_none()
+        return None if row is None else CapacidadeGondola.model_validate(row._asdict())
+
+    def todas(self) -> dict[UUID, CapacidadeGondola]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(text(_SELECT_CAPACIDADE)).all()
+        return {row.produto_id: CapacidadeGondola.model_validate(row._asdict()) for row in rows}

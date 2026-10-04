@@ -13,10 +13,16 @@ from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.reposicao.postgres import (
     PostgresAvisosGondolaRepositorio,
+    PostgresCapacidadesGondolaRepositorio,
     PostgresSetoresRepositorio,
     PostgresVerificacoesRepositorio,
 )
-from src.reposicao.repositorio import AvisosGondolaRepositorio, SetoresRepositorio, VerificacoesRepositorio
+from src.reposicao.repositorio import (
+    AvisosGondolaRepositorio,
+    CapacidadesGondolaRepositorio,
+    SetoresRepositorio,
+    VerificacoesRepositorio,
+)
 from src.reposicao.service import Relogio, Reposicao, agora_utc
 from src.sales.dependencies import get_sales
 from src.sales.service import Sales
@@ -34,6 +40,10 @@ def get_avisos_gondola_repositorio() -> AvisosGondolaRepositorio:
     return PostgresAvisosGondolaRepositorio(get_engine())
 
 
+def get_capacidades_gondola_repositorio() -> CapacidadesGondolaRepositorio:
+    return PostgresCapacidadesGondolaRepositorio(get_engine())
+
+
 def get_relogio() -> Relogio:
     """Em testes, sobrescreva para controlar o dia de hoje da queda de venda e a hora das
     verificações."""
@@ -48,9 +58,10 @@ def get_reposicao(
     verificacoes: VerificacoesRepositorio = Depends(get_verificacoes_repositorio),
     setores: SetoresRepositorio = Depends(get_setores_repositorio),
     avisos: AvisosGondolaRepositorio = Depends(get_avisos_gondola_repositorio),
+    capacidades: CapacidadesGondolaRepositorio = Depends(get_capacidades_gondola_repositorio),
     notificacoes: Notificacoes = Depends(get_notificacoes),
     relogio: Relogio = Depends(get_relogio),
 ) -> Reposicao:
     return Reposicao(
-        catalog, inventory, sales, politicas, verificacoes, setores, avisos, notificacoes, relogio=relogio
+        catalog, inventory, sales, politicas, verificacoes, setores, avisos, capacidades, notificacoes, relogio=relogio
     )

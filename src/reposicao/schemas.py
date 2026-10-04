@@ -5,7 +5,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.catalog.schemas import SKU
 
@@ -140,6 +140,57 @@ class VerificacaoGondola(BaseModel):
     verificado_por: str
     usuario_id: UUID
     criado_em: datetime
+
+
+class CapacidadeGondola(BaseModel):
+    """Quantas peças de um produto do catálogo, de todas as cores e tamanhos, cabem na
+    gôndola, informadas pelo repositor. Vale a última."""
+
+    model_config = ConfigDict(frozen=True)
+
+    produto_id: UUID
+    capacidade: int = Field(gt=0)
+    usuario_id: UUID
+    atualizado_em: datetime
+
+
+class ProdutoDaGondola(BaseModel):
+    """Produto do catálogo com SKU ativo. `skus` conta as cores e tamanhos ativos."""
+
+    model_config = ConfigDict(frozen=True)
+
+    produto_id: UUID
+    produto_nome: str
+    categoria: str
+    skus: int
+    capacidade: CapacidadeGondola | None
+
+
+class SkuNoMix(BaseModel):
+    """Um SKU ativo do produto no mix de gôndola. `participacao` é a venda dele dividida pela
+    venda do produto nos dias abertos do período (zero sem venda no produto). `quantidade` é
+    quantas peças pôr na gôndola, nula sem capacidade."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku: SKU
+    vendido: int
+    venda_media_diaria: float
+    participacao: float
+    disponivel: int
+    quantidade: int | None
+
+
+class MixDeGondola(BaseModel):
+    """`capacidade` é a usada na conta: a informada ou, sem ela, a gravada. `skus` vem da
+    maior participação para a menor (o código desempata)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    produto: ProdutoDaGondola
+    capacidade: int | None
+    dias_abertos: int
+    skus: list[SkuNoMix]
 
 
 class MeuAvisoGondola(BaseModel):

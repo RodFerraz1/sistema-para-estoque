@@ -13,6 +13,7 @@ const NUMEROS = [
   "dias_historico_minimo",
   "dias_observados_queda",
   "venda_diaria_minima_queda",
+  "dias_mix_gondola",
 ];
 const PERCENTUAIS = ["limiar_queda"];
 const OPCOES = ["criterio_fornecedor", "lead_time_base", "sazonalidade_modo"];
@@ -31,6 +32,7 @@ const PERGUNTAS = {
   dias_observados_queda: "pergunta 11",
   venda_diaria_minima_queda: "pergunta 11",
   limiar_queda: "pergunta 11",
+  dias_mix_gondola: "pergunta 12",
 };
 
 montarChat();

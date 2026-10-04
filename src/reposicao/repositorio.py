@@ -1,5 +1,6 @@
 """Ports de persistência do módulo `reposicao`. As verificações de gôndola e os avisos de
-gôndola vazia são append-only; os setores e o setor conhecido de cada SKU mudam."""
+gôndola vazia são append-only; os setores, o setor conhecido de cada SKU e a capacidade da
+gôndola de cada produto mudam."""
 from __future__ import annotations
 
 from collections.abc import Collection
@@ -7,7 +8,7 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
-from src.reposicao.schemas import AvisoGondola, Setor, SetorDoSku, VerificacaoGondola
+from src.reposicao.schemas import AvisoGondola, CapacidadeGondola, Setor, SetorDoSku, VerificacaoGondola
 
 
 class SetorJaExiste(Exception):
@@ -67,4 +68,16 @@ class AvisosGondolaRepositorio(Protocol):
     def do_usuario(self, usuario_id: UUID, desde: datetime) -> list[AvisoGondola]:
         """Os avisos do usuário registrados a partir de `desde`, do mais recente para o
         mais antigo (o `id` desempata)."""
+        ...
+
+
+class CapacidadesGondolaRepositorio(Protocol):
+    def gravar(self, capacidade: CapacidadeGondola) -> None:
+        """Grava a capacidade do produto, no lugar da anterior."""
+        ...
+
+    def do_produto(self, produto_id: UUID) -> CapacidadeGondola | None: ...
+
+    def todas(self) -> dict[UUID, CapacidadeGondola]:
+        """A capacidade de cada produto que tem uma, pelo `produto_id`."""
         ...

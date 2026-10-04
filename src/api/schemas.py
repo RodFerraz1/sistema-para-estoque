@@ -9,7 +9,7 @@ from uuid import UUID
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from src.ai.schemas import (
     Acao,
@@ -61,6 +61,7 @@ class AnaliseSKUResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     sku_code: str
+    produto_id: UUID
     produto_nome: str
     categoria: str
     cor: str
@@ -758,6 +759,7 @@ class QuedaDeVendaResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     sku_code: str
+    produto_id: UUID
     produto_nome: str
     cor: str
     tamanho: str
@@ -797,6 +799,7 @@ class AvisoDeGondolaNoPainelResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     sku_code: str
+    produto_id: UUID
     produto_nome: str
     cor: str
     tamanho: str
@@ -812,3 +815,58 @@ class PainelDoRepositorResponse(BaseModel):
 
     avisos_de_gondola: list[AvisoDeGondolaNoPainelResponse]
     quedas_de_venda: list[QuedaDeVendaResponse]
+
+
+class ProdutoDaGondolaResponse(BaseModel):
+    """`skus`: quantas cores e tamanhos ativos. `capacidade`: a gravada, nula sem nenhuma."""
+
+    model_config = ConfigDict(frozen=True)
+
+    produto_id: UUID
+    produto_nome: str
+    categoria: str
+    skus: int
+    capacidade: int | None
+
+
+class SkuNoMixResponse(BaseModel):
+    """`participacao` de 0 a 1, zero quando o produto não vendeu nada no período.
+    `quantidade`: quantas peças pôr na gôndola, nula sem capacidade."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    cor: str
+    tamanho: str
+    venda_media_diaria: float
+    participacao: float
+    disponivel: int
+    quantidade: int | None
+
+
+class MixDeGondolaResponse(BaseModel):
+    """`capacidade`: a usada na conta (a informada ou a gravada); `capacidade_gravada`: a que
+    o Copilot lembra. `dias_abertos`: os dias com a loja aberta do período da participação.
+    `skus` da maior participação para a menor."""
+
+    model_config = ConfigDict(frozen=True)
+
+    produto_id: UUID
+    produto_nome: str
+    categoria: str
+    capacidade: int | None
+    capacidade_gravada: int | None
+    dias_abertos: int
+    skus: list[SkuNoMixResponse]
+
+
+class GravarCapacidadeRequest(BaseModel):
+    capacidade: Annotated[int, Field(gt=0)]
+
+
+class CapacidadeGondolaResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    produto_id: UUID
+    capacidade: int
+    atualizado_em: datetime

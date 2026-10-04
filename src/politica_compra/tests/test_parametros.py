@@ -31,6 +31,7 @@ def _v1(**overrides: Any) -> dict[str, Any]:
         "dias_observados_queda": 2,
         "venda_diaria_minima_queda": 1.0,
         "limiar_queda": 0.01,
+        "dias_mix_gondola": 90,
     }
     return base | overrides
 
@@ -84,6 +85,7 @@ def test_parametros_sao_imutaveis() -> None:
         ("venda_diaria_minima_queda > 0", {"venda_diaria_minima_queda": 0}),
         ("limiar_queda > 0", {"limiar_queda": 0}),
         ("limiar_queda < 1", {"limiar_queda": 1}),
+        ("dias_mix_gondola >= 1", {"dias_mix_gondola": 0}),
     ],
 )
 def test_parametros_invalidos_sao_rejeitados(

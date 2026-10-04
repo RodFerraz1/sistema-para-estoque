@@ -377,6 +377,39 @@ function formularioDeDecisao(sugestaoAtual) {
   });
 }
 
+function participacao(mix) {
+  const semVenda = mix.skus.every((s) => s.participacao === 0);
+  return [
+    el(
+      "p",
+      { class: "suave" },
+      semVenda
+        ? `O produto não vendeu nos últimos ${numero(mix.dias_abertos)} dias com a loja aberta.`
+        : `Nos últimos ${numero(mix.dias_abertos)} dias com a loja aberta, todas as cores e tamanhos do produto. Para comprar a grade na proporção do que vende, e não a mesma quantidade de cada cor.`,
+    ),
+    el(
+      "ol",
+      { class: "lista-participacao" },
+      mix.skus.map((s) => {
+        const pct = Math.round(s.participacao * 100);
+        const este = s.sku_code === skuCode;
+        return el(
+          "li",
+          { class: este ? "este" : null },
+          el("span", { class: "participacao-sku" }, `${s.cor} · ${s.tamanho}`, este ? el("span", { class: "selo" }, "este SKU") : null),
+          el(
+            "span",
+            { class: "participacao" },
+            el("span", { class: "participacao-barra", "aria-hidden": "true" }, el("span", { style: `width: ${pct}%` })),
+            el("span", { class: "participacao-valor" }, `${numero(pct)}%`),
+          ),
+          el("span", { class: "suave participacao-dia" }, `${numero(s.venda_media_diaria, 1)}/dia`),
+        );
+      }),
+    ),
+  ];
+}
+
 async function sinaisPorUltimo(principais) {
   await Promise.allSettled(principais);
   try {
@@ -401,6 +434,10 @@ if (!skuCode) {
   analise.catch((e) => {
     if (e.status === 404) semSku(`O SKU ${skuCode} não existe no catálogo.`);
   });
+  analise.then(
+    (a) => carregar("participacao", api("GET", `/reposicao/produtos/${a.produto_id}/mix`), participacao).catch(() => {}),
+    () => bloco("participacao").replaceChildren(mensagem("erro", "Sem a situação do SKU, não dá para calcular a participação.")),
+  );
   const sugestaoAtual = carregar("sugestao", api("GET", `/skus/${sku}/sugestao-compra`), sugestao);
   formularioDeDecisao(sugestaoAtual);
   const principais = [

@@ -45,6 +45,7 @@ def _parametros(**overrides: Any) -> dict[str, Any]:
         "dias_observados_queda": 3,
         "venda_diaria_minima_queda": 2.0,
         "limiar_queda": 0.001,
+        "dias_mix_gondola": 60,
     }
     return base | overrides
 
@@ -71,6 +72,7 @@ def test_get_devolve_a_politica_ativa(client: TestClient) -> None:
             "dias_observados_queda": 2,
             "venda_diaria_minima_queda": 1.0,
             "limiar_queda": 0.01,
+            "dias_mix_gondola": 90,
         },
     }
 

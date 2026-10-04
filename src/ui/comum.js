@@ -60,6 +60,7 @@ export const TELAS = [
   { papel: "comprador", href: "politica.html", rotulo: "Política" },
   { papel: "vendas", href: "aviso.html", rotulo: "Consultar e avisar" },
   { papel: "reposicao", href: "reposicao.html", rotulo: "Painel do repositor" },
+  { papel: "reposicao", href: "gondola.html", rotulo: "Montar gôndola" },
   { papel: "admin", href: "usuarios.html", rotulo: "Usuários" },
   { papel: "admin", href: "setores.html", rotulo: "Setores" },
 ];
@@ -240,7 +241,7 @@ export function sinais(lista) {
 export const PAPEIS = {
   comprador: { rotulo: "Comprador", descricao: "painel, tela do SKU, política, preços e chat" },
   vendas: { rotulo: "Vendas", descricao: "consulta de produto, avisos ao comprador e ao repositor e meus avisos" },
-  reposicao: { rotulo: "Reposição", descricao: "busca de produto e painel do repositor" },
+  reposicao: { rotulo: "Reposição", descricao: "painel do repositor e mix de gôndola" },
   admin: { rotulo: "Admin", descricao: "cadastro das pessoas e dos setores da loja" },
 };
 

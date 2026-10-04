@@ -118,6 +118,13 @@
         <div class="unidade"><input id="limiar_queda" name="limiar_queda" type="number" min="0.01" max="99" step="0.01" required> %</div>
       </div>
 
+      <h2>Mix de gôndola <span class="selo destaque">a validar com o comprador</span></h2>
+      <div class="card pergunta">
+        <label for="dias_mix_gondola">12. Para dividir a gôndola entre as cores e tamanhos de um produto pelo que mais vende, quantos dias de venda o Copilot deve olhar?</label>
+        <p class="suave">Os dias em que a loja não abriu não contam. Mais dias dão uma divisão mais estável; menos dias percebem antes uma cor que passou a vender mais. A mesma conta aparece na tela do SKU, para comprar a grade na proporção do que vende.</p>
+        <div class="unidade"><input id="dias_mix_gondola" name="dias_mix_gondola" type="number" min="1" step="1" required> dias com a loja aberta</div>
+      </div>
+
       <div class="barra-salvar">
         <button id="salvar" type="submit" class="primario">Salvar nova versão</button>
         <span class="suave">Salvar cria uma versão nova; o painel e as sugestões passam a usá-la na hora.</span>

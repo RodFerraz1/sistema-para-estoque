@@ -107,6 +107,14 @@ function produto(item) {
   );
 }
 
+function linkDaGondola(item) {
+  return el(
+    "a",
+    { class: "botao montar-gondola", href: `gondola.html?produto=${encodeURIComponent(item.produto_id)}` },
+    "Montar a gôndola deste produto",
+  );
+}
+
 function seloDoSetor(item) {
   return el("span", { class: "selo" }, item.setor ? `Setor ${item.setor.nome}` : "Setor não informado");
 }
@@ -140,6 +148,7 @@ function cartaoDeQueda(item) {
     el("p", { class: "frase" }, frase(item)),
     numerosDaQueda(item, item.disponivel),
     verificacao(item, false),
+    linkDaGondola(item),
   );
 }
 
@@ -180,6 +189,7 @@ function cartaoDeAviso(item) {
         ),
     item.disponivel === 0 ? el("p", { class: "suave" }, "O ERP diz que não tem. Se não achar no depósito, a compradora já vê o produto em ruptura.") : null,
     verificacao(item, true),
+    linkDaGondola(item),
   );
 }
 

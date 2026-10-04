@@ -41,6 +41,7 @@ def fornecedor_to_response(f: FornecedorParaSKU) -> FornecedorResponse:
 def ficha_to_response(ficha: Ficha) -> AnaliseSKUResponse:
     return AnaliseSKUResponse(
         sku_code=ficha.sku.sku_code,
+        produto_id=ficha.sku.produto_id,
         produto_nome=ficha.sku.produto_nome,
         categoria=ficha.sku.categoria,
         cor=ficha.sku.cor,

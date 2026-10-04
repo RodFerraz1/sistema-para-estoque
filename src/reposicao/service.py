@@ -21,6 +21,10 @@ A vendedora que vê a gôndola vazia avisa o repositor, com o setor da loja. O a
 gôndola vazia entra no topo do painel do repositor e fica aberto até uma verificação do
 mesmo SKU registrada depois dele, que notifica a vendedora. O setor do último aviso, ou o
 que a verificação corrigiu, é o setor conhecido do SKU.
+
+O mix de gôndola divide a capacidade da gôndola de um produto entre as cores e tamanhos
+pela participação de cada SKU nas vendas do produto nos últimos `dias_mix_gondola` dias
+abertos. Também é conta, sem Jev.
 """
 from __future__ import annotations
 
@@ -30,7 +34,14 @@ from datetime import UTC, date, datetime, time, timedelta
 from uuid import UUID, uuid4
 
 from src.catalog.schemas import SKU
-from src.catalog.service import Catalog, SKUInativo, SKUNaoEncontrado, palavras_da_busca, sku_contem_todas
+from src.catalog.service import (
+    Catalog,
+    SKUInativo,
+    SKUNaoEncontrado,
+    ordem_por_nome,
+    palavras_da_busca,
+    sku_contem_todas,
+)
 from src.ficha_sku.service import SKUSemEstoque
 from src.inventory.schemas import Estoque
 from src.inventory.service import Inventory
@@ -38,19 +49,28 @@ from src.notificacoes.schemas import Condicao, TipoEpisodio
 from src.notificacoes.service import Notificacoes
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.politica_compra.schemas import ParametrosPolitica
-from src.reposicao.repositorio import AvisosGondolaRepositorio, SetoresRepositorio, VerificacoesRepositorio
+from src.reposicao.repositorio import (
+    AvisosGondolaRepositorio,
+    CapacidadesGondolaRepositorio,
+    SetoresRepositorio,
+    VerificacoesRepositorio,
+)
 from src.reposicao.schemas import (
     AvisoGondola,
+    CapacidadeGondola,
     DiaObservado,
     FiltroReposicao,
     ItemAvisoGondola,
     ItemQuedaDeVenda,
     MeuAvisoGondola,
+    MixDeGondola,
     PainelDoRepositor,
+    ProdutoDaGondola,
     QuedaDeVenda,
     ResultadoVerificacao,
     Setor,
     SetorDoSku,
+    SkuNoMix,
     VerificacaoGondola,
 )
 from src.sales.schemas import VendasDoDia
@@ -68,6 +88,12 @@ class SetorNaoEncontrado(Exception):
     def __init__(self, setor_id: UUID) -> None:
         super().__init__(f"Setor {setor_id} não encontrado.")
         self.setor_id = setor_id
+
+
+class ProdutoNaoEncontrado(LookupError):
+    def __init__(self, produto_id: UUID) -> None:
+        super().__init__(f"Produto {produto_id} sem SKU ativo no catálogo.")
+        self.produto_id = produto_id
 
 
 class SetorInativo(Exception):
@@ -135,9 +161,49 @@ def quedas_de_venda(
     return quedas
 
 
+def dividir_a_gondola(capacidade: int, vendido: dict[str, int], disponivel: dict[str, int]) -> dict[str, int]:
+    """Quantas peças de cada SKU pôr na gôndola. Elegíveis são os SKUs com disponível maior
+    que zero: cada um ganha uma peça quando cabe, senão as peças vão para os que mais
+    venderam. O resto vai pela venda, pelo método dos maiores restos, sem passar do
+    disponível; o que não cabe num SKU volta e é dividido de novo entre os que ainda têm
+    disponível. Sem venda entre eles, a divisão é igual. O código desempata."""
+    elegiveis = sorted((c for c in vendido if disponivel.get(c, 0) > 0), key=lambda c: (-vendido[c], c))
+    quantidade = dict.fromkeys(vendido, 0)
+    for codigo in elegiveis[:capacidade]:
+        quantidade[codigo] = 1
+    resto = capacidade - min(capacidade, len(elegiveis))
+    while resto > 0:
+        candidatos = [c for c in elegiveis if quantidade[c] < disponivel[c]]
+        if not candidatos:
+            break
+        pesos = {c: vendido[c] for c in candidatos}
+        if not any(pesos.values()):
+            pesos = dict.fromkeys(candidatos, 1)
+        soma = sum(pesos.values())
+        cotas = {c: resto * pesos[c] // soma for c in candidatos}
+        sobra = resto - sum(cotas.values())
+        for codigo in sorted(candidatos, key=lambda c: (-(resto * pesos[c] % soma), c))[:sobra]:
+            cotas[codigo] += 1
+        for codigo in candidatos:
+            pecas = min(cotas[codigo], disponivel[codigo] - quantidade[codigo])
+            quantidade[codigo] += pecas
+            resto -= pecas
+    return quantidade
+
+
 def _ainda_verificado(queda: QuedaDeVenda, verificacao: VerificacaoGondola | None) -> bool:
     """Nenhum dia aberto inteiro fechou depois da verificação."""
     return verificacao is not None and verificacao.criado_em.astimezone(UTC).date() >= queda.ultimos_dias[-1].dia
+
+
+def _produto(skus: list[SKU], capacidade: CapacidadeGondola | None) -> ProdutoDaGondola:
+    return ProdutoDaGondola(
+        produto_id=skus[0].produto_id,
+        produto_nome=skus[0].produto_nome,
+        categoria=skus[0].categoria,
+        skus=len(skus),
+        capacidade=capacidade,
+    )
 
 
 def _aberto(aviso: AvisoGondola, ultima_verificacao: VerificacaoGondola | None) -> bool:
@@ -155,6 +221,7 @@ class Reposicao:
         verificacoes: VerificacoesRepositorio,
         setores: SetoresRepositorio,
         avisos: AvisosGondolaRepositorio,
+        capacidades: CapacidadesGondolaRepositorio,
         notificacoes: Notificacoes,
         *,
         relogio: Relogio = agora_utc,
@@ -166,6 +233,7 @@ class Reposicao:
         self._verificacoes = verificacoes
         self._setores = setores
         self._avisos = avisos
+        self._capacidades = capacidades
         self._notificacoes = notificacoes
         self._relogio = relogio
 
@@ -396,6 +464,72 @@ class Reposicao:
             for a in avisos
             if (sku := skus[a.sku_code]) is not None
         ]
+
+    def produtos(self, busca: str | None = None) -> list[ProdutoDaGondola]:
+        """Os produtos com SKU ativo, pelo nome. Com `busca`, só os que têm algum SKU com
+        todas as palavras, na regra do `catalog.buscar_skus`."""
+        palavras = palavras_da_busca(busca or "")
+        por_produto: dict[UUID, list[SKU]] = {}
+        for sku in self._catalog.listar_skus():
+            por_produto.setdefault(sku.produto_id, []).append(sku)
+        capacidades = self._capacidades.todas()
+        achados = [
+            skus
+            for skus in por_produto.values()
+            if not palavras or any(sku_contem_todas(s, palavras) for s in skus)
+        ]
+        achados.sort(key=lambda skus: (ordem_por_nome(skus[0])[0], str(skus[0].produto_id)))
+        return [_produto(skus, capacidades.get(skus[0].produto_id)) for skus in achados]
+
+    def _skus_do_produto(self, produto_id: UUID) -> list[SKU]:
+        skus = [s for s in self._catalog.listar_skus() if s.produto_id == produto_id]
+        if not skus:
+            raise ProdutoNaoEncontrado(produto_id)
+        return skus
+
+    def mix(self, produto_id: UUID, capacidade: int | None = None) -> MixDeGondola:
+        """A participação de cada SKU ativo do produto nas vendas dos últimos
+        `dias_mix_gondola` dias abertos e, com a capacidade informada ou a gravada, quantas
+        peças de cada pôr na gôndola. Um número fixo de leituras. Lança
+        `ProdutoNaoEncontrado`."""
+        skus = self._skus_do_produto(produto_id)
+        gravada = self._capacidades.do_produto(produto_id)
+        capacidade = capacidade or (gravada.capacidade if gravada else None)
+        hoje = self._relogio().astimezone(UTC).date()
+        dias = self._politicas.ativa().parametros.dias_mix_gondola
+        desde = datetime.combine(hoje - timedelta(days=dias * 3 // 2), time(), tzinfo=UTC)
+        vendas = {
+            codigo: {v.dia: v.quantidade for v in lista}
+            for codigo, lista in self._sales.vendas_diarias_de_todos(desde).items()
+        }
+        janela = _dias_abertos(vendas, hoje)[:dias]
+        vendido = {s.sku_code: sum(vendas.get(s.sku_code, {}).get(dia, 0) for dia in janela) for s in skus}
+        estoques = self._inventory.estoques()
+        disponivel = {s.sku_code: e.quantidade_disponivel if (e := estoques.get(s.sku_code)) else 0 for s in skus}
+        quantidade = dividir_a_gondola(capacidade, vendido, disponivel) if capacidade else {}
+        total = sum(vendido.values())
+        linhas = [
+            SkuNoMix(
+                sku=s,
+                vendido=vendido[s.sku_code],
+                venda_media_diaria=vendido[s.sku_code] / len(janela) if janela else 0.0,
+                participacao=vendido[s.sku_code] / total if total else 0.0,
+                disponivel=disponivel[s.sku_code],
+                quantidade=quantidade.get(s.sku_code),
+            )
+            for s in skus
+        ]
+        linhas.sort(key=lambda l: (-l.vendido, l.sku.sku_code))
+        return MixDeGondola(produto=_produto(skus, gravada), capacidade=capacidade, dias_abertos=len(janela), skus=linhas)
+
+    def gravar_capacidade(self, produto_id: UUID, capacidade: int, autor: Usuario) -> CapacidadeGondola:
+        """No lugar da anterior. Lança `ProdutoNaoEncontrado`."""
+        self._skus_do_produto(produto_id)
+        gravada = CapacidadeGondola(
+            produto_id=produto_id, capacidade=capacidade, usuario_id=autor.id, atualizado_em=self._relogio()
+        )
+        self._capacidades.gravar(gravada)
+        return gravada
 
     def setores(self) -> list[Setor]:
         """Todos, ativos ou não, pelo nome."""

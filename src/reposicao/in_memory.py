@@ -7,11 +7,12 @@ from uuid import UUID
 
 from src.reposicao.repositorio import (
     AvisosGondolaRepositorio,
+    CapacidadesGondolaRepositorio,
     SetoresRepositorio,
     SetorJaExiste,
     VerificacoesRepositorio,
 )
-from src.reposicao.schemas import AvisoGondola, Setor, SetorDoSku, VerificacaoGondola
+from src.reposicao.schemas import AvisoGondola, CapacidadeGondola, Setor, SetorDoSku, VerificacaoGondola
 
 
 class InMemoryVerificacoesRepositorio(VerificacoesRepositorio):
@@ -79,3 +80,17 @@ class InMemoryAvisosGondolaRepositorio(AvisosGondolaRepositorio):
         return self._recentes_primeiro(
             [a for a in self._avisos if a.usuario_id == usuario_id and a.criado_em >= desde]
         )
+
+
+class InMemoryCapacidadesGondolaRepositorio(CapacidadesGondolaRepositorio):
+    def __init__(self) -> None:
+        self._capacidades: dict[UUID, CapacidadeGondola] = {}
+
+    def gravar(self, capacidade: CapacidadeGondola) -> None:
+        self._capacidades[capacidade.produto_id] = capacidade
+
+    def do_produto(self, produto_id: UUID) -> CapacidadeGondola | None:
+        return self._capacidades.get(produto_id)
+
+    def todas(self) -> dict[UUID, CapacidadeGondola]:
+        return dict(self._capacidades)

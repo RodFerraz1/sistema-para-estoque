@@ -1,5 +1,5 @@
 """Endpoints HTTP do módulo `reposicao`: o painel do repositor, as verificações de gôndola,
-os avisos de gôndola vazia e os setores da loja."""
+os avisos de gôndola vazia, os setores da loja e o mix de gôndola."""
 from __future__ import annotations
 
 from typing import Annotated
@@ -12,10 +12,14 @@ from src.api.schemas import (
     AvisoDeGondolaNoPainelResponse,
     AvisoGondolaResponse,
     AvisoNoPainelResponse,
+    CapacidadeGondolaResponse,
     CriarSetorRequest,
     DiaObservadoResponse,
+    GravarCapacidadeRequest,
+    MixDeGondolaResponse,
     MudarSetorRequest,
     PainelDoRepositorResponse,
+    ProdutoDaGondolaResponse,
     QuedaDeVendaResponse,
     QuedaNoAvisoResponse,
     RegistrarAvisoGondolaRequest,
@@ -23,6 +27,7 @@ from src.api.schemas import (
     SetorDoSkuResponse,
     SetorResponse,
     SetorResumoResponse,
+    SkuNoMixResponse,
     VerificacaoGondolaResponse,
 )
 from src.api.skus import sku_ou_404
@@ -30,8 +35,15 @@ from src.catalog.dependencies import get_catalog
 from src.catalog.service import Catalog, SKUInativo, SKUNaoEncontrado
 from src.reposicao.dependencies import get_reposicao
 from src.reposicao.repositorio import SetorJaExiste
-from src.reposicao.schemas import FiltroReposicao, ItemAvisoGondola, ItemQuedaDeVenda, QuedaDeVenda, Setor
-from src.reposicao.service import Reposicao, SetorInativo, SetorNaoEncontrado
+from src.reposicao.schemas import (
+    FiltroReposicao,
+    ItemAvisoGondola,
+    ItemQuedaDeVenda,
+    ProdutoDaGondola,
+    QuedaDeVenda,
+    Setor,
+)
+from src.reposicao.service import ProdutoNaoEncontrado, Reposicao, SetorInativo, SetorNaoEncontrado
 from src.usuarios.dependencies import exige_papel
 from src.usuarios.schemas import Usuario
 
@@ -40,6 +52,7 @@ router = APIRouter(tags=["reposicao"])
 REPOSICAO = [Depends(exige_papel("reposicao"))]
 QUEM_VE_VERIFICACOES = [Depends(exige_papel("comprador", "reposicao"))]
 QUEM_VE_SETOR_DO_SKU = [Depends(exige_papel("vendas", "reposicao"))]
+QUEM_VE_O_MIX = [Depends(exige_papel("comprador", "reposicao"))]
 ADMIN = [Depends(exige_papel("admin"))]
 
 
@@ -59,6 +72,7 @@ def _queda(queda: QuedaDeVenda) -> QuedaNoAvisoResponse:
 def _queda_to_response(item: ItemQuedaDeVenda) -> QuedaDeVendaResponse:
     return QuedaDeVendaResponse(
         sku_code=item.sku.sku_code,
+        produto_id=item.sku.produto_id,
         produto_nome=item.sku.produto_nome,
         cor=item.sku.cor,
         tamanho=item.sku.tamanho,
@@ -72,6 +86,7 @@ def _queda_to_response(item: ItemQuedaDeVenda) -> QuedaDeVendaResponse:
 def _aviso_no_painel_to_response(item: ItemAvisoGondola) -> AvisoDeGondolaNoPainelResponse:
     return AvisoDeGondolaNoPainelResponse(
         sku_code=item.sku.sku_code,
+        produto_id=item.sku.produto_id,
         produto_nome=item.sku.produto_nome,
         cor=item.sku.cor,
         tamanho=item.sku.tamanho,
@@ -223,3 +238,78 @@ def mudar_setor(
     except SetorJaExiste as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     return _setor_to_response(setor, reposicao.skus_por_setor())
+
+
+def _produto_to_response(produto: ProdutoDaGondola) -> ProdutoDaGondolaResponse:
+    return ProdutoDaGondolaResponse(
+        produto_id=produto.produto_id,
+        produto_nome=produto.produto_nome,
+        categoria=produto.categoria,
+        skus=produto.skus,
+        capacidade=produto.capacidade.capacidade if produto.capacidade else None,
+    )
+
+
+@router.get("/reposicao/produtos", response_model=list[ProdutoDaGondolaResponse], dependencies=REPOSICAO)
+def produtos(
+    busca: Annotated[str | None, Query(max_length=100)] = None,
+    reposicao: Reposicao = Depends(get_reposicao),
+) -> list[ProdutoDaGondolaResponse]:
+    """Os produtos com SKU ativo, pelo nome, com a capacidade da gôndola gravada. `busca`
+    acha o produto pelo código, nome, cor ou tamanho de qualquer SKU dele."""
+    return [_produto_to_response(p) for p in reposicao.produtos(busca)]
+
+
+@router.get("/reposicao/produtos/{produto_id}/mix", response_model=MixDeGondolaResponse, dependencies=QUEM_VE_O_MIX)
+def mix(
+    produto_id: UUID,
+    capacidade: Annotated[int | None, Query(gt=0)] = None,
+    reposicao: Reposicao = Depends(get_reposicao),
+) -> MixDeGondolaResponse:
+    """Para cada SKU ativo do produto, a participação nas vendas dos últimos
+    `dias_mix_gondola` dias abertos, a venda média diária, o disponível e quantas peças pôr
+    na gôndola. Sem `capacidade`, usa a gravada; sem nenhuma das duas, a `quantidade` vem
+    nula. 404 sem SKU ativo do produto."""
+    try:
+        resultado = reposicao.mix(produto_id, capacidade)
+    except ProdutoNaoEncontrado as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    produto = _produto_to_response(resultado.produto)
+    return MixDeGondolaResponse(
+        produto_id=produto.produto_id,
+        produto_nome=produto.produto_nome,
+        categoria=produto.categoria,
+        capacidade=resultado.capacidade,
+        capacidade_gravada=produto.capacidade,
+        dias_abertos=resultado.dias_abertos,
+        skus=[
+            SkuNoMixResponse(
+                sku_code=s.sku.sku_code,
+                cor=s.sku.cor,
+                tamanho=s.sku.tamanho,
+                venda_media_diaria=s.venda_media_diaria,
+                participacao=s.participacao,
+                disponivel=s.disponivel,
+                quantidade=s.quantidade,
+            )
+            for s in resultado.skus
+        ],
+    )
+
+
+@router.put("/reposicao/produtos/{produto_id}/capacidade", response_model=CapacidadeGondolaResponse)
+def gravar_capacidade(
+    produto_id: UUID,
+    corpo: GravarCapacidadeRequest,
+    usuario: Usuario = Depends(exige_papel("reposicao")),
+    reposicao: Reposicao = Depends(get_reposicao),
+) -> CapacidadeGondolaResponse:
+    """Quantas peças do produto cabem na gôndola, no lugar da anterior. 404 sem SKU ativo do
+    produto, 422 com capacidade menor que 1."""
+    try:
+        gravada = reposicao.gravar_capacidade(produto_id, corpo.capacidade, usuario)
+    except ProdutoNaoEncontrado as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    return CapacidadeGondolaResponse(
+        produto_id=gravada.produto_id, capacidade=gravada.capacidade, atualizado_em=gravada.atualizado_em
+    )

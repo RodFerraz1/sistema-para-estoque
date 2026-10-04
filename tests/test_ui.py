@@ -20,6 +20,7 @@ PAGINAS = [
     "estoque.html",
     "reposicao.html",
     "setores.html",
+    "gondola.html",
 ]
 PAPEL_DAS_PAGINAS = {
     "index.html": "comprador",
@@ -28,6 +29,7 @@ PAPEL_DAS_PAGINAS = {
     "estoque.html": "comprador",
     "aviso.html": "vendas",
     "reposicao.html": "reposicao",
+    "gondola.html": "reposicao",
     "usuarios.html": "admin",
     "setores.html": "admin",
 }
@@ -146,6 +148,7 @@ def test_cada_pagina_chama_a_api() -> None:
         "sinais",
         "precos",
         "vendas",
+        "mix",
     }
     assert ("POST", "/chat") in chamadas["chat.js"]
     assert {("GET", "/politica-compra"), ("PUT", "/politica-compra")} <= set(chamadas["politica.js"])
@@ -173,6 +176,11 @@ def test_cada_pagina_chama_a_api() -> None:
         ("GET", "/skus/${encodeURIComponent(s.sku_code)}/setor"),
         ("POST", "/avisos-gondola"),
     } <= set(chamadas["aviso.js"])
+    assert set(chamadas["gondola.js"]) == {
+        ("GET", "/reposicao/produtos?${consulta}"),
+        ("GET", "/reposicao/produtos/${produtoId}/mix?${consulta}"),
+        ("PUT", "/reposicao/produtos/${produtoId}/capacidade"),
+    }
     assert set(chamadas["setores.js"]) == {("GET", "/setores"), ("POST", "/setores"), ("PUT", "/setores/${setor.id}")}
 
 
@@ -342,6 +350,16 @@ def test_painel_do_repositor_e_de_celular_com_os_filtros_da_api() -> None:
 def test_politica_pergunta_a_sensibilidade_da_queda_de_venda() -> None:
     html = (UI_DIR / "politica.html").read_text()
 
-    for campo in ("dias_observados_queda", "venda_diaria_minima_queda", "limiar_queda"):
+    for campo in ("dias_observados_queda", "venda_diaria_minima_queda", "limiar_queda", "dias_mix_gondola"):
         assert f'name="{campo}"' in html
     assert "a validar com o comprador" in html
+
+
+def test_montar_gondola_e_de_celular_e_os_cards_do_repositor_levam_ate_ela() -> None:
+    html = (UI_DIR / "gondola.html").read_text()
+
+    assert 'name="viewport"' in html and "chat" not in html.lower()
+    assert "Quantas peças cabem?" in html
+    assert 'href: "gondola.html", rotulo: "Montar gôndola"' in (UI_DIR / "comum.js").read_text()
+    assert "Montar a gôndola deste produto" in (UI_DIR / "reposicao.js").read_text()
+    assert "gondola.html?produto=" in (UI_DIR / "reposicao.js").read_text()

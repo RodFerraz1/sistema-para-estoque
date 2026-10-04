@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Montar gôndola - Copilot de Compras</title>
+  <link rel="stylesheet" href="estilo.css">
+  <script type="module" src="gondola.js"></script>
+</head>
+<body>
+  <header>
+    <div class="conteudo estreito">
+      <strong class="marca">Copilot de Compras</strong>
+      <nav aria-label="Telas do Copilot"></nav>
+    </div>
+  </header>
+  <main class="conteudo estreito">
+    <section id="escolher" hidden>
+      <h1>Montar gôndola</h1>
+      <p class="suave">Escolha o produto e veja quantas peças de cada cor e tamanho pôr na gôndola, pelo que mais vende.</p>
+      <form id="form-busca" role="search" aria-label="Buscar produto">
+        <input id="busca" name="busca" type="search" autocomplete="off" enterkeyhint="search" maxlength="100" placeholder="Buscar pelo nome ou pela cor" aria-label="Buscar produto pelo nome ou pela cor">
+      </form>
+      <p id="busca-status" class="suave" aria-live="polite"></p>
+      <ul id="produtos" class="produtos-gondola" aria-label="Produtos"></ul>
+    </section>
+
+    <section id="montar" hidden>
+      <a class="voltar" href="gondola.html">&larr; Outros produtos</a>
+      <h1 id="titulo">Montar gôndola</h1>
+      <p id="subtitulo" class="suave"></p>
+
+      <form id="form-capacidade" class="card capacidade-gondola" novalidate>
+        <label for="capacidade">Quantas peças cabem?</label>
+        <p class="suave">Todas as cores e tamanhos do produto juntos, na gôndola dele.</p>
+        <div class="capacidade-campos">
+          <div class="unidade"><input id="capacidade" name="capacidade" type="number" inputmode="numeric" min="1" step="1" placeholder="Ex.: 12"> peças</div>
+          <button id="lembrar" type="submit" disabled>Lembrar este número</button>
+        </div>
+        <p id="gravada" class="suave" aria-live="polite"></p>
+      </form>
+
+      <div id="mix" aria-live="polite"></div>
+    </section>
+    <p id="carregando" class="carregando">Carregando...</p>
+  </main>
+</body>
+</html>

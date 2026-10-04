@@ -42,6 +42,7 @@ from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
 from src.purchasing.service import Purchasing
 from src.reposicao.in_memory import (
     InMemoryAvisosGondolaRepositorio,
+    InMemoryCapacidadesGondolaRepositorio,
     InMemorySetoresRepositorio,
     InMemoryVerificacoesRepositorio,
 )
@@ -155,6 +156,7 @@ def copilot(
             InMemoryVerificacoesRepositorio(),
             InMemorySetoresRepositorio(),
             InMemoryAvisosGondolaRepositorio(),
+            InMemoryCapacidadesGondolaRepositorio(),
             notificacoes,
             relogio=lambda: NOW,
         ),

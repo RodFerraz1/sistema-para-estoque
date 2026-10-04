@@ -49,11 +49,11 @@ A UI fica em `http://localhost:8000/ui/` (a raiz redireciona para o painel de al
 
 ### Resetar o ambiente local
 
-O seed (`uv run python -m scripts.seed`) apaga e recria o schema `erp` e só acrescenta, no schema `copilot`, os setores da loja e o setor conhecido dos SKUs dos cenários que faltarem. As outras tabelas do Copilot não são tocadas por ele e acumulam o que o uso grava: avisos da equipe de vendas, avisos de gôndola vazia, decisões de compra, cobranças de entrega, episódios de alerta (as notificações), verificações de gôndola, registros de decisão do chat e versões da política. Para voltar ao estado inicial:
+O seed (`uv run python -m scripts.seed`) apaga e recria o schema `erp` e só acrescenta, no schema `copilot`, os setores da loja e o setor conhecido dos SKUs dos cenários que faltarem. As outras tabelas do Copilot não são tocadas por ele e acumulam o que o uso grava: avisos da equipe de vendas, avisos de gôndola vazia, decisões de compra, cobranças de entrega, episódios de alerta (as notificações), verificações de gôndola, capacidades da gôndola, registros de decisão do chat e versões da política. Para voltar ao estado inicial:
 
 ```bash
 docker compose exec db psql -U copilot -d copilot -c "
-  TRUNCATE copilot.avisos, copilot.avisos_gondola, copilot.setores_sku, copilot.setores, copilot.decisoes_compra, copilot.cobrancas_entrega, copilot.episodios_alerta, copilot.verificacoes_gondola, copilot.registros_decisao;
+  TRUNCATE copilot.avisos, copilot.avisos_gondola, copilot.capacidades_gondola, copilot.setores_sku, copilot.setores, copilot.decisoes_compra, copilot.cobrancas_entrega, copilot.episodios_alerta, copilot.verificacoes_gondola, copilot.registros_decisao;
   DELETE FROM copilot.politicas_compra WHERE versao > 1;"
 uv run python -m scripts.seed
 ```
