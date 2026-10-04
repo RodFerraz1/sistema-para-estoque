@@ -70,7 +70,7 @@ class ItemAlerta(BaseModel):
     SKU sem giro, e `cobertura_na_chegada_sem_compra_meses` quando a sugestão de pedido
     não tem cálculo (SKU novo, sem giro ou sem fornecedor). A quantidade e o fornecedor
     sugeridos só vêm quando a sugestão tem compra. `avisos_abertos` vem do mais recente
-    para o mais antigo."""
+    para o mais antigo. `parou_de_vender`: queda de venda com o disponível zero."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -82,6 +82,7 @@ class ItemAlerta(BaseModel):
     quantidade_sugerida: int | None
     fornecedor_sugerido: str | None
     avisos_abertos: list[Aviso]
+    parou_de_vender: bool = False
 
     @property
     def so_por_aviso(self) -> bool:

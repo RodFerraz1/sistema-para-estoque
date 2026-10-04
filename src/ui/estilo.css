@@ -103,6 +103,7 @@ nav a {
   font-weight: 500;
   padding: 6px 12px;
   border-radius: var(--raio-pequeno);
+  white-space: nowrap;
 }
 
 nav a:hover {
@@ -1782,6 +1783,59 @@ input[type="search"],
 
 .tipos button[aria-pressed="true"] small {
   color: rgba(255, 255, 255, 0.85);
+}
+
+/* Painel do repositor */
+
+.filtros.filtros-repositor {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr) auto;
+  margin-top: 20px;
+}
+
+.estreito .grupo > header {
+  flex-wrap: wrap;
+}
+
+.estreito .grupo > header p {
+  flex-basis: 100%;
+}
+
+.card.repor {
+  margin: 0;
+  padding: 16px 18px;
+  border-left: 4px solid var(--urgente);
+}
+
+.repor-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.repor .frase {
+  font-weight: 500;
+}
+
+.repor .numeros {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 760px) {
+  .filtros.filtros-repositor {
+    grid-template-columns: 1fr;
+  }
+
+  .repor-topo {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .repor .numeros dd {
+    font-size: 1.15rem;
+  }
 }
 
 /* Usuários e conta */

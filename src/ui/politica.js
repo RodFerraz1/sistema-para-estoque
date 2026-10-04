@@ -4,7 +4,17 @@ import { api, cabecalho, dataHora, el, mensagem } from "./comum.js";
 cabecalho("comprador");
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-const NUMEROS = ["teto_meses", "extra_sazonal_meses", "piso_alerta_dias", "piso_reposicao_dias", "ciclo_compra_meses", "dias_historico_minimo"];
+const NUMEROS = [
+  "teto_meses",
+  "extra_sazonal_meses",
+  "piso_alerta_dias",
+  "piso_reposicao_dias",
+  "ciclo_compra_meses",
+  "dias_historico_minimo",
+  "dias_observados_queda",
+  "venda_diaria_minima_queda",
+];
+const PERCENTUAIS = ["limiar_queda"];
 const OPCOES = ["criterio_fornecedor", "lead_time_base", "sazonalidade_modo"];
 const PERGUNTAS = {
   teto_meses: "pergunta 1",
@@ -18,6 +28,9 @@ const PERGUNTAS = {
   sazonalidade_modo: "pergunta 8",
   dias_historico_minimo: "pergunta 9",
   motivos_de_alerta: "pergunta 10",
+  dias_observados_queda: "pergunta 11",
+  venda_diaria_minima_queda: "pergunta 11",
+  limiar_queda: "pergunta 11",
 };
 
 montarChat();
@@ -35,6 +48,7 @@ document.getElementById("meses").append(
 function preencher(politica) {
   const p = politica.parametros;
   for (const campo of NUMEROS) formulario.elements[campo].value = p[campo];
+  for (const campo of PERCENTUAIS) formulario.elements[campo].value = Math.round(p[campo] * 10000) / 100;
   for (const campo of OPCOES) formulario.elements[campo].value = p[campo];
   for (const caixa of formulario.querySelectorAll('input[name="meses_quentes"]')) {
     caixa.checked = p.meses_quentes.includes(Number(caixa.value));
@@ -48,6 +62,7 @@ function preencher(politica) {
 function parametros() {
   const p = {};
   for (const campo of NUMEROS) p[campo] = Number(formulario.elements[campo].value);
+  for (const campo of PERCENTUAIS) p[campo] = Number(formulario.elements[campo].value) / 100;
   for (const campo of OPCOES) p[campo] = formulario.elements[campo].value;
   p.meses_quentes = [...formulario.querySelectorAll('input[name="meses_quentes"]:checked')].map((c) => Number(c.value));
   p.motivos_de_alerta = [...formulario.querySelectorAll('input[name="motivos_de_alerta"]:checked')].map((c) => c.value);

@@ -30,6 +30,7 @@ from src.api.schemas import (
     DecisaoCompraResponse,
     EntregaPendenteResponse,
     HistoricoDeAtrasosResponse,
+    PainelDoRepositorResponse,
     PainelResponse,
     PrecosResponse,
     SKUResumoResponse,
@@ -117,6 +118,19 @@ def test_cenarios_de_ruptura_do_seed_no_painel(client: TestClient) -> None:
     assert alertas[QUEDA_SEM_ESTOQUE].disponivel == 0
     assert alertas[RUPTURA_SEM_PEDIDO].fornecedor_sugerido == "Katrina Têxtil"
     assert TAPETE_MARROM not in alertas
+
+
+def test_queda_de_venda_do_seed_vai_para_o_repositor_ou_para_o_comprador(client: TestClient) -> None:
+    response = client.get("/reposicao/painel")
+    assert response.status_code == 200
+    [tapete] = PainelDoRepositorResponse.model_validate(response.json()).quedas_de_venda
+
+    assert tapete.sku_code == TAPETE_MARROM
+    assert [d.quantidade for d in tapete.ultimos_dias] == [5, 0]
+    assert 9 <= tapete.venda_diaria_base <= 11
+    assert tapete.disponivel > 0
+    parou = {i.sku_code for i in _painel(client).alertas if i.parou_de_vender}
+    assert parou == {QUEDA_SEM_ESTOQUE}
 
 
 def test_precos_contra_o_seed(client: TestClient) -> None:

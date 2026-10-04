@@ -78,6 +78,7 @@ def _item_to_response(item: ItemAlerta) -> ItemAlertaResponse:
         ultimo_aviso=aviso_to_response(item.avisos_abertos[0]) if item.avisos_abertos else None,
         so_por_aviso=item.so_por_aviso,
         grupo=item.grupo,
+        parou_de_vender=item.parou_de_vender,
     )
 
 

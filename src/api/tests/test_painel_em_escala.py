@@ -1,8 +1,9 @@
-"""O painel, a tela de Estoque e a varredura das notificações leem o estoque inteiro num
-retrato em lote: o número de consultas ao banco não depende do número de SKUs. Conta as
-consultas de `GET /painel`, `GET /estoque` e `GET /notificacoes` contra o Postgres, com o
-que já estiver no banco e com 30 SKUs a mais. O tempo com 5.000 SKUs fica no benchmark
-(`scripts/benchmark_painel.py`), fora da suíte. Pulado sem banco."""
+"""O painel, a tela de Estoque, o painel do repositor e a varredura das notificações leem
+o estoque inteiro num retrato em lote: o número de consultas ao banco não depende do número
+de SKUs. Conta as consultas de `GET /painel`, `GET /estoque`, `GET /reposicao/painel` e
+`GET /notificacoes` contra o Postgres, com o que já estiver no banco e com 30 SKUs a mais.
+O tempo com 5.000 SKUs fica no benchmark (`scripts/benchmark_painel.py`), fora da suíte.
+Pulado sem banco."""
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -76,7 +77,7 @@ def _consultas(client: TestClient, rota: str) -> int:
     return len(consultas)
 
 
-@pytest.mark.parametrize("rota", ["/painel", "/estoque"])
+@pytest.mark.parametrize("rota", ["/painel", "/estoque", "/reposicao/painel"])
 def test_faz_o_mesmo_numero_de_consultas_com_mais_skus(client: TestClient, rota: str) -> None:
     antes = _consultas(client, rota)
 

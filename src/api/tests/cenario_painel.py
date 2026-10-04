@@ -9,8 +9,8 @@ Em ruptura (abaixo de 20 dias): `ZERADO` (0 dias), `SEM_FORNECEDOR` (3 dias, sem
 `REGULAR` segura 45 dias e `SOBRANDO` 270. Com o lead time observado ligado, `URGENTE` e
 `MAIS_URGENTE` acabam antes da compra chegar. Todos são da categoria `felpudo`, menos o
 `SEM_FORNECEDOR` (`cama`) e o `INATIVO` (`mesa`). A Katrina também vende `ZERADO` e
-`MAIS_URGENTE`, mais cara que a Boa Vista. Os episódios de alerta, os usuários e o relógio
-das notificações também ficam em memória, com o mesmo relógio do painel.
+`MAIS_URGENTE`, mais cara que a Boa Vista. Os episódios de alerta, os usuários e os relógios
+das notificações e da reposição também ficam em memória, com o mesmo relógio do painel.
 """
 from __future__ import annotations
 
@@ -43,6 +43,7 @@ from src.painel.in_memory import (
 from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
 from src.politica_compra.schemas import PARAMETROS_V1
+from src.reposicao.dependencies import get_relogio as get_relogio_da_reposicao
 from src.usuarios.dependencies import get_usuarios_repositorio
 from src.usuarios.in_memory import InMemoryUsuariosRepositorio
 from tests.fakes import (
@@ -88,6 +89,7 @@ DEPENDENCIAS = (
     get_episodios_repositorio,
     get_usuarios_repositorio,
     get_relogio_das_notificacoes,
+    get_relogio_da_reposicao,
 )
 ONTEM = date(2026, 9, 30)
 
@@ -169,6 +171,7 @@ def preparar(*, erp: InMemoryERPAdapter | None = None, **parametros: object) -> 
     app.dependency_overrides[get_episodios_repositorio] = lambda: cenario.episodios
     app.dependency_overrides[get_usuarios_repositorio] = lambda: cenario.usuarios
     app.dependency_overrides[get_relogio_das_notificacoes] = lambda: cenario.relogio
+    app.dependency_overrides[get_relogio_da_reposicao] = lambda: cenario.relogio
     return cenario
 
 

@@ -66,6 +66,9 @@ class ParametrosPolitica(BaseModel):
     extra_sazonal_meses: float = Field(ge=0)
     dias_historico_minimo: int = Field(ge=0)
     motivos_de_alerta: tuple[MotivoAlerta, ...]
+    dias_observados_queda: int = Field(ge=1)
+    venda_diaria_minima_queda: float = Field(gt=0)
+    limiar_queda: float = Field(gt=0, lt=1)
 
     @model_validator(mode="after")
     def _regras_entre_campos(self) -> Self:
@@ -95,6 +98,9 @@ PARAMETROS_V1 = ParametrosPolitica(
     extra_sazonal_meses=2.0,
     dias_historico_minimo=60,
     motivos_de_alerta=(MotivoAlerta.ABAIXO_DO_PISO_ALERTA, MotivoAlerta.ENTREGA_ATRASADA),
+    dias_observados_queda=2,
+    venda_diaria_minima_queda=1.0,
+    limiar_queda=0.01,
 )
 
 

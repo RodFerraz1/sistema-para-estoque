@@ -59,6 +59,7 @@ export const TELAS = [
   { papel: "comprador", href: "estoque.html", rotulo: "Estoque" },
   { papel: "comprador", href: "politica.html", rotulo: "Política" },
   { papel: "vendas", href: "aviso.html", rotulo: "Avisar o comprador" },
+  { papel: "reposicao", href: "reposicao.html", rotulo: "Painel do repositor" },
   { papel: "admin", href: "usuarios.html", rotulo: "Usuários" },
 ];
 

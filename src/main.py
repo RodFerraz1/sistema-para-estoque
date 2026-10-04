@@ -18,6 +18,7 @@ from src.api.painel import router as painel_router
 from src.api.politica_compra import router as politica_compra_router
 from src.api.rag import decisao_indisponivel
 from src.api.rag import router as rag_router
+from src.api.reposicao import router as reposicao_router
 from src.api.skus import router as skus_router
 from src.api.skus import sku_sem_estoque
 from src.api.usuarios import router as usuarios_router
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(painel_router)
     app.include_router(entregas_router)
     app.include_router(notificacoes_router)
+    app.include_router(reposicao_router)
     # Handler no app, e não no endpoint, porque a dependência do Jev também lança sem JEV_KEY.
     app.add_exception_handler(DecisaoIndisponivel, decisao_indisponivel)
     app.add_exception_handler(SKUSemEstoque, sku_sem_estoque)

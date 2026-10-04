@@ -151,12 +151,22 @@ function cartao(item, { id, cor }, piso) {
           ? el("span", {}, "Sem vendas recentes")
           : el("span", {}, "Segura ", el("b", {}, coberturaEmDias(item.cobertura_atual_dias))),
       ),
-      zerado || motivos.length
-        ? el("div", { class: "selos" }, zerado ? el("span", { class: "selo urgente" }, "Zerado") : null, selosDeMotivo(motivos))
+      zerado || motivos.length || item.parou_de_vender
+        ? el(
+            "div",
+            { class: "selos" },
+            zerado ? el("span", { class: "selo urgente" }, "Zerado") : null,
+            seloParouDeVender(item.parou_de_vender),
+            selosDeMotivo(motivos),
+          )
         : null,
     ),
     sugestao(item),
   );
+}
+
+function seloParouDeVender(parou) {
+  return parou ? el("span", { class: "selo urgente", title: "Vendia todo dia e parou de vender nos últimos dias" }, "Parou de vender") : null;
 }
 
 function plural(n, singular, varios) {
@@ -206,6 +216,7 @@ function skuAtrasado(s) {
       "div",
       { class: "selos" },
       s.disponivel === 0 ? el("span", { class: "selo urgente" }, "Zerado") : null,
+      seloParouDeVender(pararamDeVender.has(s.sku_code)),
       s.em_ruptura && s.disponivel > 0 ? el("span", { class: "selo urgente" }, "Em ruptura") : null,
     ),
   );
@@ -385,6 +396,7 @@ function mostrar(painel, politica) {
   const grupos = GRUPOS.filter((g) => !g.motivo || motivos.includes(g.motivo));
   const porGrupo = Object.fromEntries(GRUPOS.map((g) => [g.id, []]));
   for (const item of painel.alertas) porGrupo[item.grupo].push(item);
+  pararamDeVender = new Set(painel.alertas.filter((i) => i.parou_de_vender).map((i) => i.sku_code));
   porGrupo.pedidos_de_vendas.sort((a, b) => b.ultimo_aviso.criado_em.localeCompare(a.ultimo_aviso.criado_em));
   const comFiltro = Object.keys(filtros.valores()).length > 0;
   const vazio = comFiltro ? nenhumComFiltros() : tudoEmDia();
@@ -419,6 +431,7 @@ function montarFiltros(politica, categorias, fornecedores) {
 }
 
 let politica;
+let pararamDeVender = new Set();
 let ultimaConsulta = 0;
 let recadoDaCobranca = null;
 

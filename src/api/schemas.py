@@ -317,7 +317,8 @@ class RegistrarAvisoRequest(BaseModel):
 class ItemAlertaResponse(BaseModel):
     """A cobertura vem em meses e em dias. A atual é nula para SKU sem giro; a na chegada sem
     a compra, nula quando a sugestão não tem cálculo. Quantidade e fornecedor só com compra.
-    `so_por_aviso`: tem aviso aberto e nenhum motivo de alerta calculado."""
+    `so_por_aviso`: tem aviso aberto e nenhum motivo de alerta calculado. `parou_de_vender`:
+    queda de venda com o disponível zero."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -337,6 +338,7 @@ class ItemAlertaResponse(BaseModel):
     ultimo_aviso: AvisoResponse | None
     so_por_aviso: bool
     grupo: GrupoDoPainel
+    parou_de_vender: bool
 
 
 class DecisaoCompraResponse(BaseModel):
@@ -595,3 +597,35 @@ class NotificacoesResponse(BaseModel):
 
     notificacoes: list[NotificacaoResponse]
     nao_lidas: int
+
+
+class DiaObservadoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    dia: date
+    quantidade: int
+
+
+class QuedaDeVendaResponse(BaseModel):
+    """`venda_diaria_base` é a média por dia aberto antes da janela; `ultimos_dias`, a janela
+    observada, do mais antigo ao mais recente; `venda_perdida`, o que a base esperava vender
+    na janela menos o que vendeu."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    produto_nome: str
+    cor: str
+    tamanho: str
+    categoria: str
+    disponivel: int
+    venda_diaria_base: float
+    ultimos_dias: list[DiaObservadoResponse]
+    vendido_na_janela: int
+    venda_perdida: float
+
+
+class PainelDoRepositorResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    quedas_de_venda: list[QuedaDeVendaResponse]

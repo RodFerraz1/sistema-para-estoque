@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import UTC, datetime
 
 from src.erp_adapter.port import ERPAdapter
-from src.sales.schemas import GiroMedioMensal, Sazonalidade, Venda, VendaMensal, VendasDoMes
+from src.sales.schemas import GiroMedioMensal, Sazonalidade, Venda, VendaMensal, VendasDoDia, VendasDoMes
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -80,6 +80,11 @@ class Sales:
     def vendas_por_mes_de_todos(self) -> dict[str, list[VendasDoMes]]:
         """`vendas_por_mes` dos SKUs ativos numa leitura só. SKU sem venda fica de fora."""
         return self._erp.giros(_EPOCH)
+
+    def vendas_diarias_de_todos(self, desde: datetime) -> dict[str, list[VendasDoDia]]:
+        """As vendas dos SKUs ativos desde `desde`, somadas por dia em UTC, numa leitura só.
+        SKU sem venda fica de fora."""
+        return self._erp.vendas_diarias(desde)
 
     def giro(self, vendas_por_mes: list[VendasDoMes], meses: int = 6) -> GiroMedioMensal:
         """Média dos `meses` fechados antes do mês corrente. Com menos histórico que isso,

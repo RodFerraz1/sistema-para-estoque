@@ -104,6 +104,19 @@
         <label><input type="checkbox" name="motivos_de_alerta" value="periodo_sazonal"> A compra chega numa data forte (pergunta 2)</label>
       </fieldset>
 
+      <h2>Parou de vender <span class="selo destaque">a validar com o comprador</span></h2>
+      <div class="card pergunta">
+        <label for="dias_observados_queda">11. Quando um produto que vende todo dia para de vender, mas o ERP diz que tem estoque, depois de quantos dias você quer que o repositor vá olhar a gôndola?</label>
+        <p class="suave">Os dias em que a loja não abriu (domingo, feriado) não contam. Exemplo: um tapete vende 10 por dia e vende 5 e depois 0. Com 2 dias, ele vai para o painel do repositor.</p>
+        <div class="unidade campo"><input id="dias_observados_queda" name="dias_observados_queda" type="number" min="1" step="1" required> dias com a loja aberta</div>
+        <label for="venda_diaria_minima_queda">Só vigiar produtos que vendem pelo menos</label>
+        <p class="suave">Para quem vende uma peça por semana, um dia sem venda é normal.</p>
+        <div class="unidade campo"><input id="venda_diaria_minima_queda" name="venda_diaria_minima_queda" type="number" min="0.1" step="0.1" required> peças por dia</div>
+        <label for="limiar_queda">Sensibilidade: avisar quando a chance de ser só um dia fraco for menor que</label>
+        <p class="suave">Maior avisa mais cedo, com mais alarme falso. Menor avisa só quando é quase certo.</p>
+        <div class="unidade"><input id="limiar_queda" name="limiar_queda" type="number" min="0.01" max="99" step="0.01" required> %</div>
+      </div>
+
       <div class="barra-salvar">
         <button id="salvar" type="submit" class="primario">Salvar nova versão</button>
         <span class="suave">Salvar cria uma versão nova; o painel e as sugestões passam a usá-la na hora.</span>

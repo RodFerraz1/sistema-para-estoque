@@ -66,6 +66,7 @@ def test_item_traz_o_que_o_comprador_precisa_sem_abrir_o_sku(client: TestClient)
         "ultimo_aviso": None,
         "so_por_aviso": False,
         "grupo": "em_ruptura",
+        "parou_de_vender": False,
     }
     # Posição de 150 com o que está a caminho: acima do piso de reposição, não compra.
     assert piso["cobertura_atual_dias"] == pytest.approx(15.0)

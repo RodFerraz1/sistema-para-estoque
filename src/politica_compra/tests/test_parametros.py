@@ -28,6 +28,9 @@ def _v1(**overrides: Any) -> dict[str, Any]:
         "extra_sazonal_meses": 2.0,
         "dias_historico_minimo": 60,
         "motivos_de_alerta": ["ruptura_antes_da_chegada", "abaixo_do_piso_alerta"],
+        "dias_observados_queda": 2,
+        "venda_diaria_minima_queda": 1.0,
+        "limiar_queda": 0.01,
     }
     return base | overrides
 
@@ -77,6 +80,10 @@ def test_parametros_sao_imutaveis() -> None:
         ("criterio_fornecedor fechado", {"criterio_fornecedor": "melhor_nota"}),
         ("sazonalidade_modo fechado", {"sazonalidade_modo": "ajustar"}),
         ("sem campos extras", {"estoque_seguranca": 10}),
+        ("dias_observados_queda >= 1", {"dias_observados_queda": 0}),
+        ("venda_diaria_minima_queda > 0", {"venda_diaria_minima_queda": 0}),
+        ("limiar_queda > 0", {"limiar_queda": 0}),
+        ("limiar_queda < 1", {"limiar_queda": 1}),
     ],
 )
 def test_parametros_invalidos_sao_rejeitados(

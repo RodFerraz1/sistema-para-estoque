@@ -55,6 +55,7 @@ from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.politica_compra.schemas import DIAS_POR_MES, MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import SugestaoPedido
 from src.purchasing.service import Purchasing
+from src.reposicao.service import Reposicao
 from src.usuarios.schemas import Usuario
 
 Relogio = Callable[[], datetime]
@@ -212,6 +213,7 @@ def _item(
     parametros: ParametrosPolitica,
     avisos: list[Aviso],
     com_entrega_atrasada: bool,
+    com_queda_de_venda: bool,
 ) -> ItemAlerta:
     fornecedor = sugestao.fornecedor if sugestao.quantidade > 0 else None
     return ItemAlerta(
@@ -225,6 +227,7 @@ def _item(
         quantidade_sugerida=sugestao.quantidade if fornecedor else None,
         fornecedor_sugerido=fornecedor.fornecedor_nome if fornecedor else None,
         avisos_abertos=avisos,
+        parou_de_vender=com_queda_de_venda and ficha.estoque.quantidade_disponivel == 0,
     )
 
 
@@ -291,6 +294,7 @@ class Painel:
         decisoes: DecisoesRepositorio,
         cobrancas: CobrancasRepositorio,
         notificacoes: Notificacoes,
+        reposicao: Reposicao,
         *,
         relogio: Relogio = agora_utc,
     ) -> None:
@@ -303,6 +307,7 @@ class Painel:
         self._decisoes = decisoes
         self._cobrancas = cobrancas
         self._notificacoes = notificacoes
+        self._reposicao = reposicao
         self._relogio = relogio
 
     def _sku(self, sku_code: str) -> SKU:
@@ -449,7 +454,10 @@ class Painel:
         que ficaram nos alertas.
 
         O `filtro` vale para os alertas e os decididos, menos o motivo, que só vale para os
-        alertas. `skus_com_erro` não é filtrado."""
+        alertas. `skus_com_erro` não é filtrado.
+
+        Um SKU com queda de venda e disponível zero leva o selo `parou_de_vender`: não vai
+        para o repositor, e a solução é comprar ou cobrar a entrega."""
         filtro = filtro or FiltroPainel()
         palavras = palavras_da_busca(filtro.busca or "")
         parametros = self._politicas.ativa().parametros
@@ -461,6 +469,7 @@ class Painel:
 
         retrato = self._ficha_sku.retrato()
         sugestoes = self._purchasing.sugerir_pedidos(retrato)
+        quedas = self._reposicao.quedas_de_venda(parametros)
         cobrancas = self._cobrancas.ultimas()
         atrasadas: dict[str, list[EntregaAtrasada]] = {}
         if MotivoAlerta.ENTREGA_ATRASADA in parametros.motivos_de_alerta:
@@ -485,7 +494,9 @@ class Painel:
                 continue
             if not _passa_no_sku(filtro, palavras, sku, ficha):
                 continue
-            item = _item(ficha, sugestoes[sku.sku_code], parametros, abertos, sku.sku_code in atrasadas)
+            item = _item(
+                ficha, sugestoes[sku.sku_code], parametros, abertos, sku.sku_code in atrasadas, sku.sku_code in quedas
+            )
             if (item.motivos or item.avisos_abertos) and _tem_o_motivo(filtro, item):
                 alertas.append(item)
         decididos.sort(key=lambda d: (d.decisao.criado_em, d.sku.sku_code), reverse=True)

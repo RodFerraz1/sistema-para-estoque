@@ -18,6 +18,7 @@ PAGINAS = [
     "usuarios.html",
     "conta.html",
     "estoque.html",
+    "reposicao.html",
 ]
 PAPEL_DAS_PAGINAS = {
     "index.html": "comprador",
@@ -25,6 +26,7 @@ PAPEL_DAS_PAGINAS = {
     "politica.html": "comprador",
     "estoque.html": "comprador",
     "aviso.html": "vendas",
+    "reposicao.html": "reposicao",
     "usuarios.html": "admin",
 }
 PAGINAS_DO_COMPRADOR = {
@@ -154,6 +156,7 @@ def test_cada_pagina_chama_a_api() -> None:
     assert chamadas["conta.js"] == [("PUT", "/eu/senha")]
     assert set(chamadas["notificacoes.js"]) == {("GET", "/notificacoes"), ("POST", "/notificacoes/vistas")}
     assert set(chamadas["estoque.js"]) == {("GET", "/estoque?${consulta}"), ("GET", "/categorias")}
+    assert set(chamadas["reposicao.js"]) == {("GET", "/reposicao/painel?${consulta}"), ("GET", "/categorias")}
 
 
 def test_endpoints_chamados_pelos_js_existem_no_app() -> None:
@@ -305,3 +308,23 @@ def test_pagina_de_login_nao_monta_cabecalho() -> None:
 def test_tela_do_sku_passa_o_sku_em_contexto_ao_chat() -> None:
     assert "montarChat(skuCode" in (UI_DIR / "sku.js").read_text()
     assert "sku_code: skuEmContexto" in (UI_DIR / "chat.js").read_text()
+
+
+def test_painel_do_repositor_e_de_celular_com_os_filtros_da_api() -> None:
+    html = (UI_DIR / "reposicao.html").read_text()
+    parametros = {
+        p["name"] for p in app.openapi()["paths"]["/reposicao/painel"]["get"]["parameters"] if p["in"] == "query"
+    }
+    campos = set(re.findall(r'<(?:input|select) id="filtro-\w+" name="(\w+)"', html))
+
+    assert campos == parametros == {"busca", "categoria"}
+    assert 'name="viewport"' in html and "chat" not in html.lower()
+    assert "barraDeFiltros(" in (UI_DIR / "reposicao.js").read_text()
+
+
+def test_politica_pergunta_a_sensibilidade_da_queda_de_venda() -> None:
+    html = (UI_DIR / "politica.html").read_text()
+
+    for campo in ("dias_observados_queda", "venda_diaria_minima_queda", "limiar_queda"):
+        assert f'name="{campo}"' in html
+    assert "a validar com o comprador" in html

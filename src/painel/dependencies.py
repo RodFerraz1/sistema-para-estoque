@@ -18,6 +18,8 @@ from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.purchasing.dependencies import get_purchasing
 from src.purchasing.service import Purchasing
+from src.reposicao.dependencies import get_reposicao
+from src.reposicao.service import Reposicao
 
 
 def get_avisos_repositorio() -> AvisosRepositorio:
@@ -47,8 +49,19 @@ def get_painel(
     decisoes: DecisoesRepositorio = Depends(get_decisoes_repositorio),
     cobrancas: CobrancasRepositorio = Depends(get_cobrancas_repositorio),
     notificacoes: Notificacoes = Depends(get_notificacoes),
+    reposicao: Reposicao = Depends(get_reposicao),
     relogio: Relogio = Depends(get_relogio),
 ) -> Painel:
     return Painel(
-        catalog, ficha_sku, inventory, purchasing, politicas, avisos, decisoes, cobrancas, notificacoes, relogio=relogio
+        catalog,
+        ficha_sku,
+        inventory,
+        purchasing,
+        politicas,
+        avisos,
+        decisoes,
+        cobrancas,
+        notificacoes,
+        reposicao,
+        relogio=relogio,
     )
