@@ -9,15 +9,30 @@ from fastapi.testclient import TestClient
 from src.main import UI_DIR, app
 from src.politica_compra.schemas import MotivoAlerta
 
-PAGINAS = ["index.html", "sku.html", "aviso.html", "politica.html", "login.html", "usuarios.html", "conta.html"]
+PAGINAS = [
+    "index.html",
+    "sku.html",
+    "aviso.html",
+    "politica.html",
+    "login.html",
+    "usuarios.html",
+    "conta.html",
+    "estoque.html",
+]
 PAPEL_DAS_PAGINAS = {
     "index.html": "comprador",
     "sku.html": "comprador",
     "politica.html": "comprador",
+    "estoque.html": "comprador",
     "aviso.html": "vendas",
     "usuarios.html": "admin",
 }
-PAGINAS_DO_COMPRADOR = {"index.html": "painel.js", "sku.html": "sku.js", "politica.html": "politica.js"}
+PAGINAS_DO_COMPRADOR = {
+    "index.html": "painel.js",
+    "sku.html": "sku.js",
+    "politica.html": "politica.js",
+    "estoque.html": "estoque.js",
+}
 TIPOS = {".html": "text/html", ".css": "text/css", ".js": "text/javascript"}
 REFERENCIA_NO_HTML = re.compile(r'(?:src|href)="([^"]+)"')
 IMPORT_NO_JS = re.compile(r'from\s+"\./([^"]+)"')
@@ -96,6 +111,7 @@ def test_assets_referenciados_respondem_com_o_tipo_certo(client: TestClient) -> 
         "login.js",
         "usuarios.js",
         "conta.js",
+        "estoque.js",
     } <= assets
 
     for asset in sorted(assets):
@@ -135,6 +151,7 @@ def test_cada_pagina_chama_a_api() -> None:
         ("PUT", "/usuarios/${pessoa.id}/senha"),
     }
     assert chamadas["conta.js"] == [("PUT", "/eu/senha")]
+    assert set(chamadas["estoque.js"]) == {("GET", "/estoque?${consulta}"), ("GET", "/categorias")}
 
 
 def test_endpoints_chamados_pelos_js_existem_no_app() -> None:
@@ -203,8 +220,35 @@ def test_painel_tem_busca_e_filtros_com_os_nomes_da_api_e_guarda_na_url() -> Non
 
     assert campos == parametros == {"busca", "categoria", "motivo", "fornecedor"}
     assert 'id="limpar-filtros"' in html
-    assert "history.replaceState" in painel and "location.search" in painel
+    assert "barraDeFiltros(" in painel and "guardarNaUrl(" in painel
     assert "Nenhum SKU com esses filtros" in painel and "Tudo em dia" in painel
+
+
+def test_barra_de_filtros_guarda_os_filtros_na_url() -> None:
+    comum = (UI_DIR / "comum.js").read_text()
+
+    assert "history.replaceState" in comum and "location.search" in comum
+
+
+def test_estoque_tem_a_barra_de_filtros_do_painel_com_os_nomes_da_api() -> None:
+    html = (UI_DIR / "estoque.html").read_text()
+    estoque = (UI_DIR / "estoque.js").read_text()
+    parametros = {p["name"] for p in app.openapi()["paths"]["/estoque"]["get"]["parameters"] if p["in"] == "query"}
+    campos = set(re.findall(r'<(?:input|select) id="[\w-]+" name="(\w+)"', html))
+
+    assert campos == {"busca", "categoria", "situacao", "ordem"}
+    assert campos | {"pagina", "por_pagina"} == parametros
+    assert 'id="limpar-filtros"' in html
+    assert "barraDeFiltros(" in estoque and "guardarNaUrl(" in estoque
+    assert {"em_ruptura", "sem_venda", "com_transito"} <= set(re.findall(r'\["(\w+)", "', estoque))
+    assert "sku.html?sku=" in estoque
+    assert "Nenhum SKU com esses filtros" in estoque
+
+
+def test_menu_do_comprador_tem_o_estoque_logo_depois_do_painel() -> None:
+    telas = re.findall(r'\{ papel: "(\w+)", href: "([^"]+)"', (UI_DIR / "comum.js").read_text())
+
+    assert telas[:2] == [("comprador", "index.html"), ("comprador", "estoque.html")]
 
 
 def test_decididos_ficam_recolhidos_por_padrao() -> None:

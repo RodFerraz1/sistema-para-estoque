@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Painel de alertas - Copilot de Compras</title>
+  <title>Estoque - Copilot de Compras</title>
   <link rel="stylesheet" href="estilo.css">
-  <script type="module" src="painel.js"></script>
+  <script type="module" src="estoque.js"></script>
 </head>
 <body>
   <header>
@@ -18,22 +18,24 @@
   <main class="conteudo">
     <div class="cabecalho-pagina">
       <div>
-        <h1 id="saudacao">Painel de alertas</h1>
-        <p class="suave">O que pede a sua atenção agora, calculado na hora com a política de compra.</p>
-      </div>
-      <div class="acoes">
-        <a id="link-aviso" class="botao" href="aviso.html" target="_blank" rel="noopener" data-papel="vendas" hidden>Página das vendedoras ↗</a>
+        <h1>Estoque</h1>
+        <p class="suave">Todos os SKUs ativos: o que tem, o que está a caminho e quantos dias o estoque segura.</p>
       </div>
     </div>
-    <form id="filtros" class="filtros" role="search" aria-label="Buscar e filtrar o painel" hidden>
+    <form id="filtros" class="filtros filtros-estoque" role="search" aria-label="Buscar e filtrar o estoque" hidden>
       <input id="filtro-busca" name="busca" type="search" autocomplete="off" enterkeyhint="search" maxlength="100" placeholder="Buscar código, nome, cor, tamanho" aria-label="Buscar por código, nome, cor ou tamanho">
       <select id="filtro-categoria" name="categoria" aria-label="Categoria"><option value="">Todas as categorias</option></select>
-      <select id="filtro-motivo" name="motivo" aria-label="Motivo"><option value="">Todos os motivos</option></select>
-      <select id="filtro-fornecedor" name="fornecedor" aria-label="Fornecedor"><option value="">Todos os fornecedores</option></select>
+      <select id="filtro-situacao" name="situacao" aria-label="Situação"><option value="">Todas as situações</option></select>
       <button id="limpar-filtros" class="limpar-filtros" type="button" hidden>Limpar filtros</button>
     </form>
-    <p id="carregando" class="carregando">Calculando o painel...</p>
-    <div id="painel"></div>
+    <div class="barra-estoque" hidden>
+      <p id="total" class="suave" aria-live="polite"></p>
+      <label class="ordem">Ordenar por
+        <select id="ordem" name="ordem"></select>
+      </label>
+    </div>
+    <p id="carregando" class="carregando">Lendo o estoque...</p>
+    <div id="estoque"></div>
   </main>
 </body>
 </html>

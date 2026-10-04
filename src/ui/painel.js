@@ -3,11 +3,13 @@ import {
   MOTIVOS,
   TIPOS_DE_AVISO,
   api,
+  barraDeFiltros,
   cabecalho,
   coberturaEmDias,
   dataHora,
   dias,
   el,
+  guardarNaUrl,
   mensagem,
   nomeDaCategoria,
   numero,
@@ -19,14 +21,9 @@ import {
 cabecalho("comprador");
 montarChat();
 
-const ESPERA_DA_BUSCA_MS = 300;
-const FILTROS = ["busca", "categoria", "motivo", "fornecedor"];
-
 const carregando = document.getElementById("carregando");
 const conteudo = document.getElementById("painel");
-const formulario = document.getElementById("filtros");
-const campos = Object.fromEntries(FILTROS.map((f) => [f, document.getElementById(`filtro-${f}`)]));
-const limpar = document.getElementById("limpar-filtros");
+const filtros = barraDeFiltros(document.getElementById("filtros"), carregar);
 
 const GRUPOS = [
   {
@@ -230,12 +227,8 @@ function nenhumComFiltros() {
     { class: "card vazio" },
     el("strong", {}, "Nenhum SKU com esses filtros"),
     el("p", { class: "suave" }, "Nada pedindo atenção com essa busca. Tente outra palavra ou veja o painel inteiro."),
-    el("button", { type: "button", onclick: limparFiltros }, "Limpar filtros"),
+    el("button", { type: "button", onclick: filtros.limpar }, "Limpar filtros"),
   );
-}
-
-function filtrosAtuais() {
-  return Object.fromEntries(FILTROS.map((f) => [f, campos[f].value.trim()]).filter(([, valor]) => valor));
 }
 
 function mostrar(painel, politica) {
@@ -244,7 +237,7 @@ function mostrar(painel, politica) {
   const porGrupo = Object.fromEntries(GRUPOS.map((g) => [g.id, []]));
   for (const item of painel.alertas) porGrupo[item.grupo].push(item);
   porGrupo.pedidos_de_vendas.sort((a, b) => b.ultimo_aviso.criado_em.localeCompare(a.ultimo_aviso.criado_em));
-  const comFiltro = Object.keys(filtrosAtuais()).length > 0;
+  const comFiltro = Object.keys(filtros.valores()).length > 0;
   const vazio = comFiltro ? nenhumComFiltros() : tudoEmDia();
   conteudo.replaceChildren(
     el(
@@ -258,33 +251,20 @@ function mostrar(painel, politica) {
   );
 }
 
-function opcoes(select, lista, valorDaUrl) {
-  const valores = new Set(lista.map(([valor]) => valor));
-  if (valorDaUrl && !valores.has(valorDaUrl)) lista.push([valorDaUrl, valorDaUrl]);
-  select.append(...lista.map(([valor, rotulo]) => el("option", { value: valor }, rotulo)));
-  select.value = valorDaUrl ?? "";
-}
-
 function montarFiltros(politica, categorias, fornecedores) {
-  const daUrl = new URLSearchParams(location.search);
   const ruptura = "abaixo_do_piso_alerta";
   const motivos = [...politica.parametros.motivos_de_alerta].sort((a, b) => (b === ruptura) - (a === ruptura));
-  campos.busca.value = daUrl.get("busca") ?? "";
-  opcoes(campos.categoria, categorias.map((c) => [c, nomeDaCategoria(c)]), daUrl.get("categoria"));
-  opcoes(campos.motivo, [["aviso", "Aviso da equipe de vendas"], ...motivos.map((m) => [m, MOTIVOS[m] ?? m])], daUrl.get("motivo"));
-  opcoes(campos.fornecedor, fornecedores.map((f) => [f.id, f.nome]), daUrl.get("fornecedor"));
-  formulario.hidden = false;
+  filtros.opcoes("categoria", categorias.map((c) => [c, nomeDaCategoria(c)]));
+  filtros.opcoes("motivo", [["aviso", "Aviso da equipe de vendas"], ...motivos.map((m) => [m, MOTIVOS[m] ?? m])]);
+  filtros.opcoes("fornecedor", fornecedores.map((f) => [f.id, f.nome]));
+  filtros.mostrar();
 }
 
 let politica;
 let ultimaConsulta = 0;
-let espera;
 
 async function carregar() {
-  const filtros = filtrosAtuais();
-  const consulta = new URLSearchParams(filtros).toString();
-  history.replaceState(null, "", consulta ? `?${consulta}` : location.pathname);
-  limpar.hidden = consulta === "";
+  const consulta = guardarNaUrl(filtros.valores());
   const numero = ++ultimaConsulta;
   conteudo.setAttribute("aria-busy", "true");
   try {
@@ -297,24 +277,6 @@ async function carregar() {
     if (numero === ultimaConsulta) conteudo.removeAttribute("aria-busy");
   }
 }
-
-function limparFiltros() {
-  for (const campo of Object.values(campos)) campo.value = "";
-  carregar();
-  campos.busca.focus();
-}
-
-formulario.addEventListener("submit", (evento) => {
-  evento.preventDefault();
-  clearTimeout(espera);
-  carregar();
-});
-campos.busca.addEventListener("input", () => {
-  clearTimeout(espera);
-  espera = setTimeout(carregar, ESPERA_DA_BUSCA_MS);
-});
-for (const f of ["categoria", "motivo", "fornecedor"]) campos[f].addEventListener("change", carregar);
-limpar.addEventListener("click", limparFiltros);
 
 try {
   const [politicaAtiva, categorias, fornecedores] = await Promise.all([

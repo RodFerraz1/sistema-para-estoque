@@ -385,6 +385,34 @@ class PainelResponse(BaseModel):
     contagens: dict[GrupoDoPainel, int]
 
 
+class ItemEstoqueResponse(BaseModel):
+    """`cobertura_dias` é nula para SKU sem giro."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    produto_nome: str
+    cor: str
+    tamanho: str
+    categoria: str
+    disponivel: int
+    em_transito: int
+    venda_media_diaria: float
+    cobertura_dias: float | None
+    em_ruptura: bool
+
+
+class EstoqueResponse(BaseModel):
+    """`total` conta os SKUs de todas as páginas com o filtro aplicado."""
+
+    model_config = ConfigDict(frozen=True)
+
+    itens: list[ItemEstoqueResponse]
+    total: int
+    pagina: int
+    por_pagina: int
+
+
 class FornecedorResumoResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 

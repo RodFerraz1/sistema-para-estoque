@@ -54,6 +54,7 @@ export async function api(metodo, caminho, corpo) {
 
 export const TELAS = [
   { papel: "comprador", href: "index.html", rotulo: "Painel" },
+  { papel: "comprador", href: "estoque.html", rotulo: "Estoque" },
   { papel: "comprador", href: "politica.html", rotulo: "Política" },
   { papel: "vendas", href: "aviso.html", rotulo: "Avisar o comprador" },
   { papel: "admin", href: "usuarios.html", rotulo: "Usuários" },
@@ -234,6 +235,69 @@ const CATEGORIAS = { felpudo: "Felpudo", jogo_cama: "Jogo de cama", mesa: "Mesa"
 
 export function nomeDaCategoria(categoria) {
   return CATEGORIAS[categoria] ?? categoria.replaceAll("_", " ");
+}
+
+const ESPERA_DA_BUSCA_MS = 300;
+
+export function barraDeFiltros(formulario, aoMudar) {
+  const campos = [...formulario.querySelectorAll("input[name], select[name]")];
+  const limpar = formulario.querySelector(".limpar-filtros");
+  const daUrl = new URLSearchParams(location.search);
+  let espera;
+
+  const valores = () => Object.fromEntries(campos.map((c) => [c.name, c.value.trim()]).filter(([, valor]) => valor));
+  const atualizarLimpar = () => (limpar.hidden = Object.keys(valores()).length === 0);
+
+  function mudou() {
+    clearTimeout(espera);
+    atualizarLimpar();
+    aoMudar();
+  }
+
+  function limparFiltros() {
+    for (const campo of campos) campo.value = "";
+    mudou();
+    campos[0].focus();
+  }
+
+  formulario.addEventListener("submit", (evento) => {
+    evento.preventDefault();
+    mudou();
+  });
+  for (const campo of campos) {
+    if (campo.type === "search") {
+      campo.value = daUrl.get(campo.name) ?? "";
+      campo.addEventListener("input", () => {
+        clearTimeout(espera);
+        espera = setTimeout(mudou, ESPERA_DA_BUSCA_MS);
+      });
+    } else {
+      campo.addEventListener("change", mudou);
+    }
+  }
+  limpar.addEventListener("click", limparFiltros);
+
+  return {
+    valores,
+    limpar: limparFiltros,
+    opcoes(nome, lista) {
+      const select = formulario.elements[nome];
+      const valorDaUrl = daUrl.get(nome);
+      if (valorDaUrl && !lista.some(([valor]) => valor === valorDaUrl)) lista.push([valorDaUrl, valorDaUrl]);
+      select.append(...lista.map(([valor, rotulo]) => el("option", { value: valor }, rotulo)));
+      select.value = valorDaUrl ?? "";
+    },
+    mostrar() {
+      atualizarLimpar();
+      formulario.hidden = false;
+    },
+  };
+}
+
+export function guardarNaUrl(parametros) {
+  const consulta = new URLSearchParams(parametros).toString();
+  history.replaceState(null, "", consulta ? `?${consulta}` : location.pathname);
+  return consulta;
 }
 
 export const TIPOS_DE_AVISO = { acabou: "Acabou", vendendo_muito: "Vendendo muito" };

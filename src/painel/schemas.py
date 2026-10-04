@@ -15,6 +15,9 @@ TipoDecisao = Literal["vou_comprar", "negociando", "nao_comprar_agora"]
 GrupoDoPainel = Literal["pedidos_de_vendas", "em_ruptura", "vao_faltar", "outros_alertas"]
 GRUPOS: tuple[GrupoDoPainel, ...] = ("pedidos_de_vendas", "em_ruptura", "vao_faltar", "outros_alertas")
 MotivoDoFiltro = Literal["aviso"] | MotivoAlerta
+SituacaoEstoque = Literal["em_ruptura", "sem_venda", "com_transito"]
+OrdemEstoque = Literal["cobertura", "venda_diaria", "nome"]
+POR_PAGINA_MAXIMO = 100
 
 
 class Aviso(BaseModel):
@@ -131,3 +134,39 @@ class PainelDeAlertas(BaseModel):
         for item in self.alertas:
             contagens[item.grupo] += 1
         return contagens
+
+
+class FiltroEstoque(BaseModel):
+    """Vazio, não filtra. `busca` segue a regra do `catalog.buscar_skus`; `situacao` é
+    `em_ruptura` (cobertura abaixo do piso de alerta), `sem_venda` (sem giro) ou
+    `com_transito` (compra a caminho)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    busca: str | None = None
+    categoria: str | None = None
+    situacao: SituacaoEstoque | None = None
+
+
+class ItemEstoque(BaseModel):
+    """Uma linha da tela de Estoque. `cobertura_meses` é nula para SKU sem giro."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku: SKU
+    disponivel: int
+    em_transito: int
+    venda_media_diaria: float
+    cobertura_meses: float | None
+    em_ruptura: bool
+
+
+class PaginaDeEstoque(BaseModel):
+    """`total` conta os SKUs de todas as páginas com o filtro aplicado."""
+
+    model_config = ConfigDict(frozen=True)
+
+    itens: list[ItemEstoque]
+    total: int
+    pagina: int
+    por_pagina: int

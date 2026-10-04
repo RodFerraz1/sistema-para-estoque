@@ -1,5 +1,6 @@
-"""O painel lê o estoque inteiro num retrato em lote: o número de consultas ao banco não
-depende do número de SKUs. Conta as consultas de `GET /painel` contra o Postgres, com o que
+"""O painel e a tela de Estoque leem o estoque inteiro num retrato em lote: o número de
+consultas ao banco não depende do número de SKUs. Conta as consultas de `GET /painel` e
+`GET /estoque` contra o Postgres, com o que
 já estiver no banco e com 30 SKUs a mais. O tempo com 5.000 SKUs fica no benchmark
 (`scripts/benchmark_painel.py`), fora da suíte. Pulado sem banco."""
 from __future__ import annotations
@@ -60,7 +61,7 @@ def client() -> Iterator[TestClient]:
     yield TestClient(app)
 
 
-def _consultas_do_painel(client: TestClient) -> int:
+def _consultas(client: TestClient, rota: str) -> int:
     consultas: list[str] = []
 
     def contar(conn, cursor, statement, parameters, context, executemany) -> None:  # noqa: ANN001
@@ -68,18 +69,19 @@ def _consultas_do_painel(client: TestClient) -> int:
 
     event.listen(get_engine(), "before_cursor_execute", contar)
     try:
-        response = client.get("/painel")
+        response = client.get(rota)
     finally:
         event.remove(get_engine(), "before_cursor_execute", contar)
     assert response.status_code == 200, response.text
     return len(consultas)
 
 
-def test_painel_faz_o_mesmo_numero_de_consultas_com_mais_skus(client: TestClient) -> None:
-    antes = _consultas_do_painel(client)
+@pytest.mark.parametrize("rota", ["/painel", "/estoque"])
+def test_faz_o_mesmo_numero_de_consultas_com_mais_skus(client: TestClient, rota: str) -> None:
+    antes = _consultas(client, rota)
 
     with erp_no_banco(_mais_skus(30)):
-        depois = _consultas_do_painel(client)
+        depois = _consultas(client, rota)
 
     assert depois == antes
     assert antes <= 12

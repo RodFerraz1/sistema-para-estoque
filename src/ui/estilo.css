@@ -646,7 +646,8 @@ legend + * {
   white-space: nowrap;
 }
 
-#painel[aria-busy="true"] {
+#painel[aria-busy="true"],
+#estoque[aria-busy="true"] {
   opacity: 0.55;
   transition: opacity 0.15s;
 }
@@ -898,6 +899,197 @@ details.decididos ul {
 
   .item-sugestao {
     text-align: left;
+  }
+}
+
+/* Estoque */
+
+.filtros.filtros-estoque {
+  grid-template-columns: minmax(200px, 1.8fr) repeat(2, minmax(0, 1fr)) auto;
+}
+
+.barra-estoque {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+  scroll-margin-top: 80px;
+}
+
+.barra-estoque p {
+  margin: 0;
+}
+
+.ordem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+}
+
+.ordem select {
+  color: var(--texto);
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.tabela-estoque {
+  background: var(--superficie);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.tabela-estoque th,
+.tabela-estoque td {
+  padding: 10px 16px;
+  vertical-align: middle;
+}
+
+.tabela-estoque .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tabela-estoque tbody tr {
+  position: relative;
+  transition: background 0.15s;
+}
+
+.tabela-estoque tbody tr:hover {
+  background: var(--superficie-2);
+}
+
+.tabela-estoque tbody tr.em-ruptura td:first-child {
+  box-shadow: inset 3px 0 0 var(--urgente);
+}
+
+.tabela-estoque .produto a {
+  color: var(--texto);
+}
+
+.tabela-estoque .produto a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.tabela-estoque .produto strong,
+.tabela-estoque .produto span {
+  display: block;
+}
+
+.tabela-estoque .produto span {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
+.tabela-estoque .produto code {
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.tabela-estoque .categoria {
+  color: var(--texto-suave);
+}
+
+.tabela-estoque .segura {
+  font-weight: 600;
+}
+
+.tabela-estoque .segura .selo {
+  margin-left: 8px;
+}
+
+.paginacao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+}
+
+.paginacao button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (max-width: 760px) {
+  .filtros.filtros-estoque {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tabela-estoque {
+    background: none;
+    border: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .tabela-estoque thead {
+    display: none;
+  }
+
+  .tabela-estoque table,
+  .tabela-estoque tbody {
+    display: block;
+  }
+
+  .tabela-estoque tbody tr {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px 8px;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    box-shadow: var(--sombra);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+
+  .tabela-estoque tbody tr.em-ruptura {
+    border-left: 4px solid var(--urgente);
+  }
+
+  .tabela-estoque tbody tr.em-ruptura td:first-child {
+    box-shadow: none;
+  }
+
+  .tabela-estoque td {
+    padding: 0;
+    border: 0;
+  }
+
+  .tabela-estoque td.produto {
+    grid-column: 1 / -1;
+  }
+
+  .tabela-estoque td.categoria {
+    display: none;
+  }
+
+  .tabela-estoque td.num {
+    text-align: left;
+    white-space: normal;
+  }
+
+  .tabela-estoque td[data-rotulo]::before {
+    content: attr(data-rotulo);
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--texto-suave);
+  }
+
+  .tabela-estoque .segura .selo {
+    margin: 4px 0 0;
   }
 }
 

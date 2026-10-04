@@ -18,6 +18,15 @@ import {
 } from "./comum.js";
 
 cabecalho("comprador");
+voltarParaOEstoque();
+
+function voltarParaOEstoque() {
+  const origem = document.referrer ? new URL(document.referrer) : null;
+  if (origem?.origin !== location.origin || !origem.pathname.endsWith("/estoque.html")) return;
+  const voltar = document.querySelector(".voltar");
+  voltar.href = `estoque.html${origem.search}`;
+  voltar.textContent = "← Estoque";
+}
 
 const MOTIVOS_SEM_COMPRA = {
   sku_novo: "SKU novo: ainda não tem o histórico mínimo de vendas que a política pede para sugerir sozinho.",

@@ -28,6 +28,11 @@ def sku_contem_todas(sku: SKU, palavras: list[str]) -> bool:
     return all(p in alvo for p in palavras)
 
 
+def ordem_por_nome(sku: SKU) -> tuple[str, str, str]:
+    """Nome do produto, cor e tamanho, sem diferenciar acento nem maiúscula."""
+    return (_normalizar(sku.produto_nome), _normalizar(sku.cor), _normalizar(sku.tamanho))
+
+
 class Catalog:
     def __init__(self, erp: ERPAdapter) -> None:
         self._erp = erp
@@ -67,5 +72,5 @@ class Catalog:
         if not palavras:
             return []
         achados = [sku for sku in self._erp.listar_skus() if sku_contem_todas(sku, palavras)]
-        achados.sort(key=lambda s: (_normalizar(s.produto_nome), _normalizar(s.cor), _normalizar(s.tamanho)))
+        achados.sort(key=ordem_por_nome)
         return achados[:limite]

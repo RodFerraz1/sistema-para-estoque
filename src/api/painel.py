@@ -11,8 +11,10 @@ from src.api.conversores import aviso_to_response, decisao_to_response
 from src.api.schemas import (
     AvisoResponse,
     DecisaoCompraResponse,
+    EstoqueResponse,
     ItemAlertaResponse,
     ItemDecididoResponse,
+    ItemEstoqueResponse,
     PainelResponse,
     RegistrarAvisoRequest,
     RegistrarDecisaoRequest,
@@ -22,7 +24,17 @@ from src.catalog.dependencies import get_catalog
 from src.catalog.service import Catalog
 from src.inventory.schemas import dias_de_cobertura
 from src.painel.dependencies import get_painel
-from src.painel.schemas import FiltroPainel, ItemAlerta, ItemDecidido, MotivoDoFiltro
+from src.painel.schemas import (
+    POR_PAGINA_MAXIMO,
+    FiltroEstoque,
+    FiltroPainel,
+    ItemAlerta,
+    ItemDecidido,
+    ItemEstoque,
+    MotivoDoFiltro,
+    OrdemEstoque,
+    SituacaoEstoque,
+)
 from src.painel.service import (
     MotivoObrigatorio,
     Painel,
@@ -71,6 +83,21 @@ def _decidido_to_response(item: ItemDecidido) -> ItemDecididoResponse:
         cor=item.sku.cor,
         tamanho=item.sku.tamanho,
         decisao=decisao_to_response(item.decisao),
+    )
+
+
+def _item_de_estoque_to_response(item: ItemEstoque) -> ItemEstoqueResponse:
+    return ItemEstoqueResponse(
+        sku_code=item.sku.sku_code,
+        produto_nome=item.sku.produto_nome,
+        cor=item.sku.cor,
+        tamanho=item.sku.tamanho,
+        categoria=item.sku.categoria,
+        disponivel=item.disponivel,
+        em_transito=item.em_transito,
+        venda_media_diaria=item.venda_media_diaria,
+        cobertura_dias=_dias(item.cobertura_meses),
+        em_ruptura=item.em_ruptura,
     )
 
 
@@ -157,3 +184,27 @@ def registrar_decisao(
     except (QuantidadeObrigatoria, QuantidadeSoParaComprar, MotivoObrigatorio) as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e)) from e
     return decisao_to_response(decisao)
+
+
+@router.get("/estoque", response_model=EstoqueResponse, dependencies=COMPRADOR)
+def estoque(
+    busca: Annotated[str | None, Query(max_length=100)] = None,
+    categoria: str | None = None,
+    situacao: SituacaoEstoque | None = None,
+    ordem: OrdemEstoque = "cobertura",
+    pagina: Annotated[int, Query(ge=1)] = 1,
+    por_pagina: Annotated[int, Query(ge=1, le=POR_PAGINA_MAXIMO)] = 50,
+    painel: Painel = Depends(get_painel),
+) -> EstoqueResponse:
+    """Todos os SKUs ativos com estoque no ERP, paginados. `busca` segue a regra de
+    `/painel`; `situacao` é `em_ruptura`, `sem_venda` ou `com_transito`; `ordem` é
+    `cobertura` (a menor primeiro), `venda_diaria` (a maior primeiro) ou `nome`. Página
+    depois da última vem vazia, com o total. 503 com o banco fora do ar."""
+    filtro = FiltroEstoque(busca=busca, categoria=categoria, situacao=situacao)
+    resultado = painel.estoque(filtro, ordem=ordem, pagina=pagina, por_pagina=por_pagina)
+    return EstoqueResponse(
+        itens=[_item_de_estoque_to_response(i) for i in resultado.itens],
+        total=resultado.total,
+        pagina=resultado.pagina,
+        por_pagina=resultado.por_pagina,
+    )

@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from src.catalog.schemas import SKU
-from src.catalog.service import Catalog, palavras_da_busca, sku_contem_todas
+from src.catalog.service import Catalog, ordem_por_nome, palavras_da_busca, sku_contem_todas
 from src.ficha_sku.schemas import Ficha
 from src.ficha_sku.service import FichaSKU
 from src.inventory.schemas import Cobertura
@@ -26,9 +26,13 @@ from src.painel.schemas import (
     GRUPOS,
     Aviso,
     DecisaoCompra,
+    FiltroEstoque,
     FiltroPainel,
     ItemAlerta,
     ItemDecidido,
+    ItemEstoque,
+    OrdemEstoque,
+    PaginaDeEstoque,
     PainelDeAlertas,
     TipoAviso,
     TipoDecisao,
@@ -79,12 +83,16 @@ def _opcional(valor: str | None) -> str | None:
     return (valor or "").strip() or None
 
 
+def _em_ruptura(cobertura: Cobertura, parametros: ParametrosPolitica) -> bool:
+    return cobertura.meses is not None and cobertura.meses < parametros.piso_alerta_dias / DIAS_POR_MES
+
+
 def _motivos(
     sugestao: SugestaoPedido, cobertura: Cobertura, parametros: ParametrosPolitica
 ) -> list[MotivoAlerta]:
     """Os alertas da sugestão e o piso de alerta, filtrados pelos motivos de alerta da política."""
     ocorridos = [MotivoAlerta(a.tipo.value) for a in sugestao.alertas]
-    if cobertura.meses is not None and cobertura.meses < parametros.piso_alerta_dias / DIAS_POR_MES:
+    if _em_ruptura(cobertura, parametros):
         ocorridos.append(MotivoAlerta.ABAIXO_DO_PISO_ALERTA)
     return [m for m in ocorridos if m in parametros.motivos_de_alerta]
 
@@ -122,6 +130,38 @@ def _tem_o_motivo(filtro: FiltroPainel, item: ItemAlerta) -> bool:
     if filtro.motivo == "aviso":
         return bool(item.avisos_abertos)
     return filtro.motivo in item.motivos
+
+
+def _passa_no_estoque(filtro: FiltroEstoque, palavras: list[str], ficha: Ficha, parametros: ParametrosPolitica) -> bool:
+    if palavras and not sku_contem_todas(ficha.sku, palavras):
+        return False
+    if filtro.categoria and ficha.sku.categoria != filtro.categoria:
+        return False
+    if filtro.situacao == "em_ruptura":
+        return _em_ruptura(ficha.cobertura, parametros)
+    if filtro.situacao == "sem_venda":
+        return ficha.cobertura.sem_giro
+    if filtro.situacao == "com_transito":
+        return ficha.em_transito > 0
+    return True
+
+
+ORDENS_DO_ESTOQUE: dict[OrdemEstoque, Callable[[Ficha], tuple]] = {
+    "cobertura": lambda f: (f.cobertura.meses is None, f.cobertura.meses or 0.0, f.sku.sku_code),
+    "venda_diaria": lambda f: (-f.giro.unidades_por_mes, f.sku.sku_code),
+    "nome": lambda f: (*ordem_por_nome(f.sku), f.sku.sku_code),
+}
+
+
+def _item_de_estoque(ficha: Ficha, parametros: ParametrosPolitica) -> ItemEstoque:
+    return ItemEstoque(
+        sku=ficha.sku,
+        disponivel=ficha.estoque.quantidade_disponivel,
+        em_transito=ficha.em_transito,
+        venda_media_diaria=ficha.giro.unidades_por_mes / DIAS_POR_MES,
+        cobertura_meses=ficha.cobertura.meses,
+        em_ruptura=_em_ruptura(ficha.cobertura, parametros),
+    )
 
 
 def _item(ficha: Ficha, sugestao: SugestaoPedido, parametros: ParametrosPolitica, avisos: list[Aviso]) -> ItemAlerta:
@@ -274,3 +314,29 @@ class Painel:
                 alertas.append(item)
         decididos.sort(key=lambda d: (d.decisao.criado_em, d.sku.sku_code), reverse=True)
         return PainelDeAlertas(alertas=sorted(alertas, key=_ordem), decididos=decididos, skus_com_erro=com_erro)
+
+    def estoque(
+        self, filtro: FiltroEstoque, ordem: OrdemEstoque = "cobertura", pagina: int = 1, por_pagina: int = 50
+    ) -> PaginaDeEstoque:
+        """Os SKUs ativos com estoque no ERP, do retrato em lote, com o filtro aplicado. Por
+        `cobertura` (a menor primeiro, os sem giro no fim), `venda_diaria` (a maior primeiro)
+        ou `nome` (produto, cor e tamanho), com o código para desempatar. Ruptura é a
+        cobertura abaixo do piso de alerta da política ativa, com ou sem o motivo ligado.
+        Página depois da última vem vazia, com o total."""
+        palavras = palavras_da_busca(filtro.busca or "")
+        parametros = self._politicas.ativa().parametros
+        retrato = self._ficha_sku.retrato()
+        fichas = [
+            ficha
+            for sku in retrato.skus
+            if (ficha := retrato.fichas.get(sku.sku_code)) is not None
+            and _passa_no_estoque(filtro, palavras, ficha, parametros)
+        ]
+        fichas.sort(key=ORDENS_DO_ESTOQUE[ordem])
+        inicio = (pagina - 1) * por_pagina
+        return PaginaDeEstoque(
+            itens=[_item_de_estoque(f, parametros) for f in fichas[inicio : inicio + por_pagina]],
+            total=len(fichas),
+            pagina=pagina,
+            por_pagina=por_pagina,
+        )
