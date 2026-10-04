@@ -252,7 +252,7 @@ function formularioDeCobranca(pedido, fornecedor) {
 function pedidoAtrasado(pedido, fornecedor) {
   return el(
     "div",
-    { class: "pedido-atrasado" },
+    { class: "pedido-atrasado", id: `pedido-${pedido.pedido_id}` },
     el(
       "div",
       { class: "pedido-cabecalho" },
@@ -446,6 +446,11 @@ try {
   politica = politicaAtiva;
   montarFiltros(politica, categorias, fornecedores);
   await carregar();
+  const ancora = location.hash && document.getElementById(location.hash.slice(1));
+  if (ancora) {
+    ancora.classList.add("em-foco");
+    ancora.scrollIntoView();
+  }
 } catch (e) {
   conteudo.replaceChildren(mensagem("erro", e.status === 503 ? e.message : `Não foi possível calcular o painel: ${e.message}`));
 } finally {

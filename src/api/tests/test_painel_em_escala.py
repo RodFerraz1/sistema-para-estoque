@@ -1,7 +1,7 @@
-"""O painel e a tela de Estoque leem o estoque inteiro num retrato em lote: o número de
-consultas ao banco não depende do número de SKUs. Conta as consultas de `GET /painel` e
-`GET /estoque` contra o Postgres, com o que
-já estiver no banco e com 30 SKUs a mais. O tempo com 5.000 SKUs fica no benchmark
+"""O painel, a tela de Estoque e a varredura das notificações leem o estoque inteiro num
+retrato em lote: o número de consultas ao banco não depende do número de SKUs. Conta as
+consultas de `GET /painel`, `GET /estoque` e `GET /notificacoes` contra o Postgres, com o
+que já estiver no banco e com 30 SKUs a mais. O tempo com 5.000 SKUs fica no benchmark
 (`scripts/benchmark_painel.py`), fora da suíte. Pulado sem banco."""
 from __future__ import annotations
 
@@ -85,3 +85,32 @@ def test_faz_o_mesmo_numero_de_consultas_com_mais_skus(client: TestClient, rota:
 
     assert depois == antes
     assert antes <= 12
+
+
+@pytest.fixture
+def sem_episodios() -> Iterator[None]:
+    """A varredura grava episódios: guarda os do banco local e os devolve no fim."""
+    with get_engine().connect() as conn:
+        conn.execute(text("CREATE TEMP TABLE backup_episodios_escala AS SELECT * FROM copilot.episodios_alerta"))
+        conn.execute(text("DELETE FROM copilot.episodios_alerta"))
+        conn.commit()
+        try:
+            yield
+        finally:
+            conn.execute(text("DELETE FROM copilot.episodios_alerta"))
+            conn.execute(text("INSERT INTO copilot.episodios_alerta SELECT * FROM backup_episodios_escala"))
+            conn.execute(text("DROP TABLE backup_episodios_escala"))
+            conn.commit()
+
+
+def test_varredura_das_notificacoes_nao_consulta_por_sku(client: TestClient, sem_episodios: None) -> None:
+    _consultas(client, "/notificacoes")
+    sem_mudanca = _consultas(client, "/notificacoes")
+
+    with erp_no_banco(_mais_skus(30)):
+        abrindo = _consultas(client, "/notificacoes")
+        sem_mudanca_com_mais_skus = _consultas(client, "/notificacoes")
+
+    assert sem_mudanca_com_mais_skus == sem_mudanca
+    assert abrindo == sem_mudanca + 1
+    assert sem_mudanca <= 14

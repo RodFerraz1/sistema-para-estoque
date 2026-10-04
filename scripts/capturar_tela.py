@@ -91,6 +91,7 @@ def capturar(
     celular: bool,
     pagina_inteira: bool,
     espera: float,
+    clicar: str | None = None,
 ) -> None:
     perfil = Path(tempfile.mkdtemp(prefix="capturar-tela-"))
     chrome = subprocess.Popen(
@@ -113,6 +114,9 @@ def capturar(
             devtools.chamar("Page.navigate", url=url)
             devtools.esperar("Page.loadEventFired", 15)
             time.sleep(espera)
+            if clicar:
+                devtools.chamar("Runtime.evaluate", expression=f"document.querySelector({json.dumps(clicar)}).click()")
+                time.sleep(1)
             if pagina_inteira:
                 conteudo = devtools.chamar("Page.getLayoutMetrics")["cssContentSize"]
                 devtools.chamar(
@@ -141,6 +145,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--celular", action="store_true", help="emula toque e viewport de celular")
     parser.add_argument("--pagina-inteira", action="store_true", help="captura a altura toda da página")
     parser.add_argument("--espera", type=float, default=4.0, help="segundos depois do load, para as chamadas da API")
+    parser.add_argument("--clicar", help="seletor CSS clicado depois da espera, antes da captura (ex.: button.sino)")
     args = parser.parse_args(argv)
     if args.email and not args.senha:
         parser.error("--email pede --senha")
@@ -154,6 +159,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         celular=args.celular,
         pagina_inteira=args.pagina_inteira,
         espera=args.espera,
+        clicar=args.clicar,
     )
     print(args.arquivo)
 

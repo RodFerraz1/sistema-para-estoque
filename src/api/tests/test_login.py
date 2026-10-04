@@ -201,7 +201,13 @@ PAPEIS_POR_ROTA: dict[tuple[str, str], set[Papel]] = {
     ("POST", "/usuarios/{usuario_id}/reativar"): {"admin"},
     ("PUT", "/usuarios/{usuario_id}/senha"): {"admin"},
 }
-DE_QUALQUER_UM = {("GET", "/eu"), ("POST", "/logout"), ("PUT", "/eu/senha")}
+DE_QUALQUER_UM = {
+    ("GET", "/eu"),
+    ("POST", "/logout"),
+    ("PUT", "/eu/senha"),
+    ("GET", "/notificacoes"),
+    ("POST", "/notificacoes/vistas"),
+}
 
 
 def test_cada_rota_recusa_quem_nao_tem_o_papel_do_mapa(cenario: Cenario) -> None:

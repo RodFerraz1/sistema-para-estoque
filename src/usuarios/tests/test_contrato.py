@@ -148,6 +148,17 @@ def test_registrar_acesso_guarda_o_ultimo(repos: Repositorios) -> None:
     assert lido is not None and lido.ultimo_acesso_em == INICIO + timedelta(hours=2)
 
 
+def test_marcar_notificacoes_vistas_move_o_cursor(repos: Repositorios) -> None:
+    gravado = usuario()
+    repos.usuarios.gravar(gravado)
+    assert gravado.notificacoes_vistas_ate is None
+
+    repos.usuarios.marcar_notificacoes_vistas(gravado.id, INICIO + timedelta(hours=3))
+
+    lido = repos.usuarios.por_id(gravado.id)
+    assert lido is not None and lido.notificacoes_vistas_ate == INICIO + timedelta(hours=3)
+
+
 def test_sessao_gravada_volta_igual_e_renova(repos: Repositorios) -> None:
     dono = usuario()
     repos.usuarios.gravar(dono)

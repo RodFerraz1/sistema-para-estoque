@@ -9,6 +9,8 @@ from src.ficha_sku.dependencies import get_ficha_sku
 from src.ficha_sku.service import FichaSKU
 from src.inventory.dependencies import get_inventory
 from src.inventory.service import Inventory
+from src.notificacoes.dependencies import get_notificacoes
+from src.notificacoes.service import Notificacoes
 from src.painel.postgres import PostgresAvisosRepositorio, PostgresCobrancasRepositorio, PostgresDecisoesRepositorio
 from src.painel.repositorio import AvisosRepositorio, CobrancasRepositorio, DecisoesRepositorio
 from src.painel.service import Painel, Relogio, agora_utc
@@ -44,6 +46,9 @@ def get_painel(
     avisos: AvisosRepositorio = Depends(get_avisos_repositorio),
     decisoes: DecisoesRepositorio = Depends(get_decisoes_repositorio),
     cobrancas: CobrancasRepositorio = Depends(get_cobrancas_repositorio),
+    notificacoes: Notificacoes = Depends(get_notificacoes),
     relogio: Relogio = Depends(get_relogio),
 ) -> Painel:
-    return Painel(catalog, ficha_sku, inventory, purchasing, politicas, avisos, decisoes, cobrancas, relogio=relogio)
+    return Painel(
+        catalog, ficha_sku, inventory, purchasing, politicas, avisos, decisoes, cobrancas, notificacoes, relogio=relogio
+    )

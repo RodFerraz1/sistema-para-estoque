@@ -45,6 +45,13 @@ def criados() -> Iterator[dict[str, list[UUID]]]:
     ids: dict[str, list[UUID]] = {"avisos": [], "decisoes_compra": [], "cobrancas_entrega": []}
     yield ids
     with get_engine().begin() as conn:
+        conn.execute(
+            text(
+                "DELETE FROM copilot.episodios_alerta e USING copilot.avisos a WHERE a.id = ANY(:ids) "
+                "AND e.tipo = 'aviso' AND e.sku_code = a.sku_code AND e.aberto_em = a.criado_em"
+            ),
+            {"ids": ids["avisos"]},
+        )
         for tabela, lista in ids.items():
             conn.execute(text(f"DELETE FROM copilot.{tabela} WHERE id = ANY(:ids)"), {"ids": lista})
 

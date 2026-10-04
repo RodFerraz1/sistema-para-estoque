@@ -112,6 +112,7 @@ def test_assets_referenciados_respondem_com_o_tipo_certo(client: TestClient) -> 
         "usuarios.js",
         "conta.js",
         "estoque.js",
+        "notificacoes.js",
     } <= assets
 
     for asset in sorted(assets):
@@ -151,6 +152,7 @@ def test_cada_pagina_chama_a_api() -> None:
         ("PUT", "/usuarios/${pessoa.id}/senha"),
     }
     assert chamadas["conta.js"] == [("PUT", "/eu/senha")]
+    assert set(chamadas["notificacoes.js"]) == {("GET", "/notificacoes"), ("POST", "/notificacoes/vistas")}
     assert set(chamadas["estoque.js"]) == {("GET", "/estoque?${consulta}"), ("GET", "/categorias")}
 
 

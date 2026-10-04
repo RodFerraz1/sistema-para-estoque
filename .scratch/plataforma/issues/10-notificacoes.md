@@ -4,13 +4,24 @@
 
 **Blocked by:** 04, 09
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** `.scratch/plataforma/spec.md` (seção "Episódios de alerta e notificações")
 
-- [ ] Tabela `episodios_alerta` com índice único parcial para não haver dois abertos da mesma condição. O usuário ganha o cursor `notificacoes_vistas_ate`.
-- [ ] Varredura idempotente, com lock consultivo do Postgres, que abre e fecha episódios de `ruptura` e `entrega_atrasada` a partir do retrato. SKU com decisão de compra vigente não abre episódio de ruptura. Avisos abrem episódio `aviso` na hora em que são registrados.
-- [ ] `GET /notificacoes` (roda a varredura e devolve as dos papéis do usuário, com o total de não lidas) e `POST /notificacoes/vistas`.
-- [ ] Sino em todas as telas logadas, com a lista e o link de cada notificação para o SKU ou para a entrega. Consulta ao abrir a tela e a cada 2 minutos com a aba visível. Pop-up que agrupa por tipo, fecha sozinho e não bloqueia a tela.
-- [ ] Testes: entrar abre, varrer de novo não duplica, sair fecha, voltar abre outro, decisão vigente impede, o cursor separa lidas de não lidas, papel errado não vê. No Postgres: duas varreduras simultâneas não duplicam.
-- [ ] Verificado no navegador. Typecheck e suíte completa verdes.
+- [x] Tabela `episodios_alerta` com índice único parcial para não haver dois abertos da mesma condição. O usuário ganha o cursor `notificacoes_vistas_ate`.
+- [x] Varredura idempotente, com lock consultivo do Postgres, que abre e fecha episódios de `ruptura` e `entrega_atrasada` a partir do retrato. SKU com decisão de compra vigente não abre episódio de ruptura. Avisos abrem episódio `aviso` na hora em que são registrados.
+- [x] `GET /notificacoes` (roda a varredura e devolve as dos papéis do usuário, com o total de não lidas) e `POST /notificacoes/vistas`.
+- [x] Sino em todas as telas logadas, com a lista e o link de cada notificação para o SKU ou para a entrega. Consulta ao abrir a tela e a cada 2 minutos com a aba visível. Pop-up que agrupa por tipo, fecha sozinho e não bloqueia a tela.
+- [x] Testes: entrar abre, varrer de novo não duplica, sair fecha, voltar abre outro, decisão vigente impede, o cursor separa lidas de não lidas, papel errado não vê. No Postgres: duas varreduras simultâneas não duplicam.
+- [x] Verificado no navegador. Typecheck e suíte completa verdes.
+
+## Comments
+
+**2026-10-04 (agente):** módulo novo `src/notificacoes` (schemas, service `Notificacoes`, `EpisodiosRepositorio` em memória e Postgres, dependências), migration `0018_episodios_alerta` (tabela com os 8 tipos da spec, índice único parcial `(tipo, sku_code, pedido_id) NULLS NOT DISTINCT WHERE fechado_em IS NULL` e a coluna `copilot.usuarios.notificacoes_vistas_ate`; `Usuario` ganhou o campo e o repositório, `marcar_notificacoes_vistas`). A varredura (`EpisodiosRepositorio.varrer(tipos, condicoes, agora)`) roda numa transação com `pg_advisory_xact_lock` e só fecha episódios dos tipos varridos; o teste de contrato com duas threads falha sem a trava. Quem sabe as condições é o dono delas: `Painel.varrer_episodios()` monta, com o mesmo retrato em lote, `ruptura` por SKU (cobertura abaixo do piso, sem decisão vigente) e `entrega_atrasada` por pedido (sem cobrança vigente), cada um só com o motivo ligado na política (motivo desligado fecha os episódios). `GET /notificacoes` faz 14 consultas fixas para o comprador (teste em `test_painel_em_escala.py`, mais 1 INSERT em lote quando abre episódios). Rotas para qualquer pessoa logada: `GET /notificacoes` (varre só as condições dos papéis do usuário, hoje só as do comprador, para a vendedora não pagar o retrato a cada 2 minutos; devolve as 50 mais recentes dos papéis dela e o total de não lidas) e `POST /notificacoes/vistas` (cursor = agora, 204). Decisões: o aviso segue o protótipo e nasce como evento já fechado (`Notificacoes.registrar`), um por aviso, porque não é condição que dura; `detalhe` guarda nomes do SKU e números do momento (cobertura em dias, fornecedor, dias de atraso, SKUs do pedido, quem avisou), e o texto fica na UI. Cursor nulo = tudo não lido. UI: `notificacoes.js`, montado por `cabecalho()` em toda tela logada: sino com contagem, lista com selo por tipo, "Nova" e "Marcar tudo como lido", links para `sku.html?sku=` ou `index.html#pedido-<id>` (o painel rola e destaca o pedido; `guardarNaUrl` passou a manter o hash). Pop-up no canto, agrupado por tipo, fecha em 12 s (pausa com o mouse em cima), não bloqueia; o que já apareceu no pop-up fica no `localStorage` (sem ele, lembra só enquanto a página está aberta). Consulta ao abrir e a cada 2 minutos com a aba visível. `scripts/capturar_tela.py` ganhou `--clicar <seletor>` (ex.: `button.sino`). README: o reset também esvazia `copilot.episodios_alerta`. O smoke do painel apaga os episódios dos avisos que cria.
+
+**Para os próximos tickets:**
+- **Nova condição** (queda de venda, estoque divergente): o módulo dono monta `list[Condicao]` e chama `Notificacoes.varrer(TIPOS, condicoes)`; a rota `GET /notificacoes` chama essa varredura quando o usuário tem o papel de destino (como faz com `painel.varrer_episodios()` para o comprador). **Evento** (decisão sobre aviso, gôndola vazia, verificação sobre aviso): `Notificacoes.registrar(Condicao(...), quando)`.
+- **Notificação para uma pessoa** (tickets 13 e 14): falta a coluna do usuário de destino em `episodios_alerta` (migration nova) e o filtro em `dos_papeis`/`abertos_depois`; o índice único hoje é por tipo, SKU e pedido.
+- **UI:** cada tipo novo entra no `TIPOS` (rótulo, cor, frases do pop-up) e no `conteudoDe` de `notificacoes.js`; sem isso a notificação aparece com um texto genérico.
+- **Testes HTTP:** o `cenario_painel.preparar()` já põe episódios, usuários e o relógio das notificações em memória (mesmo relógio do painel). Para o cursor valer entre chamadas, o `test_notificacoes.py` lê o usuário logado do repositório em memória (`entrar`). `atrasar` saiu de `test_entregas_atrasadas.py` para o `cenario_painel.py`.
+- Banco local sem episódios e com os cursores zerados. Suíte com 1040 testes verde; pyright com os mesmos 79 erros por arquivo.

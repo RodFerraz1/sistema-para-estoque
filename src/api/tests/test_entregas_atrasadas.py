@@ -15,40 +15,20 @@ from src.api.tests.cenario_painel import (
     SOBRANDO,
     URGENTE,
     ZERADO,
-    Cenario,
+    atrasar,
     avisar,
     client,  # noqa: F401 (fixture)
     codigos,
     painel,
     preparar,
 )
-from src.catalog.schemas import SKU, Fornecedor
 from src.erp_adapter.in_memory import PedidoCompra
 from src.erp_adapter.schemas import StatusPedidoCompra
 from src.politica_compra.schemas import MotivoAlerta
 from src.usuarios.schemas import Usuario
-from tests.fakes import make_item_pedido_compra, make_pedido_compra
+from tests.fakes import make_pedido_compra
 
-ONTEM = date(2026, 9, 30)
 HOJE = date(2026, 10, 1)
-
-
-def atrasar(
-    cenario: Cenario,
-    fornecedor: Fornecedor,
-    *itens: tuple[SKU, int],
-    prevista: date | None = ONTEM,
-    status: StatusPedidoCompra = "enviado",
-    key: str = "atrasado",
-    recebida: int = 0,
-) -> PedidoCompra:
-    pedido = make_pedido_compra(fornecedor, status, key=key, data_prevista_entrega=prevista)
-    cenario.erp.pedidos_compra.append(pedido)
-    cenario.erp.itens_pedido_compra.extend(
-        make_item_pedido_compra(pedido, sku, quantidade=quantidade, quantidade_recebida=recebida)
-        for sku, quantidade in itens
-    )
-    return pedido
 
 
 def entregas(client: TestClient, **filtros: str) -> list[dict]:

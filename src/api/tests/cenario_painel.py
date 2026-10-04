@@ -9,21 +9,26 @@ Em ruptura (abaixo de 20 dias): `ZERADO` (0 dias), `SEM_FORNECEDOR` (3 dias, sem
 `REGULAR` segura 45 dias e `SOBRANDO` 270. Com o lead time observado ligado, `URGENTE` e
 `MAIS_URGENTE` acabam antes da compra chegar. Todos são da categoria `felpudo`, menos o
 `SEM_FORNECEDOR` (`cama`) e o `INATIVO` (`mesa`). A Katrina também vende `ZERADO` e
-`MAIS_URGENTE`, mais cara que a Boa Vista.
+`MAIS_URGENTE`, mais cara que a Boa Vista. Os episódios de alerta, os usuários e o relógio
+das notificações também ficam em memória, com o mesmo relógio do painel.
 """
 from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from fastapi.testclient import TestClient
 
-from src.catalog.schemas import SKU
+from src.catalog.schemas import SKU, Fornecedor
 from src.erp_adapter.dependencies import get_erp_adapter
-from src.erp_adapter.in_memory import InMemoryERPAdapter
+from src.erp_adapter.in_memory import InMemoryERPAdapter, PedidoCompra
+from src.erp_adapter.schemas import StatusPedidoCompra
 from src.main import app
+from src.notificacoes.dependencies import get_episodios_repositorio
+from src.notificacoes.dependencies import get_relogio as get_relogio_das_notificacoes
+from src.notificacoes.in_memory import InMemoryEpisodiosRepositorio
 from src.painel.dependencies import (
     get_avisos_repositorio,
     get_cobrancas_repositorio,
@@ -38,6 +43,8 @@ from src.painel.in_memory import (
 from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
 from src.politica_compra.schemas import PARAMETROS_V1
+from src.usuarios.dependencies import get_usuarios_repositorio
+from src.usuarios.in_memory import InMemoryUsuariosRepositorio
 from tests.fakes import (
     RelogioFake,
     make_estoque,
@@ -78,7 +85,11 @@ DEPENDENCIAS = (
     get_decisoes_repositorio,
     get_cobrancas_repositorio,
     get_relogio,
+    get_episodios_repositorio,
+    get_usuarios_repositorio,
+    get_relogio_das_notificacoes,
 )
+ONTEM = date(2026, 9, 30)
 
 
 @pytest.fixture
@@ -130,6 +141,8 @@ class Cenario:
     avisos: InMemoryAvisosRepositorio
     decisoes: InMemoryDecisoesRepositorio
     cobrancas: InMemoryCobrancasRepositorio
+    episodios: InMemoryEpisodiosRepositorio
+    usuarios: InMemoryUsuariosRepositorio
     relogio: RelogioFake
 
 
@@ -141,6 +154,8 @@ def preparar(*, erp: InMemoryERPAdapter | None = None, **parametros: object) -> 
         avisos=InMemoryAvisosRepositorio(),
         decisoes=InMemoryDecisoesRepositorio(),
         cobrancas=InMemoryCobrancasRepositorio(),
+        episodios=InMemoryEpisodiosRepositorio(),
+        usuarios=InMemoryUsuariosRepositorio(),
         relogio=RelogioFake(AGORA),
     )
     if parametros:
@@ -151,7 +166,28 @@ def preparar(*, erp: InMemoryERPAdapter | None = None, **parametros: object) -> 
     app.dependency_overrides[get_decisoes_repositorio] = lambda: cenario.decisoes
     app.dependency_overrides[get_cobrancas_repositorio] = lambda: cenario.cobrancas
     app.dependency_overrides[get_relogio] = lambda: cenario.relogio
+    app.dependency_overrides[get_episodios_repositorio] = lambda: cenario.episodios
+    app.dependency_overrides[get_usuarios_repositorio] = lambda: cenario.usuarios
+    app.dependency_overrides[get_relogio_das_notificacoes] = lambda: cenario.relogio
     return cenario
+
+
+def atrasar(
+    cenario: Cenario,
+    fornecedor: Fornecedor,
+    *itens: tuple[SKU, int],
+    prevista: date | None = ONTEM,
+    status: StatusPedidoCompra = "enviado",
+    key: str = "atrasado",
+    recebida: int = 0,
+) -> PedidoCompra:
+    pedido = make_pedido_compra(fornecedor, status, key=key, data_prevista_entrega=prevista)
+    cenario.erp.pedidos_compra.append(pedido)
+    cenario.erp.itens_pedido_compra.extend(
+        make_item_pedido_compra(pedido, sku, quantidade=quantidade, quantidade_recebida=recebida)
+        for sku, quantidade in itens
+    )
+    return pedido
 
 
 def painel(client: TestClient) -> dict:

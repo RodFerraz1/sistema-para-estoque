@@ -1,3 +1,5 @@
+import { montarSino } from "./notificacoes.js";
+
 export class ErroApi extends Error {
   constructor(status, detalhes) {
     super(detalhes.map((d) => (d.campo ? `${d.campo}: ${d.mensagem}` : d.mensagem)).join("\n"));
@@ -105,6 +107,7 @@ export async function cabecalho(papelDaTela) {
       el("button", { type: "button", onclick: sair }, "Sair"),
     ),
   );
+  montarSino();
   return eu;
 }
 
@@ -307,7 +310,7 @@ export function barraDeFiltros(formulario, aoMudar) {
 
 export function guardarNaUrl(parametros) {
   const consulta = new URLSearchParams(parametros).toString();
-  history.replaceState(null, "", consulta ? `?${consulta}` : location.pathname);
+  history.replaceState(null, "", `${consulta ? `?${consulta}` : location.pathname}${location.hash}`);
   return consulta;
 }
 

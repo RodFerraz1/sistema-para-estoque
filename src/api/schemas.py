@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
@@ -25,6 +25,7 @@ from src.ai.schemas import (
 )
 from src.erp_adapter.schemas import StatusPedidoCompra
 from src.inventory.schemas import Cobertura, Estoque, StatusEmTransito
+from src.notificacoes.schemas import TipoEpisodio
 from src.painel.schemas import GrupoDoPainel, TipoAviso, TipoDecisao
 from src.politica_compra.schemas import MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
@@ -570,3 +571,27 @@ class RedefinirSenhaRequest(BaseModel):
 class TrocarSenhaRequest(BaseModel):
     senha_atual: Senha
     nova_senha: Senha
+
+
+class NotificacaoResponse(BaseModel):
+    """`detalhe` traz os números do momento em que o episódio abriu (nomes do SKU,
+    cobertura em dias, fornecedor, dias de atraso, quem avisou). `fechado_em` nulo: a
+    condição ainda vale."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    tipo: TipoEpisodio
+    sku_code: str | None
+    pedido_id: UUID | None
+    aberto_em: datetime
+    fechado_em: datetime | None
+    detalhe: dict[str, Any]
+    lida: bool
+
+
+class NotificacoesResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    notificacoes: list[NotificacaoResponse]
+    nao_lidas: int

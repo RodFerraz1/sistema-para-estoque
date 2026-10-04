@@ -72,6 +72,13 @@ class PostgresUsuariosRepositorio(UsuariosRepositorio):
                 {"id": usuario_id, "quando": quando},
             )
 
+    def marcar_notificacoes_vistas(self, usuario_id: UUID, quando: datetime) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                text("UPDATE copilot.usuarios SET notificacoes_vistas_ate = :quando WHERE id = :id"),
+                {"id": usuario_id, "quando": quando},
+            )
+
 
 _CAMPOS_SESSAO = list(Sessao.model_fields)
 

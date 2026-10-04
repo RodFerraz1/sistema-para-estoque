@@ -41,6 +41,10 @@ class InMemoryUsuariosRepositorio(UsuariosRepositorio):
         usuario = self._usuarios[usuario_id]
         self._usuarios[usuario_id] = usuario.model_copy(update={"ultimo_acesso_em": quando})
 
+    def marcar_notificacoes_vistas(self, usuario_id: UUID, quando: datetime) -> None:
+        usuario = self._usuarios[usuario_id]
+        self._usuarios[usuario_id] = usuario.model_copy(update={"notificacoes_vistas_ate": quando})
+
 
 class InMemorySessoesRepositorio(SessoesRepositorio):
     def __init__(self) -> None:

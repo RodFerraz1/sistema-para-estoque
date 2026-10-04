@@ -32,9 +32,12 @@ from src.catalog.service import Catalog
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.ficha_sku.service import FichaSKU
 from src.inventory.service import Inventory
+from src.notificacoes.in_memory import InMemoryEpisodiosRepositorio
+from src.notificacoes.service import Notificacoes
 from src.painel.in_memory import InMemoryAvisosRepositorio, InMemoryCobrancasRepositorio, InMemoryDecisoesRepositorio
 from src.painel.schemas import Aviso, TipoAviso
 from src.painel.service import Painel
+from src.usuarios.in_memory import InMemoryUsuariosRepositorio
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
 from src.purchasing.service import Purchasing
 from src.sales.service import Sales
@@ -136,6 +139,7 @@ def copilot(
         repositorio_avisos,
         InMemoryDecisoesRepositorio(),
         InMemoryCobrancasRepositorio(),
+        Notificacoes(InMemoryEpisodiosRepositorio(), InMemoryUsuariosRepositorio(), relogio=lambda: NOW),
         relogio=lambda: NOW,
     )
     decisao = DecisaoComTrechosSoNosSinais(
