@@ -61,6 +61,7 @@ export const TELAS = [
   { papel: "vendas", href: "aviso.html", rotulo: "Consultar e avisar" },
   { papel: "reposicao", href: "reposicao.html", rotulo: "Painel do repositor" },
   { papel: "admin", href: "usuarios.html", rotulo: "Usuários" },
+  { papel: "admin", href: "setores.html", rotulo: "Setores" },
 ];
 
 export function telaInicial(eu) {
@@ -238,9 +239,9 @@ export function sinais(lista) {
 
 export const PAPEIS = {
   comprador: { rotulo: "Comprador", descricao: "painel, tela do SKU, política, preços e chat" },
-  vendas: { rotulo: "Vendas", descricao: "consulta de produto, avisos ao comprador e meus avisos" },
+  vendas: { rotulo: "Vendas", descricao: "consulta de produto, avisos ao comprador e ao repositor e meus avisos" },
   reposicao: { rotulo: "Reposição", descricao: "busca de produto e painel do repositor" },
-  admin: { rotulo: "Admin", descricao: "cadastro das pessoas" },
+  admin: { rotulo: "Admin", descricao: "cadastro das pessoas e dos setores da loja" },
 };
 
 export function selosDePapel(papeis) {
@@ -316,12 +317,18 @@ export function guardarNaUrl(parametros) {
   return consulta;
 }
 
-export const TIPOS_DE_AVISO = { acabou: "Acabou", vendendo_muito: "Vendendo muito" };
+export const TIPOS_DE_AVISO = { acabou: "Acabou", vendendo_muito: "Vendendo muito", gondola_vazia: "Gôndola vazia" };
 
 export const TIPOS_DE_VERIFICACAO = {
   repus: "Repôs a gôndola",
   estava_na_gondola: "Estava na gôndola",
   sem_estoque_no_deposito: "Não achou no depósito",
+};
+
+export const VERIFICACAO_PARA_VENDAS = {
+  repus: { texto: "Repôs a gôndola", classe: "bom" },
+  estava_na_gondola: { texto: "Estava na gôndola", classe: "destaque" },
+  sem_estoque_no_deposito: { texto: "Não tinha no depósito", classe: "" },
 };
 
 export const TIPOS_DE_DECISAO = {

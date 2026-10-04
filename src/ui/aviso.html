@@ -16,7 +16,7 @@
   </header>
   <main class="conteudo estreito">
     <h1>Consultar e avisar</h1>
-    <p class="suave">Veja se tem, se vem compra e quando chega. Acabou ou está vendendo muito? Avise o comprador.</p>
+    <p class="suave">Veja se tem, se vem compra e quando chega. Acabou ou está vendendo muito? Avise o comprador. A gôndola está vazia? Avise o repositor.</p>
 
     <section class="card consulta" aria-label="Consultar um produto">
       <div class="campo">
@@ -30,7 +30,8 @@
       <div id="disponibilidade" class="disponibilidade" aria-live="polite" hidden></div>
 
       <div id="acoes" class="acoes-vendedora" hidden>
-        <button id="abrir-aviso" type="button" class="primario grande" aria-expanded="false" aria-controls="aviso-form">Avisar o comprador</button>
+        <button id="abrir-aviso" type="button" class="grande" aria-expanded="false" aria-controls="aviso-form">Avisar o comprador<small>acabou, vende muito</small></button>
+        <button id="abrir-gondola" type="button" class="grande" aria-expanded="false" aria-controls="gondola-form">Gôndola vazia<small>avisar o repositor</small></button>
       </div>
 
       <form id="aviso-form" class="aviso-form" novalidate hidden>
@@ -49,6 +50,22 @@
 
         <button id="enviar" type="submit" class="primario grande">Enviar aviso</button>
       </form>
+
+      <form id="gondola-form" class="aviso-form" novalidate hidden>
+        <div id="gondola-sem-estoque" class="mensagem aviso" hidden>
+          <strong>O sistema diz que não tem estoque.</strong> O repositor pode não achar no depósito. Se a gôndola está vazia, pode avisar mesmo assim.
+        </div>
+        <div class="campo">
+          <label for="gondola-setor">Em que setor da loja?</label>
+          <select id="gondola-setor"></select>
+          <p id="gondola-setor-dica" class="suave" hidden>Ainda não sabemos onde este produto fica. Escolha o setor e o Copilot lembra da próxima vez.</p>
+        </div>
+        <div class="campo">
+          <label for="gondola-comentario">Comentário <span class="suave">(opcional)</span></label>
+          <textarea id="gondola-comentario" maxlength="2000" placeholder="Ex.: só sobrou o tamanho P"></textarea>
+        </div>
+        <button id="enviar-gondola" type="submit" class="primario grande">Avisar o repositor</button>
+      </form>
       <div id="resultado"></div>
     </section>
 
@@ -56,7 +73,7 @@
       <header>
         <h2 id="t-meus-avisos">Meus avisos</h2>
         <span id="contagem-meus-avisos" class="contagem" hidden></span>
-        <p class="suave">O que o comprador decidiu sobre o que você avisou nos últimos 30 dias.</p>
+        <p class="suave">O que o comprador e o repositor fizeram com o que você avisou nos últimos 30 dias.</p>
       </header>
       <div id="lista-meus-avisos"><p class="carregando">Carregando os seus avisos...</p></div>
     </section>

@@ -10,8 +10,8 @@ Em ruptura (abaixo de 20 dias): `ZERADO` (0 dias), `SEM_FORNECEDOR` (3 dias, sem
 `MAIS_URGENTE` acabam antes da compra chegar. Todos são da categoria `felpudo`, menos o
 `SEM_FORNECEDOR` (`cama`) e o `INATIVO` (`mesa`). A Katrina também vende `ZERADO` e
 `MAIS_URGENTE`, mais cara que a Boa Vista. Os episódios de alerta, os usuários, as
-verificações de gôndola e os relógios das notificações e da reposição também ficam em
-memória, com o mesmo relógio do painel.
+verificações de gôndola, os setores, os avisos de gôndola vazia e os relógios das
+notificações e da reposição também ficam em memória, com o mesmo relógio do painel.
 """
 from __future__ import annotations
 
@@ -45,8 +45,16 @@ from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
 from src.politica_compra.schemas import PARAMETROS_V1
 from src.reposicao.dependencies import get_relogio as get_relogio_da_reposicao
-from src.reposicao.dependencies import get_verificacoes_repositorio
-from src.reposicao.in_memory import InMemoryVerificacoesRepositorio
+from src.reposicao.dependencies import (
+    get_avisos_gondola_repositorio,
+    get_setores_repositorio,
+    get_verificacoes_repositorio,
+)
+from src.reposicao.in_memory import (
+    InMemoryAvisosGondolaRepositorio,
+    InMemorySetoresRepositorio,
+    InMemoryVerificacoesRepositorio,
+)
 from src.usuarios.dependencies import get_usuarios_repositorio
 from src.usuarios.in_memory import InMemoryUsuariosRepositorio
 from tests.fakes import (
@@ -94,6 +102,8 @@ DEPENDENCIAS = (
     get_relogio_das_notificacoes,
     get_relogio_da_reposicao,
     get_verificacoes_repositorio,
+    get_setores_repositorio,
+    get_avisos_gondola_repositorio,
 )
 ONTEM = date(2026, 9, 30)
 
@@ -150,6 +160,8 @@ class Cenario:
     episodios: InMemoryEpisodiosRepositorio
     usuarios: InMemoryUsuariosRepositorio
     verificacoes: InMemoryVerificacoesRepositorio
+    setores: InMemorySetoresRepositorio
+    avisos_gondola: InMemoryAvisosGondolaRepositorio
     relogio: RelogioFake
 
 
@@ -164,6 +176,8 @@ def preparar(*, erp: InMemoryERPAdapter | None = None, **parametros: object) -> 
         episodios=InMemoryEpisodiosRepositorio(),
         usuarios=InMemoryUsuariosRepositorio(),
         verificacoes=InMemoryVerificacoesRepositorio(),
+        setores=InMemorySetoresRepositorio(),
+        avisos_gondola=InMemoryAvisosGondolaRepositorio(),
         relogio=RelogioFake(AGORA),
     )
     if parametros:
@@ -179,6 +193,8 @@ def preparar(*, erp: InMemoryERPAdapter | None = None, **parametros: object) -> 
     app.dependency_overrides[get_relogio_das_notificacoes] = lambda: cenario.relogio
     app.dependency_overrides[get_relogio_da_reposicao] = lambda: cenario.relogio
     app.dependency_overrides[get_verificacoes_repositorio] = lambda: cenario.verificacoes
+    app.dependency_overrides[get_setores_repositorio] = lambda: cenario.setores
+    app.dependency_overrides[get_avisos_gondola_repositorio] = lambda: cenario.avisos_gondola
     return cenario
 
 

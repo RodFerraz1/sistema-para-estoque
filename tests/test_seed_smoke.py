@@ -398,6 +398,21 @@ def test_so_os_cenarios_pararam_de_vender() -> None:
     assert pararam == {TAPETE_MARROM, QUEDA_SEM_ESTOQUE}
 
 
+def test_setores_de_exemplo_e_o_setor_dos_cenarios() -> None:
+    with get_engine().connect() as conn:
+        nomes = set(conn.execute(text("SELECT nome FROM copilot.setores WHERE ativo")).scalars())
+        linhas = conn.execute(
+            text("SELECT ss.sku_code, s.nome FROM copilot.setores_sku ss JOIN copilot.setores s ON s.id = ss.setor_id")
+        ).all()
+    setor_de: dict[str, str] = {linha.sku_code: linha.nome for linha in linhas}
+
+    assert {"Banho", "Cama", "Mesa", "Cozinha", "Tapetes"} <= nomes
+    assert setor_de[TAPETE_MARROM] == "Tapetes"
+    assert setor_de[TAPETE_BRANCO] == "Tapetes"
+    assert setor_de[RUPTURA_SEM_PEDIDO] == "Cama"
+    assert setor_de[QUEDA_SEM_ESTOQUE] == "Cozinha"
+
+
 def test_skus_sinteticos_a_mais() -> None:
     (antes,) = _fetch_one("SELECT count(*) FROM erp.skus")
     try:

@@ -1,4 +1,4 @@
-import { api, coberturaEmDias, decisaoParaVendas, el, mensagem, numero, quando } from "./comum.js";
+import { VERIFICACAO_PARA_VENDAS, api, coberturaEmDias, decisaoParaVendas, el, mensagem, numero, quando } from "./comum.js";
 
 const INTERVALO_MS = 2 * 60 * 1000;
 const POPUP_FECHA_EM_MS = 12 * 1000;
@@ -18,6 +18,12 @@ const TIPOS = {
     rotulo: "Parou de vender",
     classe: "urgente",
     grupo: ["SKU parou de vender com estoque", "SKUs pararam de vender com estoque"],
+  },
+  gondola_vazia: { rotulo: "Gôndola vazia", classe: "vendas", grupo: ["aviso de gôndola vazia", "avisos de gôndola vazia"] },
+  verificacao_sobre_aviso: {
+    rotulo: "Gôndola verificada",
+    classe: "bom",
+    grupo: ["gôndola que você avisou foi verificada", "gôndolas que você avisou foram verificadas"],
   },
 };
 
@@ -66,6 +72,20 @@ function conteudoDe(n) {
       href: `reposicao.html?busca=${encodeURIComponent(n.sku_code)}`,
       titulo: `${nomeDoSku(d)} parou de vender. Gôndola vazia?`,
       linha: `Vendia ${numero(d.venda_diaria_base, 1)} por dia, vendeu ${numero(d.vendido_na_janela)} em ${d.dias_observados} dias · ${numero(d.disponivel)} no estoque (ERP)`,
+    };
+  }
+  if (n.tipo === "gondola_vazia") {
+    return {
+      href: `reposicao.html?busca=${encodeURIComponent(n.sku_code)}`,
+      titulo: `${d.avisado_por}: gôndola vazia de ${nomeDoSku(d)}`,
+      linha: `Setor ${d.setor} · ${numero(d.disponivel_no_erp)} no estoque (ERP)${d.comentario ? ` · "${d.comentario}"` : ""}`,
+    };
+  }
+  if (n.tipo === "verificacao_sobre_aviso") {
+    return {
+      href: "aviso.html#meus-avisos",
+      titulo: `${d.verificado_por} verificou a gôndola de ${nomeDoSku(d)}`,
+      linha: `${VERIFICACAO_PARA_VENDAS[d.resultado]?.texto ?? d.resultado}${d.comentario ? ` · "${d.comentario}"` : ""}`,
     };
   }
   if (n.tipo === "decisao_sobre_aviso") {

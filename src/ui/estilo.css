@@ -1859,6 +1859,44 @@ input[type="search"],
 
 .acoes-vendedora {
   margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.acoes-vendedora button {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 68px;
+  padding: 8px 10px;
+  font-size: 1rem;
+  border-width: 2px;
+  border-color: var(--primaria);
+  color: var(--primaria-escura);
+}
+
+.acoes-vendedora button small {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--texto-suave);
+}
+
+.acoes-vendedora button[aria-expanded="true"] {
+  background: var(--primaria);
+  color: #fff;
+}
+
+.acoes-vendedora button[aria-expanded="true"] small {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.aviso-form select {
+  width: 100%;
+  min-height: 48px;
+}
+
+.aviso-form .mensagem.aviso {
+  margin-top: 0;
 }
 
 .aviso-form {
@@ -1918,8 +1956,13 @@ input[type="search"],
 /* Painel do repositor */
 
 .filtros.filtros-repositor {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   margin-top: 20px;
+}
+
+.filtros.filtros-repositor input[type="search"],
+.filtros.filtros-repositor button {
+  grid-column: 1 / -1;
 }
 
 .estreito .grupo > header {
@@ -1938,10 +1981,19 @@ input[type="search"],
 
 .repor-topo {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px 12px;
   margin-bottom: 10px;
+}
+
+.repor-topo .item-produto {
+  flex: 1 1 200px;
+}
+
+.repor-topo .selos {
+  justify-content: flex-end;
 }
 
 .repor .frase {
@@ -1951,6 +2003,45 @@ input[type="search"],
 .repor .numeros {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.repor .numeros.so-estoque {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 220px;
+}
+
+.card.repor.aviso-gondola {
+  border-left-color: var(--vendas);
+}
+
+.avisos-da-gondola {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--vendas-fundo);
+  border-radius: var(--raio-pequeno);
+  display: grid;
+  gap: 6px;
+}
+
+.avisos-da-gondola .comentario-do-aviso {
+  display: block;
+  margin: 2px 0 0;
+}
+
+.nenhum-aviso {
+  margin: 0 0 8px;
+}
+
+.verificar-campos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.6fr);
+  gap: 10px;
+}
+
+.verificar-campos input,
+.verificar-campos select {
+  width: 100%;
 }
 
 .verificar {
@@ -1993,13 +2084,12 @@ input[type="search"],
     grid-column: 1 / -1;
   }
 
-  .filtros.filtros-repositor {
-    grid-template-columns: 1fr;
+  .repor-topo .selos {
+    justify-content: flex-start;
   }
 
-  .repor-topo {
-    flex-direction: column;
-    gap: 8px;
+  .verificar-campos {
+    grid-template-columns: 1fr;
   }
 
   .repor .numeros dd {
@@ -2394,4 +2484,17 @@ body.chat-maximizado {
   .chat-alca {
     display: none;
   }
+}
+
+/* Setores */
+
+.linha-do-formulario {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.linha-do-formulario input {
+  flex: 1 1 160px;
+  min-width: 0;
 }

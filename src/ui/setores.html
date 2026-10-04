@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Setores - Copilot de Compras</title>
+  <link rel="stylesheet" href="estilo.css">
+  <script type="module" src="setores.js"></script>
+</head>
+<body>
+  <header>
+    <div class="conteudo">
+      <strong class="marca">Copilot de Compras</strong>
+      <nav aria-label="Telas do Copilot"></nav>
+    </div>
+  </header>
+  <main class="conteudo medio">
+    <div class="cabecalho-pagina">
+      <div>
+        <h1>Setores da loja</h1>
+        <p class="suave">A vendedora escolhe o setor quando avisa uma gôndola vazia, e o repositor filtra o painel dele por setor. O Copilot lembra o setor de cada produto pelos avisos e verificações.</p>
+      </div>
+    </div>
+
+    <form id="novo-setor" class="card novo-setor" novalidate>
+      <label for="nome">Novo setor</label>
+      <div class="linha-do-formulario">
+        <input id="nome" maxlength="100" autocomplete="off" placeholder="Ex.: Banho, Cama, Tapetes">
+        <button id="adicionar" type="submit" class="primario">Adicionar</button>
+      </div>
+    </form>
+
+    <div id="aviso"></div>
+    <section class="card" aria-labelledby="t-setores">
+      <h2 id="t-setores">Setores</h2>
+      <div id="setores"><p class="carregando">Carregando...</p></div>
+    </section>
+  </main>
+</body>
+</html>

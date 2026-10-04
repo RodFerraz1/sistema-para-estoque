@@ -130,9 +130,11 @@ def test_meus_avisos_mostra_a_decisao_que_fechou_cada_um_ou_que_aguarda_o_compra
             "cor": "branco",
             "tamanho": "70x140",
             "tipo": "vendendo_muito",
+            "setor": None,
             "comentario": None,
             "criado_em": "2026-10-01T10:00:00Z",
             "decisao": None,
+            "verificacao": None,
         },
         {
             "id": primeiro["id"],
@@ -142,6 +144,7 @@ def test_meus_avisos_mostra_a_decisao_que_fechou_cada_um_ou_que_aguarda_o_compra
             "cor": "lilás",
             "tamanho": "70x140",
             "tipo": "acabou",
+            "setor": None,
             "comentario": "Cliente quer 200.",
             "criado_em": "2026-10-01T09:00:00Z",
             "decisao": {
@@ -150,6 +153,7 @@ def test_meus_avisos_mostra_a_decisao_que_fechou_cada_um_ou_que_aguarda_o_compra
                 "motivo": None,
                 "criado_em": "2026-10-01T11:00:00Z",
             },
+            "verificacao": None,
         },
     ]
 

@@ -40,7 +40,11 @@ from src.painel.service import Painel
 from src.usuarios.in_memory import InMemoryUsuariosRepositorio
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
 from src.purchasing.service import Purchasing
-from src.reposicao.in_memory import InMemoryVerificacoesRepositorio
+from src.reposicao.in_memory import (
+    InMemoryAvisosGondolaRepositorio,
+    InMemorySetoresRepositorio,
+    InMemoryVerificacoesRepositorio,
+)
 from src.reposicao.service import Reposicao
 from src.sales.service import Sales
 from tests.fakes import (
@@ -144,7 +148,15 @@ def copilot(
         InMemoryCobrancasRepositorio(),
         notificacoes,
         Reposicao(
-            catalog, inventory, sales, politicas, InMemoryVerificacoesRepositorio(), notificacoes, relogio=lambda: NOW
+            catalog,
+            inventory,
+            sales,
+            politicas,
+            InMemoryVerificacoesRepositorio(),
+            InMemorySetoresRepositorio(),
+            InMemoryAvisosGondolaRepositorio(),
+            notificacoes,
+            relogio=lambda: NOW,
         ),
         relogio=lambda: NOW,
     )

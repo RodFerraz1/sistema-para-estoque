@@ -19,6 +19,7 @@ PAGINAS = [
     "conta.html",
     "estoque.html",
     "reposicao.html",
+    "setores.html",
 ]
 PAPEL_DAS_PAGINAS = {
     "index.html": "comprador",
@@ -28,6 +29,7 @@ PAPEL_DAS_PAGINAS = {
     "aviso.html": "vendas",
     "reposicao.html": "reposicao",
     "usuarios.html": "admin",
+    "setores.html": "admin",
 }
 PAGINAS_DO_COMPRADOR = {
     "index.html": "painel.js",
@@ -163,8 +165,15 @@ def test_cada_pagina_chama_a_api() -> None:
     assert set(chamadas["reposicao.js"]) == {
         ("GET", "/reposicao/painel?${consulta}"),
         ("GET", "/categorias"),
+        ("GET", "/setores"),
         ("POST", "/skus/${encodeURIComponent(item.sku_code)}/verificacoes"),
     }
+    assert {
+        ("GET", "/setores"),
+        ("GET", "/skus/${encodeURIComponent(s.sku_code)}/setor"),
+        ("POST", "/avisos-gondola"),
+    } <= set(chamadas["aviso.js"])
+    assert set(chamadas["setores.js"]) == {("GET", "/setores"), ("POST", "/setores"), ("PUT", "/setores/${setor.id}")}
 
 
 def test_endpoints_chamados_pelos_js_existem_no_app() -> None:
@@ -325,7 +334,7 @@ def test_painel_do_repositor_e_de_celular_com_os_filtros_da_api() -> None:
     }
     campos = set(re.findall(r'<(?:input|select) id="filtro-\w+" name="(\w+)"', html))
 
-    assert campos == parametros == {"busca", "categoria"}
+    assert campos == parametros == {"busca", "categoria", "setor"}
     assert 'name="viewport"' in html and "chat" not in html.lower()
     assert "barraDeFiltros(" in (UI_DIR / "reposicao.js").read_text()
 

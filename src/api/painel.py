@@ -30,6 +30,7 @@ from src.api.schemas import (
     RegistrarAvisoRequest,
     RegistrarDecisaoRequest,
     SKUComEntregaAtrasadaResponse,
+    VerificacaoSobreAvisoResponse,
 )
 from src.api.skus import sku_ou_404
 from src.catalog.dependencies import get_catalog
@@ -58,6 +59,9 @@ from src.painel.service import (
     SKUInativo,
     SKUNaoEncontrado,
 )
+from src.reposicao.dependencies import get_reposicao
+from src.reposicao.schemas import MeuAvisoGondola
+from src.reposicao.service import Reposicao
 from src.usuarios.dependencies import exige_papel
 from src.usuarios.schemas import Usuario
 
@@ -213,14 +217,42 @@ def _meu_aviso_to_response(item: MeuAviso) -> MeuAvisoResponse:
     )
 
 
+def _meu_aviso_gondola_to_response(item: MeuAvisoGondola) -> MeuAvisoResponse:
+    verificacao = item.verificacao
+    return MeuAvisoResponse(
+        id=item.aviso.id,
+        para="repositor",
+        sku_code=item.sku.sku_code,
+        produto_nome=item.sku.produto_nome,
+        cor=item.sku.cor,
+        tamanho=item.sku.tamanho,
+        tipo="gondola_vazia",
+        setor=item.setor.nome,
+        comentario=item.aviso.comentario,
+        criado_em=item.aviso.criado_em,
+        verificacao=None
+        if verificacao is None
+        else VerificacaoSobreAvisoResponse(
+            resultado=verificacao.resultado, comentario=verificacao.comentario, criado_em=verificacao.criado_em
+        ),
+    )
+
+
 @router.get("/avisos/meus", response_model=list[MeuAvisoResponse])
 def meus_avisos(
-    usuario: Usuario = Depends(exige_papel("vendas")), painel: Painel = Depends(get_painel)
+    usuario: Usuario = Depends(exige_papel("vendas")),
+    painel: Painel = Depends(get_painel),
+    reposicao: Reposicao = Depends(get_reposicao),
 ) -> list[MeuAvisoResponse]:
-    """Os avisos do usuário logado nos últimos 30 dias, do mais recente para o mais antigo,
-    cada um com a decisão de compra que o fechou (tipo, quantidade em `vou_comprar`, motivo
-    em `nao_comprar_agora` e data) ou nula, aguardando o comprador."""
-    return [_meu_aviso_to_response(a) for a in painel.meus_avisos(usuario)]
+    """Os avisos do usuário logado nos últimos 30 dias, ao comprador e ao repositor, do mais
+    recente para o mais antigo. O aviso ao comprador vem com a decisão de compra que o fechou
+    (tipo, quantidade em `vou_comprar`, motivo em `nao_comprar_agora` e data) ou nula,
+    aguardando o comprador. O aviso de gôndola vazia vem com o setor e a verificação de
+    gôndola que o fechou (resultado, comentário e data) ou nula, aguardando o repositor."""
+    avisos = [_meu_aviso_to_response(a) for a in painel.meus_avisos(usuario)] + [
+        _meu_aviso_gondola_to_response(a) for a in reposicao.meus_avisos_de_gondola(usuario)
+    ]
+    return sorted(avisos, key=lambda a: a.criado_em, reverse=True)
 
 
 @router.get(

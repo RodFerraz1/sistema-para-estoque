@@ -104,6 +104,16 @@ def test_listar_filtra_pelo_sku(verificacoes: VerificacoesRepositorio) -> None:
     assert verificacoes.listar("NAO-EXISTE") == []
 
 
+def test_dos_skus_traz_as_dos_skus_a_partir_da_data(verificacoes: VerificacoesRepositorio) -> None:
+    antiga, no_limite, recente = verificacao(SKU, minutos=-1), verificacao(SKU), verificacao(OUTRO_SKU, minutos=5)
+    de_fora = verificacao("PM-AMAR-3040-01", minutos=6)
+    for v in (recente, antiga, de_fora, no_limite):
+        verificacoes.gravar(v)
+
+    assert verificacoes.dos_skus({SKU, OUTRO_SKU}, INICIO) == [recente, no_limite]
+    assert verificacoes.dos_skus(set(), INICIO) == []
+
+
 def test_ultimas_traz_a_mais_recente_de_cada_sku(verificacoes: VerificacoesRepositorio) -> None:
     antiga, recente = verificacao(SKU, minutos=0), verificacao(SKU, minutos=10)
     outra = verificacao(OUTRO_SKU, minutos=5)

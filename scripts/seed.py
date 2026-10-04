@@ -22,6 +22,11 @@ Cenários fixos da demonstração (códigos estáveis):
 - `PM-AMAR-3040-01`: vendia uns 4 por dia, não vendeu nos dois últimos dias abertos e
   está sem estoque. Queda de venda sem estoque.
 
+Setores da loja (`copilot.setores`): Banho, Cama, Mesa, Cozinha e Tapetes, e o setor
+conhecido (`copilot.setores_sku`) dos SKUs dos cenários: o Tapete Banheiro fica em Tapetes e
+os outros pelo setor da categoria. Setores e setores conhecidos que já existem ficam como
+estão, para o seed não desfazer o que o admin e o repositor ajustaram.
+
 `--skus N` acrescenta N SKUs sintéticos (`SINT0001-...`), para medir escala.
 """
 from __future__ import annotations
@@ -57,6 +62,9 @@ DIAS_DE_ATRASO = 10
 # fornecedor ter o que mostrar na negociação; as dos outros fornecedores chegaram no prazo.
 ATRASO_NAS_ENTREGAS_DA_KATRINA = 6
 KATRINA = "Katrina Têxtil"
+SETORES = ("Banho", "Cama", "Mesa", "Cozinha", "Tapetes")
+SETOR_DA_CATEGORIA = {"felpudo": "Banho", "jogo_cama": "Cama", "mesa": "Mesa", "cozinha": "Cozinha", "banho": "Banho"}
+TAPETE_BANHEIRO = "Tapete Banheiro"
 
 
 @dataclass(frozen=True)
@@ -838,6 +846,28 @@ def _seed_pedidos_compra(
     )
 
 
+def _seed_setores(conn: Connection, skus: list[dict], agora: datetime) -> None:
+    for nome in SETORES:
+        conn.execute(
+            text("INSERT INTO copilot.setores (id, nome, ativo) VALUES (:id, :nome, true) ON CONFLICT DO NOTHING"),
+            {"id": _uuid("setor", nome), "nome": nome},
+        )
+    id_por_nome = {
+        row.nome.lower(): row.id for row in conn.execute(text("SELECT id, nome FROM copilot.setores")).all()
+    }
+    for sku in skus:
+        if sku["sku_code"] not in CENARIOS:
+            continue
+        nome = "Tapetes" if sku["produto_nome"] == TAPETE_BANHEIRO else SETOR_DA_CATEGORIA[sku["categoria"]]
+        conn.execute(
+            text(
+                "INSERT INTO copilot.setores_sku (sku_code, setor_id, atualizado_em) "
+                "VALUES (:sku_code, :setor_id, :agora) ON CONFLICT (sku_code) DO NOTHING"
+            ),
+            {"sku_code": sku["sku_code"], "setor_id": id_por_nome[nome.lower()], "agora": agora},
+        )
+
+
 def run(skus_extras: int = 0) -> None:
     agora = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     inicio = agora - timedelta(days=HISTORY_MONTHS * 30)
@@ -850,6 +880,7 @@ def run(skus_extras: int = 0) -> None:
         relacoes = _seed_fornecedor_skus(conn, fornecedores, skus, agora)
         _seed_historico(conn, skus, relacoes, agora)
         _seed_pedidos_compra(conn, fornecedores, relacoes, skus, agora)
+        _seed_setores(conn, skus, agora)
 
 
 if __name__ == "__main__":

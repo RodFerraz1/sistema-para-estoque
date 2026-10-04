@@ -1,4 +1,4 @@
-import { TIPOS_DE_AVISO, api, cabecalho, dataCurta, decisaoParaVendas, el, mensagem, numero, quando } from "./comum.js";
+import { TIPOS_DE_AVISO, VERIFICACAO_PARA_VENDAS, api, cabecalho, dataCurta, decisaoParaVendas, el, mensagem, numero, quando } from "./comum.js";
 
 cabecalho("vendas");
 
@@ -15,6 +15,13 @@ const formulario = document.getElementById("aviso-form");
 const botoesTipo = document.querySelectorAll(".tipos button");
 const comentario = document.getElementById("comentario");
 const enviar = document.getElementById("enviar");
+const abrirGondola = document.getElementById("abrir-gondola");
+const formularioGondola = document.getElementById("gondola-form");
+const gondolaSemEstoque = document.getElementById("gondola-sem-estoque");
+const gondolaSetor = document.getElementById("gondola-setor");
+const gondolaSetorDica = document.getElementById("gondola-setor-dica");
+const gondolaComentario = document.getElementById("gondola-comentario");
+const enviarGondola = document.getElementById("enviar-gondola");
 const resultado = document.getElementById("resultado");
 const contagemMeusAvisos = document.getElementById("contagem-meus-avisos");
 const listaMeusAvisos = document.getElementById("lista-meus-avisos");
@@ -26,6 +33,8 @@ const SITUACOES = {
 };
 
 let sku = null;
+let disponivel = null;
+let setoresAtivos = null;
 let tipo = null;
 let espera = null;
 let ultimaBusca = 0;
@@ -53,6 +62,8 @@ function chegada(entrega) {
 }
 
 function mostrarDisponibilidade(d) {
+  disponivel = d.disponivel;
+  gondolaSemEstoque.hidden = disponivel !== 0;
   const situacao = SITUACOES[d.situacao];
   disponibilidade.replaceChildren(
     el(
@@ -97,18 +108,51 @@ function escolher(s) {
 function mostrarFormulario(aberto) {
   formulario.hidden = !aberto;
   abrirAviso.setAttribute("aria-expanded", String(aberto));
-  abrirAviso.classList.toggle("primario", !aberto);
+  if (aberto) mostrarGondola(false);
+}
+
+function mostrarGondola(aberto) {
+  formularioGondola.hidden = !aberto;
+  abrirGondola.setAttribute("aria-expanded", String(aberto));
+  if (aberto) mostrarFormulario(false);
 }
 
 function limparFormulario() {
   tipo = null;
   for (const botao of botoesTipo) botao.setAttribute("aria-pressed", "false");
   comentario.value = "";
+  gondolaComentario.value = "";
   mostrarFormulario(false);
+  mostrarGondola(false);
+}
+
+async function prepararGondola(s) {
+  gondolaSetor.disabled = true;
+  gondolaSetorDica.hidden = true;
+  gondolaSetor.replaceChildren(el("option", { value: "" }, "Carregando os setores..."));
+  try {
+    const [setores, conhecido] = await Promise.all([
+      setoresAtivos ?? api("GET", "/setores"),
+      api("GET", `/skus/${encodeURIComponent(s.sku_code)}/setor`),
+    ]);
+    setoresAtivos = setores;
+    if (sku?.sku_code !== s.sku_code) return;
+    const sabido = conhecido.setor?.ativo ? conhecido.setor.id : "";
+    gondolaSetor.replaceChildren(
+      sabido ? null : el("option", { value: "" }, "Escolha o setor"),
+      ...setores.map((setor) => el("option", { value: setor.id }, setor.nome)),
+    );
+    gondolaSetor.value = sabido;
+    gondolaSetorDica.hidden = Boolean(sabido);
+    gondolaSetor.disabled = false;
+  } catch (e) {
+    if (sku?.sku_code === s.sku_code) resultado.replaceChildren(mensagem("erro", `Não foi possível carregar os setores: ${e.message}`));
+  }
 }
 
 function trocar() {
   sku = null;
+  disponivel = null;
   escolhido.hidden = true;
   disponibilidade.hidden = true;
   acoes.hidden = true;
@@ -162,6 +206,41 @@ abrirAviso.addEventListener("click", () => {
   if (!formulario.hidden) botoesTipo[0].focus();
 });
 
+abrirGondola.addEventListener("click", () => {
+  const abrir = formularioGondola.hidden;
+  mostrarGondola(abrir);
+  if (abrir) {
+    gondolaSemEstoque.hidden = disponivel !== 0;
+    prepararGondola(sku).then(() => gondolaSetor.focus());
+  }
+});
+
+formularioGondola.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  if (!gondolaSetor.value) {
+    resultado.replaceChildren(mensagem("erro", "Diga em que setor fica a gôndola vazia."));
+    return;
+  }
+  const setor = gondolaSetor.selectedOptions[0].textContent;
+  enviarGondola.disabled = true;
+  try {
+    await api("POST", "/avisos-gondola", {
+      sku_code: sku.sku_code,
+      setor_id: gondolaSetor.value,
+      comentario: gondolaComentario.value.trim() || null,
+    });
+    resultado.replaceChildren(
+      mensagem("sucesso", `Aviso enviado ao repositor: gôndola vazia de ${descricao(sku)}, no setor ${setor}. O que ele achar aparece em Meus avisos.`),
+    );
+    trocar();
+    carregarMeusAvisos();
+  } catch (e) {
+    resultado.replaceChildren(mensagem("erro", `O aviso não foi enviado: ${e.message}`));
+  } finally {
+    enviarGondola.disabled = false;
+  }
+});
+
 for (const botao of botoesTipo) {
   botao.addEventListener("click", () => {
     tipo = botao.dataset.tipo;
@@ -194,7 +273,23 @@ formulario.addEventListener("submit", async (evento) => {
   }
 });
 
+function desfechoDaGondola(aviso) {
+  const v = aviso.verificacao;
+  if (v === null) {
+    return el("div", { class: "desfecho" }, el("span", { class: "selo vendas" }, "Aguardando o repositor"));
+  }
+  const { texto, classe } = VERIFICACAO_PARA_VENDAS[v.resultado];
+  return el(
+    "div",
+    { class: "desfecho" },
+    el("span", { class: `selo ${classe}` }, texto),
+    el("span", { class: "suave" }, `verificou ${quando(v.criado_em)}`),
+    v.comentario ? el("p", { class: "motivo" }, `Repositor: "${v.comentario}"`) : null,
+  );
+}
+
 function desfecho(aviso) {
+  if (aviso.para === "repositor") return desfechoDaGondola(aviso);
   if (aviso.decisao === null) {
     return el("div", { class: "desfecho" }, el("span", { class: "selo vendas" }, "Aguardando o comprador"));
   }
@@ -209,16 +304,18 @@ function desfecho(aviso) {
 }
 
 function cartaoDoAviso(aviso) {
+  const aguardando = aviso.para === "repositor" ? aviso.verificacao === null : aviso.decisao === null;
+  const onde = aviso.para === "repositor" ? `setor ${aviso.setor} · para o repositor` : "para o comprador";
   return el(
     "article",
-    { class: `card meu-aviso${aviso.decisao === null ? " aguardando" : ""}` },
+    { class: `card meu-aviso${aguardando ? " aguardando" : ""}` },
     el(
       "div",
       { class: "meu-aviso-topo" },
       el("strong", {}, `${TIPOS_DE_AVISO[aviso.tipo]}: ${aviso.produto_nome}`),
       el("span", { class: "suave" }, quando(aviso.criado_em)),
     ),
-    el("div", { class: "suave" }, `${aviso.cor} · ${aviso.tamanho} · para o comprador`),
+    el("div", { class: "suave" }, `${aviso.cor} · ${aviso.tamanho} · ${onde}`),
     aviso.comentario ? el("p", { class: "comentario-do-aviso" }, `"${aviso.comentario}"`) : null,
     desfecho(aviso),
   );
@@ -236,7 +333,7 @@ async function carregarMeusAvisos() {
             "div",
             { class: "card vazio" },
             el("strong", {}, "Nenhum aviso nos últimos 30 dias"),
-            el("p", { class: "suave" }, "Quando você avisar o comprador, o aviso aparece aqui com o que ele decidiu."),
+            el("p", { class: "suave" }, "Quando você avisar o comprador ou o repositor, o aviso aparece aqui com o que ele fez."),
           ),
     );
   } catch (e) {

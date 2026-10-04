@@ -16,10 +16,11 @@
   </header>
   <main class="conteudo estreito">
     <h1>Painel do repositor</h1>
-    <p class="suave">O que provavelmente está faltando na gôndola: produtos que pararam de vender, mas o ERP diz que tem no depósito.</p>
+    <p class="suave">O que provavelmente está faltando na gôndola: as gôndolas vazias que as vendedoras avisaram e os produtos que pararam de vender, mas o ERP diz que tem no depósito.</p>
 
     <form id="filtros" class="filtros filtros-repositor" role="search" aria-label="Buscar e filtrar o painel do repositor" hidden>
       <input id="filtro-busca" name="busca" type="search" autocomplete="off" enterkeyhint="search" maxlength="100" placeholder="Buscar nome, cor, tamanho" aria-label="Buscar por código, nome, cor ou tamanho">
+      <select id="filtro-setor" name="setor" aria-label="Setor"><option value="">Todos os setores</option></select>
       <select id="filtro-categoria" name="categoria" aria-label="Categoria"><option value="">Todas as categorias</option></select>
       <button id="limpar-filtros" class="limpar-filtros" type="button" hidden>Limpar filtros</button>
     </form>

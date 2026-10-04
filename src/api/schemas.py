@@ -332,20 +332,24 @@ class DecisaoSobreAvisoResponse(BaseModel):
 
 
 class MeuAvisoResponse(BaseModel):
-    """`para` diz quem resolve o aviso. `decisao` nula: aguardando o comprador."""
+    """`para` diz quem resolve o aviso: o comprador, com a `decisao` de compra (nula:
+    aguardando o comprador), ou o repositor, no aviso de gôndola vazia, com o `setor` e a
+    `verificacao` de gôndola (nula: aguardando o repositor)."""
 
     model_config = ConfigDict(frozen=True)
 
     id: UUID
-    para: Literal["comprador"]
+    para: Literal["comprador", "repositor"]
     sku_code: str
     produto_nome: str
     cor: str
     tamanho: str
-    tipo: TipoAviso
+    tipo: TipoAviso | Literal["gondola_vazia"]
+    setor: str | None = None
     comentario: str | None
     criado_em: datetime
-    decisao: DecisaoSobreAvisoResponse | None
+    decisao: DecisaoSobreAvisoResponse | None = None
+    verificacao: VerificacaoSobreAvisoResponse | None = None
 
 
 class AvisoResponse(BaseModel):
@@ -380,8 +384,76 @@ class VerificacaoGondolaResponse(BaseModel):
 
 
 class RegistrarVerificacaoGondolaRequest(BaseModel):
+    """`setor_id` corrige o setor conhecido do SKU."""
+
     resultado: ResultadoVerificacao
     comentario: TextoLivre | None = None
+    setor_id: UUID | None = None
+
+
+class VerificacaoSobreAvisoResponse(BaseModel):
+    """O que a vendedora vê da verificação de gôndola que fechou o aviso dela."""
+
+    model_config = ConfigDict(frozen=True)
+
+    resultado: ResultadoVerificacao
+    comentario: str | None
+    criado_em: datetime
+
+
+NomeDoSetor = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
+
+class SetorResumoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    nome: str
+    ativo: bool
+
+
+class SetorResponse(SetorResumoResponse):
+    """`skus_conhecidos`: quantos SKUs têm este setor como setor conhecido."""
+
+    skus_conhecidos: int
+
+
+class CriarSetorRequest(BaseModel):
+    nome: NomeDoSetor
+
+
+class MudarSetorRequest(BaseModel):
+    nome: NomeDoSetor
+    ativo: bool
+
+
+class SetorDoSkuResponse(BaseModel):
+    """`setor` nulo: ninguém disse ainda onde o SKU fica."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    setor: SetorResumoResponse | None
+
+
+class RegistrarAvisoGondolaRequest(BaseModel):
+    sku_code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    setor_id: UUID
+    comentario: TextoLivre | None = None
+
+
+class AvisoGondolaResponse(BaseModel):
+    """`disponivel_no_erp` é o disponível do ERP no momento do aviso."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    sku_code: str
+    setor_id: UUID
+    comentario: str | None
+    disponivel_no_erp: int
+    avisado_por: str
+    criado_em: datetime
 
 
 class ItemAlertaResponse(BaseModel):
@@ -695,9 +767,48 @@ class QuedaDeVendaResponse(BaseModel):
     ultimos_dias: list[DiaObservadoResponse]
     vendido_na_janela: int
     venda_perdida: float
+    setor: SetorResumoResponse | None
+
+
+class QuedaNoAvisoResponse(BaseModel):
+    """A queda de venda de um SKU que também tem aviso de gôndola vazia."""
+
+    model_config = ConfigDict(frozen=True)
+
+    venda_diaria_base: float
+    ultimos_dias: list[DiaObservadoResponse]
+    vendido_na_janela: int
+    venda_perdida: float
+
+
+class AvisoNoPainelResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    avisado_por: str
+    comentario: str | None
+    criado_em: datetime
+
+
+class AvisoDeGondolaNoPainelResponse(BaseModel):
+    """SKU com aviso de gôndola vazia aberto. `avisos`, do mais antigo para o mais recente;
+    `queda`, quando o SKU também parou de vender com estoque."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    produto_nome: str
+    cor: str
+    tamanho: str
+    categoria: str
+    disponivel: int
+    setor: SetorResumoResponse | None
+    avisos: list[AvisoNoPainelResponse]
+    queda: QuedaNoAvisoResponse | None
 
 
 class PainelDoRepositorResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
+    avisos_de_gondola: list[AvisoDeGondolaNoPainelResponse]
     quedas_de_venda: list[QuedaDeVendaResponse]
