@@ -5,6 +5,7 @@ produto no `SKU` para evitar N+1 nos consumidores.
 """
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import datetime
 from uuid import UUID
 
@@ -20,7 +21,7 @@ from src.inventory.schemas import (
     ItemEmTransito,
     Movimentacao,
 )
-from src.sales.schemas import Venda
+from src.sales.schemas import Venda, VendasDoDia, VendasDoMes
 
 
 _SKU_SELECT = """
@@ -44,6 +45,62 @@ def _row_to_sku(row: Row) -> SKU:
         gramatura=row.gramatura,
         material=row.material,
         ativo=row.ativo,
+    )
+
+
+_FORNECEDORES_SELECT = """
+    SELECT s.sku_code, fs.fornecedor_id, f.nome AS fornecedor_nome,
+           fs.preco_unitario_atual, fs.moq_unidades,
+           f.lead_time_dias_contratado, fs.lead_time_dias_observado,
+           f.prazo_pagamento_padrao, f.pedido_minimo_reais
+    FROM erp.fornecedores_skus fs
+    JOIN erp.fornecedores f ON f.id = fs.fornecedor_id
+    JOIN erp.skus s ON s.id = fs.sku_id
+    WHERE fs.ativo = TRUE AND f.ativo = TRUE
+"""
+
+
+def _row_to_fornecedor(r: Row) -> FornecedorParaSKU:
+    return FornecedorParaSKU(
+        fornecedor_id=r.fornecedor_id,
+        fornecedor_nome=r.fornecedor_nome,
+        preco_unitario_reais=r.preco_unitario_atual,
+        moq_unidades=r.moq_unidades,
+        lead_time_dias_contratado=r.lead_time_dias_contratado,
+        lead_time_dias_observado=r.lead_time_dias_observado,
+        prazo_pagamento_padrao=r.prazo_pagamento_padrao,
+        pedido_minimo_reais=r.pedido_minimo_reais,
+    )
+
+
+_EM_TRANSITO_SELECT = """
+    SELECT s.sku_code, p.id AS pedido_id, p.fornecedor_id,
+           p.status::text AS status,
+           i.quantidade - i.quantidade_recebida AS quantidade_pendente,
+           p.data_prevista_entrega
+    FROM erp.pedidos_compra_itens i
+    JOIN erp.pedidos_compra p ON p.id = i.pedido_id
+    JOIN erp.skus s ON s.id = i.sku_id
+    WHERE p.status::text = ANY(:status)
+      AND i.quantidade > i.quantidade_recebida
+"""
+
+
+def _row_to_em_transito(r: Row) -> ItemEmTransito:
+    return ItemEmTransito(
+        pedido_id=r.pedido_id,
+        fornecedor_id=r.fornecedor_id,
+        status=r.status,
+        quantidade_pendente=r.quantidade_pendente,
+        data_prevista_entrega=r.data_prevista_entrega,
+    )
+
+
+def _estoque(r: Row) -> Estoque:
+    return Estoque(
+        quantidade_disponivel=r.quantidade_disponivel,
+        quantidade_reservada=r.quantidade_reservada,
+        atualizado_em=r.atualizado_em,
     )
 
 
@@ -94,34 +151,10 @@ class PostgresERPAdapter(ERPAdapter):
     def fornecedores_de(self, sku_code: str) -> list[FornecedorParaSKU]:
         with self._engine.connect() as conn:
             rows = conn.execute(
-                text(
-                    """
-                    SELECT fs.fornecedor_id, f.nome AS fornecedor_nome,
-                           fs.preco_unitario_atual, fs.moq_unidades,
-                           f.lead_time_dias_contratado, fs.lead_time_dias_observado,
-                           f.prazo_pagamento_padrao, f.pedido_minimo_reais
-                    FROM erp.fornecedores_skus fs
-                    JOIN erp.fornecedores f ON f.id = fs.fornecedor_id
-                    JOIN erp.skus s ON s.id = fs.sku_id
-                    WHERE s.sku_code = :sku_code AND fs.ativo = TRUE AND f.ativo = TRUE
-                    ORDER BY fs.preco_unitario_atual
-                    """
-                ),
+                text(_FORNECEDORES_SELECT + " AND s.sku_code = :sku_code ORDER BY fs.preco_unitario_atual"),
                 {"sku_code": sku_code},
             ).all()
-        return [
-            FornecedorParaSKU(
-                fornecedor_id=r.fornecedor_id,
-                fornecedor_nome=r.fornecedor_nome,
-                preco_unitario_reais=r.preco_unitario_atual,
-                moq_unidades=r.moq_unidades,
-                lead_time_dias_contratado=r.lead_time_dias_contratado,
-                lead_time_dias_observado=r.lead_time_dias_observado,
-                prazo_pagamento_padrao=r.prazo_pagamento_padrao,
-                pedido_minimo_reais=r.pedido_minimo_reais,
-            )
-            for r in rows
-        ]
+        return [_row_to_fornecedor(r) for r in rows]
 
     def estoque_de(self, sku_code: str) -> Estoque | None:
         with self._engine.connect() as conn:
@@ -137,13 +170,7 @@ class PostgresERPAdapter(ERPAdapter):
                 ),
                 {"sku_code": sku_code},
             ).one_or_none()
-        if row is None:
-            return None
-        return Estoque(
-            quantidade_disponivel=row.quantidade_disponivel,
-            quantidade_reservada=row.quantidade_reservada,
-            atualizado_em=row.atualizado_em,
-        )
+        return _estoque(row) if row is not None else None
 
     def vendas_de(self, sku_code: str, desde: datetime) -> list[Venda]:
         with self._engine.connect() as conn:
@@ -207,32 +234,12 @@ class PostgresERPAdapter(ERPAdapter):
         with self._engine.connect() as conn:
             rows = conn.execute(
                 text(
-                    """
-                    SELECT p.id AS pedido_id, p.fornecedor_id,
-                           p.status::text AS status,
-                           i.quantidade - i.quantidade_recebida AS quantidade_pendente,
-                           p.data_prevista_entrega
-                    FROM erp.pedidos_compra_itens i
-                    JOIN erp.pedidos_compra p ON p.id = i.pedido_id
-                    JOIN erp.skus s ON s.id = i.sku_id
-                    WHERE s.sku_code = :sku_code
-                      AND p.status::text = ANY(:status)
-                      AND i.quantidade > i.quantidade_recebida
-                    ORDER BY p.data_prevista_entrega NULLS LAST, p.id
-                    """
+                    _EM_TRANSITO_SELECT
+                    + " AND s.sku_code = :sku_code ORDER BY p.data_prevista_entrega NULLS LAST, p.id"
                 ),
                 {"sku_code": sku_code, "status": list(STATUS_EM_TRANSITO)},
             ).all()
-        return [
-            ItemEmTransito(
-                pedido_id=r.pedido_id,
-                fornecedor_id=r.fornecedor_id,
-                status=r.status,
-                quantidade_pendente=r.quantidade_pendente,
-                data_prevista_entrega=r.data_prevista_entrega,
-            )
-            for r in rows
-        ]
+        return [_row_to_em_transito(r) for r in rows]
 
     def itens_de_pedido_de(self, sku_code: str) -> list[ItemDePedido]:
         with self._engine.connect() as conn:
@@ -265,3 +272,92 @@ class PostgresERPAdapter(ERPAdapter):
             )
             for r in rows
         ]
+
+    def estoques(self) -> dict[str, Estoque]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT s.sku_code, e.quantidade_disponivel, e.quantidade_reservada,
+                           e.atualizado_em
+                    FROM erp.estoque_snapshot e
+                    JOIN erp.skus s ON s.id = e.sku_id
+                    WHERE s.ativo = TRUE
+                    """
+                )
+            ).all()
+        return {r.sku_code: _estoque(r) for r in rows}
+
+    def giros(self, desde: datetime) -> dict[str, list[VendasDoMes]]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT s.sku_code, m.mes, m.quantidade, m.primeira_venda
+                    FROM (
+                        SELECT v.sku_id, date_trunc('month', v.data AT TIME ZONE 'UTC') AS mes,
+                               sum(v.quantidade) AS quantidade, min(v.data) AS primeira_venda
+                        FROM erp.vendas v
+                        WHERE v.data >= :desde
+                        GROUP BY v.sku_id, mes
+                    ) m
+                    JOIN erp.skus s ON s.id = m.sku_id
+                    WHERE s.ativo = TRUE
+                    ORDER BY m.sku_id, m.mes
+                    """
+                ),
+                {"desde": desde},
+            ).all()
+        por_sku: dict[str, list[VendasDoMes]] = defaultdict(list)
+        for sku_code, mes, quantidade, primeira_venda in rows:
+            por_sku[sku_code].append(VendasDoMes(mes.year, mes.month, quantidade, primeira_venda))
+        return dict(por_sku)
+
+    def vendas_diarias(self, desde: datetime) -> dict[str, list[VendasDoDia]]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT s.sku_code, d.dia, d.quantidade
+                    FROM (
+                        SELECT v.sku_id, (v.data AT TIME ZONE 'UTC')::date AS dia,
+                               sum(v.quantidade) AS quantidade
+                        FROM erp.vendas v
+                        WHERE v.data >= :desde
+                        GROUP BY v.sku_id, dia
+                    ) d
+                    JOIN erp.skus s ON s.id = d.sku_id
+                    WHERE s.ativo = TRUE
+                    ORDER BY d.sku_id, d.dia
+                    """
+                ),
+                {"desde": desde},
+            ).all()
+        por_sku: dict[str, list[VendasDoDia]] = defaultdict(list)
+        for sku_code, dia, quantidade in rows:
+            por_sku[sku_code].append(VendasDoDia(dia, quantidade))
+        return dict(por_sku)
+
+    def fornecedores_por_sku(self) -> dict[str, list[FornecedorParaSKU]]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(_FORNECEDORES_SELECT + " AND s.ativo = TRUE ORDER BY s.sku_code, fs.preco_unitario_atual")
+            ).all()
+        por_sku: dict[str, list[FornecedorParaSKU]] = defaultdict(list)
+        for r in rows:
+            por_sku[r.sku_code].append(_row_to_fornecedor(r))
+        return dict(por_sku)
+
+    def itens_em_transito(self) -> dict[str, list[ItemEmTransito]]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    _EM_TRANSITO_SELECT
+                    + " AND s.ativo = TRUE ORDER BY s.sku_code, p.data_prevista_entrega NULLS LAST, p.id"
+                ),
+                {"status": list(STATUS_EM_TRANSITO)},
+            ).all()
+        por_sku: dict[str, list[ItemEmTransito]] = defaultdict(list)
+        for r in rows:
+            por_sku[r.sku_code].append(_row_to_em_transito(r))
+        return dict(por_sku)

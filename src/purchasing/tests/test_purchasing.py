@@ -108,8 +108,6 @@ def _purchasing(
     return Purchasing(
         Catalog(adapter),
         FichaSKU(Catalog(adapter), inventory, sales),
-        inventory,
-        sales,
         politicas or InMemoryPoliticaCompraRepositorio(v1=COM_LEAD_TIME_OBSERVADO),
         adapter,
         now=NOW,

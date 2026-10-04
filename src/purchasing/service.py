@@ -1,7 +1,8 @@
 """Módulo `purchasing`: sugere quanto comprar de um SKU e de quem.
 
-Mecanismo fixo, parâmetros da política de compra ativa (ADR-0003). Lê dos
-módulos de domínio; do `ERPAdapter` só lê os pedidos de compra, que não têm
+Mecanismo fixo, parâmetros da política de compra ativa (ADR-0003). A conta sai do
+retrato do `ficha_sku`: o do estoque inteiro no painel, o de um SKU só na tela do SKU,
+para os dois caminhos darem a mesma sugestão. Lê dos módulos de domínio; do `ERPAdapter` só lê os pedidos de compra, que não têm
 módulo de leitura próprio. O Copilot não escreve no ERP (ADR-0005).
 """
 from __future__ import annotations
@@ -14,9 +15,9 @@ from datetime import UTC, datetime, timedelta
 from src.catalog.schemas import SKU, FornecedorParaSKU
 from src.catalog.service import Catalog
 from src.erp_adapter.port import ERPAdapter
+from src.ficha_sku.schemas import Ficha, Retrato
 from src.ficha_sku.service import FichaSKU
 from src.inventory.schemas import dias_de_cobertura
-from src.inventory.service import Inventory
 from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.politica_compra.schemas import (
     DIAS_POR_MES,
@@ -37,7 +38,6 @@ from src.purchasing.schemas import (
     SugestaoPedido,
     TipoAlerta,
 )
-from src.sales.service import Sales
 
 
 def _lead_time(
@@ -301,13 +301,57 @@ def _sem_compra(
 MAX_SUBSTITUTOS = 10
 
 
+def _sku_novo(ficha: Ficha, parametros: ParametrosPolitica, agora: datetime) -> bool:
+    if ficha.primeira_venda is None:
+        return False
+    return agora - ficha.primeira_venda < timedelta(days=parametros.dias_historico_minimo)
+
+
+def _sugestao(ficha: Ficha, politica: PoliticaCompra, agora: datetime) -> SugestaoPedido:
+    sku_code = ficha.sku.sku_code
+    if _sku_novo(ficha, politica.parametros, agora):
+        return _sem_compra(sku_code, politica, MotivoSemCompra.SKU_NOVO)
+    giro = ficha.giro.unidades_por_mes
+    if giro == 0:
+        return _sem_compra(sku_code, politica, MotivoSemCompra.SEM_GIRO)
+    if not ficha.fornecedores:
+        return _sem_compra(sku_code, politica, MotivoSemCompra.SEM_FORNECEDOR)
+
+    candidatos = [
+        _calcular(
+            fornecedor,
+            giro=giro,
+            disponivel=ficha.estoque.quantidade_disponivel,
+            em_transito=ficha.em_transito,
+            parametros=politica.parametros,
+        )
+        for fornecedor in ficha.fornecedores
+    ]
+    escolhido = _escolher(candidatos, politica.parametros.criterio_fornecedor)
+    if escolhido.quantidade == 0:
+        return _sem_compra(
+            sku_code,
+            politica,
+            MotivoSemCompra.ACIMA_DO_PONTO_DE_REPOSICAO,
+            escolhido.calculo,
+        )
+    return SugestaoPedido(
+        sku_code=sku_code,
+        quantidade=escolhido.quantidade,
+        motivo=None,
+        fornecedor=escolhido.fornecedor,
+        valor_estimado_centavos=escolhido.valor_centavos,
+        calculo=escolhido.calculo,
+        alertas=_alertas(escolhido, politica.parametros, agora),
+        politica_versao=politica.versao,
+    )
+
+
 class Purchasing:
     def __init__(
         self,
         catalog: Catalog,
         ficha_sku: FichaSKU,
-        inventory: Inventory,
-        sales: Sales,
         politicas: PoliticaCompraRepositorio,
         erp: ERPAdapter,
         *,
@@ -315,8 +359,6 @@ class Purchasing:
     ) -> None:
         self._catalog = catalog
         self._ficha_sku = ficha_sku
-        self._inventory = inventory
-        self._sales = sales
         self._politicas = politicas
         self._erp = erp
         self._now = now
@@ -324,60 +366,22 @@ class Purchasing:
     def _agora(self) -> datetime:
         return self._now or datetime.now(UTC)
 
-    def _sku_novo(self, sku_code: str, parametros: ParametrosPolitica, agora: datetime) -> bool:
-        primeira = self._sales.primeira_venda(sku_code)
-        if primeira is None:
-            return False
-        return agora - primeira < timedelta(days=parametros.dias_historico_minimo)
-
     def sugerir_pedido(self, sku_code: str) -> SugestaoPedido | None:
-        """Sugestão calculada na hora com a política ativa.
+        """Sugestão calculada na hora com a política ativa, pela mesma conta de
+        `sugerir_pedidos` sobre o retrato deste SKU.
 
         `None` para SKU inexistente. Propaga `SKUSemEstoque` do `ficha_sku`.
         """
-        ficha = self._ficha_sku.completa(sku_code)
-        if ficha is None:
+        retrato = self._ficha_sku.retrato_de(sku_code)
+        if retrato is None:
             return None
+        return self.sugerir_pedidos(retrato)[sku_code]
+
+    def sugerir_pedidos(self, retrato: Retrato) -> dict[str, SugestaoPedido]:
+        """Sugestão de cada SKU com ficha no retrato, por `sku_code`, com a política ativa."""
         politica = self._politicas.ativa()
         agora = self._agora()
-
-        if self._sku_novo(sku_code, politica.parametros, agora):
-            return _sem_compra(sku_code, politica, MotivoSemCompra.SKU_NOVO)
-        giro = ficha.giro.unidades_por_mes
-        if giro == 0:
-            return _sem_compra(sku_code, politica, MotivoSemCompra.SEM_GIRO)
-        if not ficha.fornecedores:
-            return _sem_compra(sku_code, politica, MotivoSemCompra.SEM_FORNECEDOR)
-
-        em_transito = self._inventory.em_transito(sku_code).total_unidades
-        candidatos = [
-            _calcular(
-                fornecedor,
-                giro=giro,
-                disponivel=ficha.estoque.quantidade_disponivel,
-                em_transito=em_transito,
-                parametros=politica.parametros,
-            )
-            for fornecedor in ficha.fornecedores
-        ]
-        escolhido = _escolher(candidatos, politica.parametros.criterio_fornecedor)
-        if escolhido.quantidade == 0:
-            return _sem_compra(
-                sku_code,
-                politica,
-                MotivoSemCompra.ACIMA_DO_PONTO_DE_REPOSICAO,
-                escolhido.calculo,
-            )
-        return SugestaoPedido(
-            sku_code=sku_code,
-            quantidade=escolhido.quantidade,
-            motivo=None,
-            fornecedor=escolhido.fornecedor,
-            valor_estimado_centavos=escolhido.valor_centavos,
-            calculo=escolhido.calculo,
-            alertas=_alertas(escolhido, politica.parametros, agora),
-            politica_versao=politica.versao,
-        )
+        return {codigo: _sugestao(ficha, politica, agora) for codigo, ficha in retrato.fichas.items()}
 
     def referencias_de_preco(self, sku_code: str) -> ReferenciasDePreco | None:
         """Histórico de preço pago, preço atual por fornecedor e substitutos do SKU.

@@ -34,6 +34,10 @@ class Catalog:
     def fornecedores_de(self, sku_code: str) -> list[FornecedorParaSKU]:
         return self._erp.fornecedores_de(sku_code)
 
+    def fornecedores_por_sku(self) -> dict[str, list[FornecedorParaSKU]]:
+        """`fornecedores_de` dos SKUs ativos numa leitura só. SKU sem fornecedor fica de fora."""
+        return self._erp.fornecedores_por_sku()
+
     def buscar_skus(self, texto: str, limite: int = 20) -> list[SKU]:
         """SKUs ativos cujo código, nome do produto, cor ou tamanho contêm todas as
         palavras de `texto`, sem diferenciar acento nem maiúscula. Ordem: nome do

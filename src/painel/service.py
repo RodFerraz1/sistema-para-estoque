@@ -1,9 +1,10 @@
 """Módulo `painel`: o painel de alertas do comprador chefe, os avisos da equipe de
 vendas e as decisões de compra (ADR-0005).
 
-O painel é calculado na hora, sem estado próprio, a partir da sugestão de pedido de
-cada SKU ativo com a política ativa, dos avisos abertos e da decisão vigente. Não
-chama o Jev: os sinais do corpus ficam na tela do SKU.
+O painel é calculado na hora, sem estado próprio, a partir do retrato do estoque inteiro
+(as fichas de todos os SKUs ativos, lidas em lote), da sugestão de pedido de cada um com a
+política ativa, dos avisos abertos e da decisão vigente. Não chama o Jev: os sinais do
+corpus ficam na tela do SKU.
 
 Aviso aberto é o que não tem decisão de compra do mesmo SKU registrada depois dele.
 Decisão vigente é a mais recente do SKU, com menos de `PRAZO_DA_DECISAO` e sem aviso
@@ -17,9 +18,9 @@ from uuid import uuid4
 
 from src.catalog.schemas import SKU
 from src.catalog.service import Catalog
-from src.ficha_sku.service import SKUSemEstoque
+from src.ficha_sku.schemas import Ficha
+from src.ficha_sku.service import FichaSKU
 from src.inventory.schemas import Cobertura
-from src.inventory.service import Inventory
 from src.painel.repositorio import AvisosRepositorio, DecisoesRepositorio
 from src.painel.schemas import (
     Aviso,
@@ -115,11 +116,27 @@ def _ordem(item: ItemAlerta) -> tuple[int, bool, bool, float, str]:
     return (_grupo(item), item.disponivel > 0, cobertura is None, cobertura or 0.0, item.sku.sku_code)
 
 
+def _item(ficha: Ficha, sugestao: SugestaoPedido, parametros: ParametrosPolitica, avisos: list[Aviso]) -> ItemAlerta:
+    fornecedor = sugestao.fornecedor if sugestao.quantidade > 0 else None
+    return ItemAlerta(
+        sku=ficha.sku,
+        disponivel=ficha.estoque.quantidade_disponivel,
+        cobertura_atual_meses=ficha.cobertura.meses,
+        cobertura_na_chegada_sem_compra_meses=(
+            sugestao.calculo.cobertura_na_chegada_sem_compra_meses if sugestao.calculo else None
+        ),
+        motivos=_motivos(sugestao, ficha.cobertura, parametros),
+        quantidade_sugerida=sugestao.quantidade if fornecedor else None,
+        fornecedor_sugerido=fornecedor.fornecedor_nome if fornecedor else None,
+        avisos_abertos=avisos,
+    )
+
+
 class Painel:
     def __init__(
         self,
         catalog: Catalog,
-        inventory: Inventory,
+        ficha_sku: FichaSKU,
         purchasing: Purchasing,
         politicas: PoliticaCompraRepositorio,
         avisos: AvisosRepositorio,
@@ -128,7 +145,7 @@ class Painel:
         relogio: Relogio = agora_utc,
     ) -> None:
         self._catalog = catalog
-        self._inventory = inventory
+        self._ficha_sku = ficha_sku
         self._purchasing = purchasing
         self._politicas = politicas
         self._avisos = avisos
@@ -219,42 +236,25 @@ class Painel:
         for aviso in self._avisos.listar():
             avisos.setdefault(aviso.sku_code, []).append(aviso)
 
+        retrato = self._ficha_sku.retrato()
+        sugestoes = self._purchasing.sugerir_pedidos(retrato)
+
         alertas: list[ItemAlerta] = []
         decididos: list[ItemDecidido] = []
         com_erro: list[str] = []
-        for sku in self._catalog.listar_skus():
+        for sku in retrato.skus:
             ultima = ultimas.get(sku.sku_code)
             abertos = _abertos(avisos.get(sku.sku_code, []), ultima)
             vigente = _vigente(ultima, abertos, agora)
             if vigente is not None:
                 decididos.append(ItemDecidido(sku=sku, decisao=vigente))
                 continue
-            try:
-                item = self._item(sku, parametros, abertos)
-            except SKUSemEstoque:
+            ficha = retrato.fichas.get(sku.sku_code)
+            if ficha is None:
                 com_erro.append(sku.sku_code)
                 continue
-            if item is not None and (item.motivos or item.avisos_abertos):
+            item = _item(ficha, sugestoes[sku.sku_code], parametros, abertos)
+            if item.motivos or item.avisos_abertos:
                 alertas.append(item)
         decididos.sort(key=lambda d: (d.decisao.criado_em, d.sku.sku_code), reverse=True)
         return PainelDeAlertas(alertas=sorted(alertas, key=_ordem), decididos=decididos, skus_com_erro=com_erro)
-
-    def _item(self, sku: SKU, parametros: ParametrosPolitica, avisos: list[Aviso]) -> ItemAlerta | None:
-        sugestao = self._purchasing.sugerir_pedido(sku.sku_code)
-        estoque = self._inventory.estoque_atual(sku.sku_code)
-        if sugestao is None or estoque is None:
-            return None
-        cobertura = self._inventory.cobertura_meses(sku.sku_code)
-        fornecedor = sugestao.fornecedor if sugestao.quantidade > 0 else None
-        return ItemAlerta(
-            sku=sku,
-            disponivel=estoque.quantidade_disponivel,
-            cobertura_atual_meses=cobertura.meses,
-            cobertura_na_chegada_sem_compra_meses=(
-                sugestao.calculo.cobertura_na_chegada_sem_compra_meses if sugestao.calculo else None
-            ),
-            motivos=_motivos(sugestao, cobertura, parametros),
-            quantidade_sugerida=sugestao.quantidade if fornecedor else None,
-            fornecedor_sugerido=fornecedor.fornecedor_nome if fornecedor else None,
-            avisos_abertos=avisos,
-        )

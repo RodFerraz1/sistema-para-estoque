@@ -1,6 +1,10 @@
 """Port abstrato do ERP. Uma implementação (`PostgresERPAdapter`) fala com
 Postgres via SQLAlchemy; outra (`InMemoryERPAdapter`) serve para testes de
 módulos superiores.
+
+As leituras em lote (`estoques`, `giros`, `vendas_diarias`, `fornecedores_por_sku`,
+`itens_em_transito`) são o retrato do estoque inteiro: uma consulta cada, só dos SKUs
+ativos, indexadas por `sku_code`. Um SKU sem nada a devolver fica fora do dicionário.
 """
 from __future__ import annotations
 
@@ -11,7 +15,7 @@ from uuid import UUID
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.schemas import ItemDePedido
 from src.inventory.schemas import Estoque, ItemEmTransito, Movimentacao
-from src.sales.schemas import Venda
+from src.sales.schemas import Venda, VendasDoDia, VendasDoMes
 
 
 class ERPAdapter(Protocol):
@@ -48,4 +52,22 @@ class ERPAdapter(Protocol):
     def itens_de_pedido_de(self, sku_code: str) -> list[ItemDePedido]:
         """Itens de pedido de compra do SKU, de todos os status, do pedido mais recente
         para o mais antigo."""
+        ...
+
+    def estoques(self) -> dict[str, Estoque]: ...
+
+    def giros(self, desde: datetime) -> dict[str, list[VendasDoMes]]:
+        """Vendas com `data >= desde` somadas por mês, do mais antigo ao mais recente."""
+        ...
+
+    def vendas_diarias(self, desde: datetime) -> dict[str, list[VendasDoDia]]:
+        """Vendas com `data >= desde` somadas por dia, do mais antigo ao mais recente."""
+        ...
+
+    def fornecedores_por_sku(self) -> dict[str, list[FornecedorParaSKU]]:
+        """Na regra e na ordem de `fornecedores_de`."""
+        ...
+
+    def itens_em_transito(self) -> dict[str, list[ItemEmTransito]]:
+        """Na regra e na ordem de `itens_em_transito_de`."""
         ...

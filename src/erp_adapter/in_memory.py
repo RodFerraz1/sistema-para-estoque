@@ -12,7 +12,9 @@ alimentam as leituras de pedido.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from collections import defaultdict
+from datetime import UTC, date, datetime
+from collections.abc import Callable, Iterator
 from typing import cast
 from uuid import UUID
 
@@ -28,7 +30,7 @@ from src.inventory.schemas import (
     Movimentacao,
     StatusEmTransito,
 )
-from src.sales.schemas import Venda
+from src.sales.schemas import Venda, VendasDoDia, VendasDoMes
 
 
 class PedidoCompra(BaseModel):
@@ -66,10 +68,10 @@ class InMemoryERPAdapter(ERPAdapter):
     ) -> None:
         self.skus: list[SKU] = list(skus or [])
         self.fornecedores: list[Fornecedor] = list(fornecedores or [])
-        self.fornecedores_por_sku: dict[str, list[FornecedorParaSKU]] = dict(
+        self.vinculos: dict[str, list[FornecedorParaSKU]] = dict(
             fornecedores_por_sku or {}
         )
-        self.estoques: dict[str, Estoque] = dict(estoques or {})
+        self.estoques_por_sku: dict[str, Estoque] = dict(estoques or {})
         self.movimentacoes: list[Movimentacao] = list(movimentacoes or [])
         self.vendas: list[Venda] = list(vendas or [])
         self.pedidos_compra: list[PedidoCompra] = list(pedidos_compra or [])
@@ -94,14 +96,14 @@ class InMemoryERPAdapter(ERPAdapter):
         return sorted(
             (
                 f
-                for f in self.fornecedores_por_sku.get(sku_code, [])
+                for f in self.vinculos.get(sku_code, [])
                 if f.fornecedor_id in ativos_ids
             ),
             key=lambda f: f.preco_unitario_reais,
         )
 
     def estoque_de(self, sku_code: str) -> Estoque | None:
-        return self.estoques.get(sku_code)
+        return self.estoques_por_sku.get(sku_code)
 
     def vendas_de(self, sku_code: str, desde: datetime) -> list[Venda]:
         sku_id = self._sku_id(sku_code)
@@ -121,30 +123,37 @@ class InMemoryERPAdapter(ERPAdapter):
 
     def itens_em_transito_de(self, sku_code: str) -> list[ItemEmTransito]:
         sku_id = self._sku_id(sku_code)
+        if sku_id is None:
+            return []
+        return self._em_transito(lambda i: i.sku_id == sku_id).get(sku_id, [])
+
+    def _em_transito(self, filtro: Callable[[ItemPedidoCompra], bool]) -> dict[UUID, list[ItemEmTransito]]:
         pedidos = {
             p.id: p for p in self.pedidos_compra if p.status in STATUS_EM_TRANSITO
         }
-        itens = [
-            ItemEmTransito(
-                pedido_id=pedido.id,
-                fornecedor_id=pedido.fornecedor_id,
-                status=cast(StatusEmTransito, pedido.status),
-                quantidade_pendente=i.quantidade - i.quantidade_recebida,
-                data_prevista_entrega=pedido.data_prevista_entrega,
+        por_sku: dict[UUID, list[ItemEmTransito]] = defaultdict(list)
+        for i in self.itens_pedido_compra:
+            pedido = pedidos.get(i.pedido_id)
+            if pedido is None or i.quantidade <= i.quantidade_recebida or not filtro(i):
+                continue
+            por_sku[i.sku_id].append(
+                ItemEmTransito(
+                    pedido_id=pedido.id,
+                    fornecedor_id=pedido.fornecedor_id,
+                    status=cast(StatusEmTransito, pedido.status),
+                    quantidade_pendente=i.quantidade - i.quantidade_recebida,
+                    data_prevista_entrega=pedido.data_prevista_entrega,
+                )
             )
-            for i in self.itens_pedido_compra
-            if i.sku_id == sku_id
-            and i.quantidade > i.quantidade_recebida
-            and (pedido := pedidos.get(i.pedido_id)) is not None
-        ]
-        return sorted(
-            itens,
-            key=lambda i: (
-                i.data_prevista_entrega is None,
-                i.data_prevista_entrega or date.min,
-                i.pedido_id,
-            ),
-        )
+        for itens in por_sku.values():
+            itens.sort(
+                key=lambda i: (
+                    i.data_prevista_entrega is None,
+                    i.data_prevista_entrega or date.min,
+                    i.pedido_id,
+                )
+            )
+        return por_sku
 
     def itens_de_pedido_de(self, sku_code: str) -> list[ItemDePedido]:
         sku_id = self._sku_id(sku_code)
@@ -164,3 +173,51 @@ class InMemoryERPAdapter(ERPAdapter):
             if i.sku_id == sku_id and (pedido := pedidos.get(i.pedido_id)) is not None
         ]
         return sorted(itens, key=lambda i: (i.criado_em, str(i.pedido_id)), reverse=True)
+
+    def _ativos(self) -> dict[UUID, str]:
+        return {s.id: s.sku_code for s in self.skus if s.ativo}
+
+    def estoques(self) -> dict[str, Estoque]:
+        ativos = set(self._ativos().values())
+        return {codigo: e for codigo, e in self.estoques_por_sku.items() if codigo in ativos}
+
+    def giros(self, desde: datetime) -> dict[str, list[VendasDoMes]]:
+        somas: dict[str, dict[tuple[int, int], list[Venda]]] = defaultdict(lambda: defaultdict(list))
+        for codigo, venda in self._vendas_ativas(desde):
+            data = venda.data.astimezone(UTC)
+            somas[codigo][(data.year, data.month)].append(venda)
+        return {
+            codigo: [
+                VendasDoMes(
+                    ano=ano,
+                    mes=mes,
+                    quantidade=sum(v.quantidade for v in vendas),
+                    primeira_venda=min(v.data for v in vendas),
+                )
+                for (ano, mes), vendas in sorted(meses.items())
+            ]
+            for codigo, meses in somas.items()
+        }
+
+    def vendas_diarias(self, desde: datetime) -> dict[str, list[VendasDoDia]]:
+        somas: dict[str, dict[date, int]] = defaultdict(lambda: defaultdict(int))
+        for codigo, venda in self._vendas_ativas(desde):
+            somas[codigo][venda.data.astimezone(UTC).date()] += venda.quantidade
+        return {
+            codigo: [VendasDoDia(dia=dia, quantidade=q) for dia, q in sorted(dias.items())]
+            for codigo, dias in somas.items()
+        }
+
+    def _vendas_ativas(self, desde: datetime) -> Iterator[tuple[str, Venda]]:
+        ativos = self._ativos()
+        for venda in self.vendas:
+            if venda.sku_id in ativos and venda.data >= desde:
+                yield ativos[venda.sku_id], venda
+
+    def fornecedores_por_sku(self) -> dict[str, list[FornecedorParaSKU]]:
+        por_sku = {codigo: self.fornecedores_de(codigo) for codigo in self._ativos().values()}
+        return {codigo: lista for codigo, lista in por_sku.items() if lista}
+
+    def itens_em_transito(self) -> dict[str, list[ItemEmTransito]]:
+        ativos = self._ativos()
+        return {ativos[sku_id]: itens for sku_id, itens in self._em_transito(lambda i: i.sku_id in ativos).items()}

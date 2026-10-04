@@ -56,6 +56,7 @@ def ficha(*, giro: float = 45.333, cobertura: float | None = 2.72, fornecedores=
         fornecedores=[make_fornecedor_sku(KATRINA, preco_unitario_reais=123456, lead_time_dias_observado=62)]
         if fornecedores is None
         else fornecedores,
+        primeira_venda=datetime(2025, 1, 10, tzinfo=UTC),
     )
 
 

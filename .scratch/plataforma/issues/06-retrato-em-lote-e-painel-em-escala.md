@@ -4,13 +4,17 @@
 
 **Blocked by:** 02, 05
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** `.scratch/plataforma/spec.md` (seção "Escala: leitura em lote e filtros")
 
-- [ ] A porta do ERP ganha `estoques()`, `giros(desde)` (soma por SKU e mês), `vendas_diarias(desde)` (soma por SKU e dia), `fornecedores_por_sku()` e `itens_em_transito()`, nas duas implementações.
-- [ ] `purchasing.sugerir_pedidos(retrato)` e `sugerir_pedido(sku)` montando um retrato de um SKU só, para os dois caminhos usarem a mesma conta.
-- [ ] O painel usa o retrato. O número de consultas ao banco não depende do número de SKUs (teste que conta as consultas com um listener do SQLAlchemy).
-- [ ] Contrato das leituras em lote rodando contra o adapter em memória e o Postgres, e teste de que o retrato e a leitura por SKU dão a mesma sugestão de pedido para os mesmos dados.
-- [ ] Script de benchmark com `--skus 5000` do seed, com o tempo de `GET /painel` registrado no ticket.
-- [ ] Typecheck e suíte completa verdes.
+- [x] A porta do ERP ganha `estoques()`, `giros(desde)` (soma por SKU e mês), `vendas_diarias(desde)` (soma por SKU e dia), `fornecedores_por_sku()` e `itens_em_transito()`, nas duas implementações.
+- [x] `purchasing.sugerir_pedidos(retrato)` e `sugerir_pedido(sku)` montando um retrato de um SKU só, para os dois caminhos usarem a mesma conta.
+- [x] O painel usa o retrato. O número de consultas ao banco não depende do número de SKUs (teste que conta as consultas com um listener do SQLAlchemy).
+- [x] Contrato das leituras em lote rodando contra o adapter em memória e o Postgres, e teste de que o retrato e a leitura por SKU dão a mesma sugestão de pedido para os mesmos dados.
+- [x] Script de benchmark com `--skus 5000` do seed, com o tempo de `GET /painel` registrado no ticket.
+- [x] Typecheck e suíte completa verdes.
+
+## Comments
+
+**2026-10-04 (agente):** porta do ERP com `estoques()`, `giros(desde)`, `vendas_diarias(desde)`, `fornecedores_por_sku()` e `itens_em_transito()` nas duas implementações: uma consulta cada, só SKUs ativos, dicionários por `sku_code` (SKU sem nada fica fora). Mês e dia em UTC. `VendasDoMes` e `VendasDoDia` (em `sales.schemas`) são dataclasses, não pydantic: com 5.000 SKUs são 127 mil meses e a validação custava 0,3 s. `VendasDoMes` traz também a `primeira_venda` do mês: o SKU novo compara a primeira venda exata com `dias_historico_minimo`, que não tem teto, então `giros` lê o histórico inteiro (`desde` = época) e a primeira venda sai do primeiro mês. O retrato mora no `ficha_sku`: `Retrato(skus, fichas)` com as fichas de todos os SKUs ativos (`FichaSKU.retrato()`, 5 leituras em lote) ou de um só (`retrato_de(sku)`, as leituras por SKU); SKU sem linha de estoque fica sem ficha. `Ficha` ganhou `primeira_venda`. `Purchasing.sugerir_pedidos(retrato)` faz a conta; `sugerir_pedido(sku)` passa pelo `retrato_de`. O giro saiu para `Sales.giro(vendas_por_mes)`, usado pelos dois caminhos (`vendas_por_mes(sku)` soma as vendas em Python; `vendas_por_mes_de_todos()` usa `giros`), e a cobertura para `inventory.cobertura(disponivel, giro)`. Construtores mudaram: `Purchasing(catalog, ficha_sku, politicas, erp)` e `Painel(catalog, ficha_sku, purchasing, ...)`. No `InMemoryERPAdapter` os atributos `estoques` e `fornecedores_por_sku` viraram `estoques_por_sku` e `vinculos` (os nomes eram dos métodos novos); os parâmetros do construtor não mudaram. Testes: contrato em lote (`src/erp_adapter/tests/test_contrato_lote.py`), retrato igual à leitura por SKU com os dois lead times (`src/purchasing/tests/test_retrato.py`), ambos em memória e Postgres via `tests/erp_no_banco.py` (grava os dados de um `InMemoryERPAdapter` no schema `erp` ao lado do seed e apaga no fim, reaproveitável), e `src/api/tests/test_painel_em_escala.py`, que conta as consultas de `GET /painel` com um listener do SQLAlchemy antes e depois de 30 SKUs a mais (9 consultas). **Benchmark** (`uv run python -m scripts.benchmark_painel --skus 5000 --vezes 10`, Postgres local, 5.085 SKUs ativos, 1,25 milhão de vendas): 9 consultas, primeira chamada 1,09 s, mediana 0,90 s, máxima 1,21 s. Com 85 SKUs: 0,03 s. O que mais pesa é o `giros` (0,5 s: 0,3 s de agregação no banco). Para os próximos: o ticket 07 filtra sobre o mesmo retrato (`FichaSKU.retrato()` + `sugerir_pedidos`); `vendas_diarias` está pronto para a queda de venda e não entra no retrato do painel. O `Inventory.abaixo_do_piso` continua por SKU (ninguém do painel usa). Banco local voltou ao seed padrão (reset do README). Suíte com 921 testes verde; pyright com os mesmos 79 erros por arquivo.

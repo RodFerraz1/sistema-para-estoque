@@ -1,7 +1,8 @@
 """DTOs de domínio do módulo `sales`."""
 from __future__ import annotations
 
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -18,6 +19,27 @@ class Venda(BaseModel):
     valor_unitario_reais: int
     data: datetime
     cliente_ref: str
+
+
+# `VendasDoMes` e `VendasDoDia` são dataclasses, não modelos pydantic: o retrato do estoque
+# inteiro traz centenas de milhares delas e a validação pesa no tempo do painel.
+@dataclass(frozen=True, slots=True)
+class VendasDoMes:
+    """Soma das vendas de um SKU num mês, em UTC. `primeira_venda` é a data da primeira
+    venda do mês: com o histórico inteiro, a do primeiro mês é a primeira venda do SKU."""
+
+    ano: int
+    mes: int
+    quantidade: int
+    primeira_venda: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class VendasDoDia:
+    """Soma das vendas de um SKU num dia, em UTC."""
+
+    dia: date
+    quantidade: int
 
 
 class GiroMedioMensal(BaseModel):

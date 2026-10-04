@@ -1,10 +1,11 @@
 """Módulo `sales`: sabe sobre venda, giro, sazonalidade."""
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import UTC, datetime
 
 from src.erp_adapter.port import ERPAdapter
-from src.sales.schemas import GiroMedioMensal, Sazonalidade, Venda, VendaMensal
+from src.sales.schemas import GiroMedioMensal, Sazonalidade, Venda, VendaMensal, VendasDoMes
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -31,8 +32,21 @@ def _add_months(dt: datetime, months: int) -> datetime:
     return dt.replace(year=year, month=month)
 
 
-def _months_between(inicio: datetime, fim: datetime) -> int:
-    return (fim.year - inicio.year) * 12 + (fim.month - inicio.month)
+def _somar_por_mes(vendas: list[Venda]) -> list[VendasDoMes]:
+    """A mesma soma de `ERPAdapter.giros`, feita sobre as vendas de um SKU."""
+    por_mes: dict[tuple[int, int], list[Venda]] = defaultdict(list)
+    for v in vendas:
+        data = v.data.astimezone(UTC)
+        por_mes[(data.year, data.month)].append(v)
+    return [
+        VendasDoMes(
+            ano=ano,
+            mes=mes,
+            quantidade=sum(v.quantidade for v in do_mes),
+            primeira_venda=min(v.data for v in do_mes),
+        )
+        for (ano, mes), do_mes in sorted(por_mes.items())
+    ]
 
 
 class Sales:
@@ -57,22 +71,34 @@ class Sales:
         return [v for v in todas if v.data < fim], janela_inicio, fim
 
     def giro_medio_mensal(self, sku_code: str, meses: int = 6) -> GiroMedioMensal:
-        fim = _start_of_month(self._agora())
-        janela_inicio = _subtract_months(fim, meses)
+        return self.giro(self.vendas_por_mes(sku_code), meses)
 
-        todas = self._erp.vendas_de(sku_code, _EPOCH)
-        fechadas = [v for v in todas if v.data < fim]
-        if not fechadas:
+    def vendas_por_mes(self, sku_code: str) -> list[VendasDoMes]:
+        """O histórico inteiro do SKU somado por mês, do mais antigo ao mais recente."""
+        return _somar_por_mes(self._erp.vendas_de(sku_code, _EPOCH))
+
+    def vendas_por_mes_de_todos(self) -> dict[str, list[VendasDoMes]]:
+        """`vendas_por_mes` dos SKUs ativos numa leitura só. SKU sem venda fica de fora."""
+        return self._erp.giros(_EPOCH)
+
+    def giro(self, vendas_por_mes: list[VendasDoMes], meses: int = 6) -> GiroMedioMensal:
+        """Média dos `meses` fechados antes do mês corrente. Com menos histórico que isso,
+        divide pelos meses desde a primeira venda fechada."""
+        fim = _start_of_month(self._agora().astimezone(UTC))
+        janela_inicio = _subtract_months(fim, meses)
+        mes_corrente = (fim.year, fim.month)
+        inicio_da_janela = (janela_inicio.year, janela_inicio.month)
+        fechados = [m for m in vendas_por_mes if (m.ano, m.mes) < mes_corrente]
+        if not fechados:
             return GiroMedioMensal(
                 unidades_por_mes=0.0, meses_considerados=0, total_unidades=0
             )
 
-        primeira = min(v.data for v in fechadas)
-        meses_disponiveis = _months_between(_start_of_month(primeira), fim)
+        primeiro = fechados[0]
+        meses_disponiveis = (fim.year - primeiro.ano) * 12 + (fim.month - primeiro.mes)
         divisor = max(1, min(meses, meses_disponiveis))
 
-        na_janela = [v for v in fechadas if v.data >= janela_inicio]
-        total = sum(v.quantidade for v in na_janela)
+        total = sum(m.quantidade for m in fechados if (m.ano, m.mes) >= inicio_da_janela)
         return GiroMedioMensal(
             unidades_por_mes=total / divisor,
             meses_considerados=divisor,

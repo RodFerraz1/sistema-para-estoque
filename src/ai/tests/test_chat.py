@@ -123,13 +123,13 @@ def copilot(
     inventory = Inventory(adapter, sales)
     ficha_sku = FichaSKU(catalog, inventory, sales)
     politicas = InMemoryPoliticaCompraRepositorio(now=NOW)
-    purchasing = Purchasing(catalog, ficha_sku, inventory, sales, politicas, adapter, now=NOW)
+    purchasing = Purchasing(catalog, ficha_sku, politicas, adapter, now=NOW)
     repositorio_avisos = InMemoryAvisosRepositorio()
     for aviso in avisos:
         repositorio_avisos.gravar(aviso)
     painel = Painel(
         catalog,
-        inventory,
+        ficha_sku,
         purchasing,
         politicas,
         repositorio_avisos,
