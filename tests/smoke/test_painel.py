@@ -14,6 +14,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
+from scripts.seed import (
+    QUEDA_SEM_ESTOQUE,
+    RUPTURA_COM_PEDIDO_ATRASADO,
+    RUPTURA_SEM_PEDIDO,
+    TAPETE_MARROM,
+)
 from src.api.schemas import (
     AvisoResponse,
     DecisaoCompraResponse,
@@ -87,6 +93,16 @@ def test_aviso_painel_e_decisao_contra_o_seed(
     assert next(d for d in depois.decididos if d.sku_code == sku_code).decisao == decisao
     assert client.get(f"/skus/{sku_code}/avisos").json() == []
     assert client.get(f"/skus/{sku_code}/decisoes").json()[0]["id"] == str(decisao.id)
+
+
+def test_cenarios_de_ruptura_do_seed_no_painel(client: TestClient) -> None:
+    alertas = {i.sku_code: i for i in _painel(client).alertas}
+
+    for sku_code in (RUPTURA_SEM_PEDIDO, RUPTURA_COM_PEDIDO_ATRASADO, QUEDA_SEM_ESTOQUE):
+        assert "abaixo_do_piso_alerta" in alertas[sku_code].motivos
+    assert alertas[QUEDA_SEM_ESTOQUE].disponivel == 0
+    assert alertas[RUPTURA_SEM_PEDIDO].fornecedor_sugerido == "Katrina Têxtil"
+    assert TAPETE_MARROM not in alertas
 
 
 def test_precos_contra_o_seed(client: TestClient) -> None:

@@ -41,7 +41,7 @@ def test_analise_sku_shape(client: TestClient, sku_code: str) -> None:
     analise = AnaliseSKUResponse.model_validate(response.json())
     assert analise.sku_code == sku_code
     assert analise.produto_nome
-    assert analise.categoria in {"felpudo", "jogo_cama", "mesa", "cozinha"}
+    assert analise.categoria in {"felpudo", "jogo_cama", "mesa", "cozinha", "banho"}
     assert analise.estoque.quantidade_disponivel >= 0
     assert analise.giro.meses_considerados >= 0
     assert analise.giro.unidades_por_mes >= 0

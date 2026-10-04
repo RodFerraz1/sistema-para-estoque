@@ -7,6 +7,7 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from scripts.seed import RUPTURA_SEM_PEDIDO
 from src.ai.dependencies import get_redator
 from src.ai.redator import RedatorSemLLM
 from src.api.schemas import RegistroDecisaoResponse, RespostaChatResponse, SinalCorpusResponse
@@ -14,8 +15,8 @@ from src.main import app
 
 pytestmark = [pytest.mark.smoke, pytest.mark.externo]
 
-# Com o lead time ignorado (ADR-0006), é um SKU da Katrina que o seed ainda manda comprar.
-SKU_DA_KATRINA = "JDCP-BRAN-CASAL-01"
+# Cenário do seed: em ruptura, sem pedido, com a Katrina como fornecedor mais barato.
+SKU_DA_KATRINA = RUPTURA_SEM_PEDIDO
 ATRASO_DA_KATRINA = "Os documentos relatam atraso de entrega da Katrina Têxtil."
 
 

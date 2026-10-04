@@ -23,7 +23,8 @@ docker compose up -d
 # 2. Aplica migrations (uma vez, ou sempre que houver nova)
 uv run alembic upgrade head
 
-# 3. Popula o ERP fake com dados sintéticos reprodutíveis
+# 3. Popula o ERP fake com dados sintéticos até hoje, com os cenários da demo no topo do
+#    scripts/seed.py (--skus 5000 acrescenta SKUs sintéticos, para medir escala)
 uv run python -m scripts.seed
 
 # 4. Ingere o corpus em copilot.trechos_corpus (idempotente: só reprocessa documento novo ou alterado)
