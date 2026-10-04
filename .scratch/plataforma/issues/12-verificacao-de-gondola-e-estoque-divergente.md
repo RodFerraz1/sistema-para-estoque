@@ -4,14 +4,18 @@
 
 **Blocked by:** 10, 11
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** `.scratch/plataforma/spec.md` (seções "Repositor: queda de venda e verificação de gôndola" e "Episódios de alerta e notificações")
 
-- [ ] Tabela `verificacoes_gondola` com o disponível do ERP no momento e o `usuario_id`. `POST` e `GET /skus/{sku_code}/verificacoes`.
-- [ ] Regra de saída e volta do painel do repositor conforme a spec.
-- [ ] `MotivoAlerta` ganha `estoque_divergente`, ligado na versão padrão por migration. O episódio fecha com uma decisão de compra no SKU ou quando o disponível do ERP muda.
-- [ ] A varredura passa a abrir episódios `queda_de_venda` (para `reposicao`, exceto SKU verificado no dia) e `estoque_divergente` (para `comprador`).
-- [ ] UI: os três botões e o comentário nos cards do repositor. Na tela do SKU do comprador, o bloco de verificações. No painel do comprador, o grupo ou o selo de estoque divergente.
-- [ ] Testes HTTP: a verificação do dia tira o SKU, um dia aberto a mais parado traz de volta, `sem_estoque_no_deposito` gera estoque divergente, a decisão de compra fecha. Contrato do repositório em memória e no Postgres.
-- [ ] Verificado no navegador. Typecheck e suíte completa verdes.
+- [x] Tabela `verificacoes_gondola` com o disponível do ERP no momento e o `usuario_id`. `POST` e `GET /skus/{sku_code}/verificacoes`.
+- [x] Regra de saída e volta do painel do repositor conforme a spec.
+- [x] `MotivoAlerta` ganha `estoque_divergente`, ligado na versão padrão por migration. O episódio fecha com uma decisão de compra no SKU ou quando o disponível do ERP muda.
+- [x] A varredura passa a abrir episódios `queda_de_venda` (para `reposicao`, exceto SKU verificado no dia) e `estoque_divergente` (para `comprador`).
+- [x] UI: os três botões e o comentário nos cards do repositor. Na tela do SKU do comprador, o bloco de verificações. No painel do comprador, o grupo ou o selo de estoque divergente.
+- [x] Testes HTTP: a verificação do dia tira o SKU, um dia aberto a mais parado traz de volta, `sem_estoque_no_deposito` gera estoque divergente, a decisão de compra fecha. Contrato do repositório em memória e no Postgres.
+- [x] Verificado no navegador. Typecheck e suíte completa verdes.
+
+## Comments
+
+**2026-10-04 (agente):** `reposicao` ganhou `VerificacoesRepositorio` (em memória e Postgres, contrato em `src/reposicao/tests/`), `Reposicao.registrar_verificacao/verificacoes/ultimas_verificacoes/varrer_episodios` e recebe `Notificacoes`. Migration `0020_verificacoes_gondola`: tabela `copilot.verificacoes_gondola` (resultado com check, `disponivel_no_erp`, `verificado_por` com o nome, como `cobrado_por`, e `usuario_id` obrigatório) e `estoque_divergente` em `MotivoAlerta`, ligado na v1 padrão. Rotas em `src/api/reposicao.py`: `POST /skus/{sku}/verificacoes` (só `reposicao`, 404/422 como o aviso) e `GET` (comprador e repositor). Saída e volta (igual ao protótipo): o SKU fica fora do painel do repositor enquanto o dia da verificação mais recente for igual ou posterior ao último dia da janela, ou seja, volta quando um dia aberto inteiro depois do dia da verificação fecha ainda com queda (verificado na segunda, volta na quarta se segunda e terça ficaram paradas; domingo sem venda não conta). O episódio `queda_de_venda` usa exatamente a lista do painel, então "verificado no dia" virou "verificado sem um dia aberto inteiro depois", e o SKU que volta notifica de novo. Estoque divergente fica no `painel` (que tem as decisões): verificação mais recente `sem_estoque_no_deposito`, disponível no ERP > 0 na hora, sem decisão depois e com o disponível de agora igual ao da verificação; grupo novo `estoque_divergente` logo depois dos pedidos das vendas (como no protótipo), `ItemAlerta.estoque_divergente` com a verificação. Decisão vigente anterior à verificação mantém o SKU nos decididos (como no protótipo), mas o episódio abre. `GET /notificacoes` varre a queda de venda quando o usuário tem `reposicao`; a varredura do comprador lê o retrato uma vez para ruptura e estoque divergente. `SKUNaoEncontrado`/`SKUInativo` foram para `catalog.service` (o `painel` reimporta). UI: três botões e comentário nos cards do repositor (recado de sucesso e o card some), bloco "Verificações de gôndola" na tela do SKU, grupo e recado "Não achou no depósito" no painel do comprador, tipos `queda_de_venda` (link para `reposicao.html?busca=`) e `estoque_divergente` em `notificacoes.js`, opção na pergunta 10 da política. Escala: `/painel` com 13 consultas; `PostgresERPAdapter.vendas_diarias` passou a trazer uma linha por SKU com arrays (dias como deslocamento inteiro), e a leitura caiu de ~0,33 s para ~0,2 s com 5.085 SKUs; benchmark: mediana 1,22 s (antes 1,44 s nesta máquina). `GET /notificacoes` com todos os papéis faz até 22 consultas fixas. README: o reset também esvazia `copilot.verificacoes_gondola`. Smoke novo: verificação do tapete vira estoque divergente (restaura os episódios no fim). **Para o ticket 14:** a verificação é o lugar de fechar o aviso de gôndola vazia e notificar a vendedora (`Reposicao.registrar_verificacao`); "`sem_estoque_no_deposito` com disponível zero não vira estoque divergente" já vale. Banco local no seed padrão, sem episódios nem verificações. Suíte com 1113 testes verde; pyright com os mesmos 79 erros por arquivo.

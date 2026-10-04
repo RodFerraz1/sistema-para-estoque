@@ -12,6 +12,18 @@ from src.catalog.schemas import SKU, FornecedorParaSKU
 from src.erp_adapter.port import ERPAdapter
 
 
+class SKUNaoEncontrado(LookupError):
+    def __init__(self, sku_code: str) -> None:
+        super().__init__(f"SKU '{sku_code}' não encontrado")
+        self.sku_code = sku_code
+
+
+class SKUInativo(ValueError):
+    def __init__(self, sku_code: str) -> None:
+        super().__init__(f"O SKU '{sku_code}' está inativo: o atacadista não compra mais.")
+        self.sku_code = sku_code
+
+
 def _normalizar(texto: str) -> str:
     sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
     return sem_acento.casefold()

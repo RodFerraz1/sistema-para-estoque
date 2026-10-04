@@ -1086,6 +1086,11 @@ a.item::after {
   font-style: italic;
 }
 
+.recado.repositor {
+  background: var(--urgente-fundo);
+  border-color: #fecaca;
+}
+
 .vazio {
   text-align: center;
   padding: 48px 24px;
@@ -1823,7 +1828,46 @@ input[type="search"],
   gap: 8px;
 }
 
+.verificar {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--borda);
+}
+
+.verificar label {
+  font-size: 0.9rem;
+}
+
+.verificar label .suave {
+  font-weight: 400;
+}
+
+.resultados-verificacao {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.resultados-verificacao button {
+  min-height: 48px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.verificar .mensagem {
+  margin: 10px 0 0;
+}
+
 @media (max-width: 760px) {
+  .resultados-verificacao {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .resultados-verificacao .repus {
+    grid-column: 1 / -1;
+  }
+
   .filtros.filtros-repositor {
     grid-template-columns: 1fr;
   }

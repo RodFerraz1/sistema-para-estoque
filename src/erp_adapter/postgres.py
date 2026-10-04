@@ -6,7 +6,7 @@ produto no `SKU` para evitar N+1 nos consumidores.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import text
@@ -333,29 +333,40 @@ class PostgresERPAdapter(ERPAdapter):
         return dict(por_sku)
 
     def vendas_diarias(self, desde: datetime) -> dict[str, list[VendasDoDia]]:
+        # Uma linha por SKU, com os dias como deslocamento inteiro desde `inicio`: trazer uma
+        # linha por SKU e dia, com o código e a data em cada uma, custava o dobro com 5.000 SKUs.
+        inicio = desde.astimezone(UTC).date()
         with self._engine.connect() as conn:
             rows = conn.execute(
                 text(
                     """
-                    SELECT s.sku_code, d.dia, d.quantidade
+                    SELECT s.sku_code, d.dias, d.quantidades
                     FROM (
-                        SELECT v.sku_id, (v.data AT TIME ZONE 'UTC')::date AS dia,
-                               sum(v.quantidade) AS quantidade
-                        FROM erp.vendas v
-                        WHERE v.data >= :desde
-                        GROUP BY v.sku_id, dia
+                        SELECT sku_id, array_agg(dia - :inicio ORDER BY dia) AS dias,
+                               array_agg(quantidade ORDER BY dia) AS quantidades
+                        FROM (
+                            SELECT v.sku_id, (v.data AT TIME ZONE 'UTC')::date AS dia,
+                                   sum(v.quantidade)::int AS quantidade
+                            FROM erp.vendas v
+                            WHERE v.data >= :desde
+                            GROUP BY v.sku_id, dia
+                        ) por_dia
+                        GROUP BY sku_id
                     ) d
                     JOIN erp.skus s ON s.id = d.sku_id
                     WHERE s.ativo = TRUE
-                    ORDER BY d.sku_id, d.dia
                     """
                 ),
-                {"desde": desde},
+                {"desde": desde, "inicio": inicio},
             ).all()
-        por_sku: dict[str, list[VendasDoDia]] = defaultdict(list)
-        for sku_code, dia, quantidade in rows:
-            por_sku[sku_code].append(VendasDoDia(dia, quantidade))
-        return dict(por_sku)
+        datas: dict[int, date] = {}
+        return {
+            sku_code: [
+                VendasDoDia(datas.get(n) or datas.setdefault(n, inicio + timedelta(days=n)), quantidade)
+                for n, quantidade in zip(dias, quantidades)
+            ]
+            for sku_code, dias, quantidades in rows
+        }
 
     def fornecedores_por_sku(self) -> dict[str, list[FornecedorParaSKU]]:
         with self._engine.connect() as conn:

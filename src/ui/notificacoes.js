@@ -8,6 +8,12 @@ const TIPOS = {
   ruptura: { rotulo: "Ruptura", classe: "urgente", grupo: ["SKU entrou em ruptura", "SKUs entraram em ruptura"] },
   entrega_atrasada: { rotulo: "Entrega atrasada", classe: "destaque", grupo: ["entrega atrasou", "entregas atrasaram"] },
   aviso: { rotulo: "Aviso das vendas", classe: "vendas", grupo: ["aviso da equipe de vendas", "avisos da equipe de vendas"] },
+  estoque_divergente: { rotulo: "Estoque divergente", classe: "urgente", grupo: ["estoque divergente", "estoques divergentes"] },
+  queda_de_venda: {
+    rotulo: "Parou de vender",
+    classe: "urgente",
+    grupo: ["SKU parou de vender com estoque", "SKUs pararam de vender com estoque"],
+  },
 };
 
 const SINO = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`;
@@ -41,6 +47,20 @@ function conteudoDe(n) {
       href: `sku.html?sku=${encodeURIComponent(n.sku_code)}`,
       titulo: `${d.avisado_por} avisou: ${nomeDoSku(d)} ${d.tipo === "acabou" ? "acabou" : "está vendendo muito"}`,
       linha: d.comentario ? `"${d.comentario}"` : null,
+    };
+  }
+  if (n.tipo === "estoque_divergente") {
+    return {
+      href: `sku.html?sku=${encodeURIComponent(n.sku_code)}`,
+      titulo: `${d.verificado_por} não achou ${nomeDoSku(d)} no depósito`,
+      linha: `O ERP dizia ${numero(d.disponivel_no_erp)} un.${d.comentario ? ` · "${d.comentario}"` : ""}`,
+    };
+  }
+  if (n.tipo === "queda_de_venda") {
+    return {
+      href: `reposicao.html?busca=${encodeURIComponent(n.sku_code)}`,
+      titulo: `${nomeDoSku(d)} parou de vender. Gôndola vazia?`,
+      linha: `Vendia ${numero(d.venda_diaria_base, 1)} por dia, vendeu ${numero(d.vendido_na_janela)} em ${d.dias_observados} dias · ${numero(d.disponivel)} no estoque (ERP)`,
     };
   }
   return { href: n.sku_code ? `sku.html?sku=${encodeURIComponent(n.sku_code)}` : null, titulo: n.tipo.replaceAll("_", " "), linha: null };

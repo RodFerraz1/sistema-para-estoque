@@ -29,6 +29,53 @@ function frase(item) {
   return `Vendia ${porDia(item.venda_diaria_base)} por dia. Vendeu ${emSequencia(dias)}.`;
 }
 
+const RESULTADOS = [
+  { resultado: "repus", texto: "Repus", classe: "primario repus" },
+  { resultado: "estava_na_gondola", texto: "Estava na gôndola" },
+  { resultado: "sem_estoque_no_deposito", texto: "Não tem no depósito" },
+];
+
+function recadoDoResultado(item, resultado) {
+  const nome = `${item.produto_nome} ${item.cor}`;
+  if (resultado === "sem_estoque_no_deposito") {
+    return `${nome}: a compradora vai saber que o ERP diz ${numero(item.disponivel)} un. e o depósito não tem.`;
+  }
+  const feito = resultado === "repus" ? "reposto" : "estava na gôndola";
+  return `${nome}: ${feito}. Sai da lista e só volta se passar mais um dia inteiro sem vender.`;
+}
+
+function verificacao(item) {
+  const id = `comentario-${item.sku_code}`;
+  const comentario = el("input", { id, type: "text", maxlength: "2000", placeholder: "Ex.: estava no lugar errado" });
+  const erro = el("div", {});
+  const botoes = RESULTADOS.map(({ resultado, texto, classe }) => {
+    const botao = el("button", { type: "button", class: classe ?? "" }, texto);
+    botao.addEventListener("click", async () => {
+      botoes.forEach((b) => (b.disabled = true));
+      try {
+        await api("POST", `/skus/${encodeURIComponent(item.sku_code)}/verificacoes`, {
+          resultado,
+          comentario: comentario.value.trim() || null,
+        });
+        recadoDaVerificacao = recadoDoResultado(item, resultado);
+        await carregar();
+      } catch (e) {
+        erro.replaceChildren(mensagem("erro", `Não foi registrado: ${e.message}`));
+        botoes.forEach((b) => (b.disabled = false));
+      }
+    });
+    return botao;
+  });
+  return el(
+    "div",
+    { class: "verificar" },
+    el("label", { for: id }, "O que você achou? ", el("span", { class: "suave" }, "Comentário opcional")),
+    comentario,
+    el("div", { class: "resultados-verificacao" }, botoes),
+    erro,
+  );
+}
+
 function cartao(item) {
   const perdidas = Math.round(item.venda_perdida);
   return el(
@@ -54,6 +101,7 @@ function cartao(item) {
       el("div", {}, el("dt", {}, `Vendeu em ${item.ultimos_dias.length} dias`), el("dd", {}, numero(item.vendido_na_janela))),
       el("div", {}, el("dt", {}, "No estoque (ERP)"), el("dd", {}, `${numero(item.disponivel)} un.`)),
     ),
+    verificacao(item),
   );
 }
 
@@ -77,23 +125,31 @@ function vazio() {
 
 function mostrar(painel) {
   const itens = painel.quedas_de_venda;
+  const recado = recadoDaVerificacao;
+  recadoDaVerificacao = null;
   conteudo.replaceChildren(
     el(
-      "section",
-      { class: "grupo", "aria-labelledby": "t-quedas" },
+      "div",
+      {},
+      recado ? mensagem("sucesso", recado) : null,
       el(
-        "header",
-        {},
-        el("h2", { id: "t-quedas" }, "Pararam de vender e têm estoque"),
-        el("span", { class: "contagem" }, String(itens.length)),
-        el("p", { class: "suave" }, "Vendiam todo dia e quase não venderam desde então. Veja se estão na gôndola. Quem perde mais venda vem primeiro."),
+        "section",
+        { class: "grupo", "aria-labelledby": "t-quedas" },
+        el(
+          "header",
+          {},
+          el("h2", { id: "t-quedas" }, "Pararam de vender e têm estoque"),
+          el("span", { class: "contagem" }, String(itens.length)),
+          el("p", { class: "suave" }, "Vendiam todo dia e quase não venderam desde então. Veja se estão na gôndola e diga o que achou. Quem perde mais venda vem primeiro."),
+        ),
+        itens.length ? el("div", { class: "itens" }, itens.map(cartao)) : vazio(),
       ),
-      itens.length ? el("div", { class: "itens" }, itens.map(cartao)) : vazio(),
     ),
   );
 }
 
 let ultimaConsulta = 0;
+let recadoDaVerificacao = null;
 
 async function carregar() {
   const consulta = guardarNaUrl(filtros.valores());

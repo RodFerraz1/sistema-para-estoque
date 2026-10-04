@@ -85,7 +85,7 @@ def test_faz_o_mesmo_numero_de_consultas_com_mais_skus(client: TestClient, rota:
         depois = _consultas(client, rota)
 
     assert depois == antes
-    assert antes <= 12
+    assert antes <= 13
 
 
 @pytest.fixture
@@ -114,4 +114,4 @@ def test_varredura_das_notificacoes_nao_consulta_por_sku(client: TestClient, sem
 
     assert sem_mudanca_com_mais_skus == sem_mudanca
     assert abrindo == sem_mudanca + 1
-    assert sem_mudanca <= 14
+    assert sem_mudanca <= 22

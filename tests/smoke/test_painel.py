@@ -34,6 +34,7 @@ from src.api.schemas import (
     PainelResponse,
     PrecosResponse,
     SKUResumoResponse,
+    VerificacaoGondolaResponse,
 )
 from src.db.engine import get_engine
 from src.usuarios.schemas import Usuario
@@ -43,7 +44,12 @@ pytestmark = pytest.mark.smoke
 
 @pytest.fixture
 def criados() -> Iterator[dict[str, list[UUID]]]:
-    ids: dict[str, list[UUID]] = {"avisos": [], "decisoes_compra": [], "cobrancas_entrega": []}
+    ids: dict[str, list[UUID]] = {
+        "avisos": [],
+        "decisoes_compra": [],
+        "cobrancas_entrega": [],
+        "verificacoes_gondola": [],
+    }
     yield ids
     with get_engine().begin() as conn:
         conn.execute(
@@ -131,6 +137,51 @@ def test_queda_de_venda_do_seed_vai_para_o_repositor_ou_para_o_comprador(client:
     assert tapete.disponivel > 0
     parou = {i.sku_code for i in _painel(client).alertas if i.parou_de_vender}
     assert parou == {QUEDA_SEM_ESTOQUE}
+
+
+@pytest.fixture
+def episodios_restaurados() -> Iterator[None]:
+    """A varredura do `/notificacoes` abre e fecha episódios do seed inteiro: guarda os do
+    banco e os devolve no fim."""
+    with get_engine().connect() as conn:
+        conn.execute(text("CREATE TEMP TABLE backup_episodios_smoke AS SELECT * FROM copilot.episodios_alerta"))
+        conn.commit()
+        try:
+            yield
+        finally:
+            conn.execute(text("DELETE FROM copilot.episodios_alerta"))
+            conn.execute(text("INSERT INTO copilot.episodios_alerta SELECT * FROM backup_episodios_smoke"))
+            conn.execute(text("DROP TABLE backup_episodios_smoke"))
+            conn.commit()
+
+
+def test_verificacao_do_tapete_vira_estoque_divergente(
+    client: TestClient, criados: dict[str, list[UUID]], usuario_logado: Usuario, episodios_restaurados: None
+) -> None:
+    tipos = {n["tipo"] for n in client.get("/notificacoes").json()["notificacoes"] if n["sku_code"] == TAPETE_MARROM}
+    assert "queda_de_venda" in tipos
+
+    response = client.post(
+        f"/skus/{TAPETE_MARROM}/verificacoes",
+        json={"resultado": "sem_estoque_no_deposito", "comentario": "Smoke."},
+    )
+    assert response.status_code == 201
+    verificacao = VerificacaoGondolaResponse.model_validate(response.json())
+    criados["verificacoes_gondola"].append(verificacao.id)
+    assert verificacao.verificado_por == usuario_logado.nome
+    assert verificacao.disponivel_no_erp > 0
+
+    assert client.get("/reposicao/painel").json()["quedas_de_venda"] == []
+    item = next(i for i in _painel(client).alertas if i.sku_code == TAPETE_MARROM)
+    assert item.grupo == "estoque_divergente"
+    assert item.estoque_divergente == verificacao
+    assert client.get(f"/skus/{TAPETE_MARROM}/verificacoes").json()[0]["id"] == str(verificacao.id)
+    abertos = {
+        n["tipo"]
+        for n in client.get("/notificacoes").json()["notificacoes"]
+        if n["sku_code"] == TAPETE_MARROM and n["fechado_em"] is None
+    }
+    assert abertos == {"estoque_divergente"}
 
 
 def test_precos_contra_o_seed(client: TestClient) -> None:

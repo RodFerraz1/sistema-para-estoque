@@ -7,7 +7,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from src.api.conversores import aviso_to_response, cobranca_to_response, decisao_to_response
+from src.api.conversores import (
+    aviso_to_response,
+    cobranca_to_response,
+    decisao_to_response,
+    verificacao_gondola_to_response,
+)
 from src.api.schemas import (
     AvisoResponse,
     DecisaoCompraResponse,
@@ -79,6 +84,7 @@ def _item_to_response(item: ItemAlerta) -> ItemAlertaResponse:
         so_por_aviso=item.so_por_aviso,
         grupo=item.grupo,
         parou_de_vender=item.parou_de_vender,
+        estoque_divergente=verificacao_gondola_to_response(item.estoque_divergente) if item.estoque_divergente else None,
     )
 
 

@@ -195,6 +195,8 @@ PAPEIS_POR_ROTA: dict[tuple[str, str], set[Papel]] = {
     ("GET", "/skus"): {"comprador", "vendas", "reposicao"},
     ("POST", "/avisos"): {"vendas"},
     ("GET", "/reposicao/painel"): {"reposicao"},
+    ("POST", "/skus/{sku_code}/verificacoes"): {"reposicao"},
+    ("GET", "/skus/{sku_code}/verificacoes"): {"comprador", "reposicao"},
     ("GET", "/categorias"): {"comprador", "reposicao"},
     ("GET", "/usuarios"): {"admin"},
     ("POST", "/usuarios"): {"admin"},

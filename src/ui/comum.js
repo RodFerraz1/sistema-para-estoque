@@ -180,6 +180,7 @@ export const MOTIVOS = {
   abaixo_pedido_minimo: "Abaixo do pedido mínimo",
   periodo_sazonal: "Chega em data forte",
   entrega_atrasada: "Entrega atrasada",
+  estoque_divergente: "Estoque divergente",
 };
 
 const MOTIVOS_URGENTES = ["abaixo_do_piso_alerta", "ruptura_antes_da_chegada"];
@@ -316,6 +317,12 @@ export function guardarNaUrl(parametros) {
 }
 
 export const TIPOS_DE_AVISO = { acabou: "Acabou", vendendo_muito: "Vendendo muito" };
+
+export const TIPOS_DE_VERIFICACAO = {
+  repus: "Repôs a gôndola",
+  estava_na_gondola: "Estava na gôndola",
+  sem_estoque_no_deposito: "Não achou no depósito",
+};
 
 export const TIPOS_DE_DECISAO = {
   vou_comprar: "Vou comprar",

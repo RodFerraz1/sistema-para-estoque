@@ -40,6 +40,7 @@ from src.painel.service import Painel
 from src.usuarios.in_memory import InMemoryUsuariosRepositorio
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
 from src.purchasing.service import Purchasing
+from src.reposicao.in_memory import InMemoryVerificacoesRepositorio
 from src.reposicao.service import Reposicao
 from src.sales.service import Sales
 from tests.fakes import (
@@ -131,6 +132,7 @@ def copilot(
     repositorio_avisos = InMemoryAvisosRepositorio()
     for aviso in avisos:
         repositorio_avisos.gravar(aviso)
+    notificacoes = Notificacoes(InMemoryEpisodiosRepositorio(), InMemoryUsuariosRepositorio(), relogio=lambda: NOW)
     painel = Painel(
         catalog,
         ficha_sku,
@@ -140,8 +142,10 @@ def copilot(
         repositorio_avisos,
         InMemoryDecisoesRepositorio(),
         InMemoryCobrancasRepositorio(),
-        Notificacoes(InMemoryEpisodiosRepositorio(), InMemoryUsuariosRepositorio(), relogio=lambda: NOW),
-        Reposicao(catalog, inventory, sales, politicas, relogio=lambda: NOW),
+        notificacoes,
+        Reposicao(
+            catalog, inventory, sales, politicas, InMemoryVerificacoesRepositorio(), notificacoes, relogio=lambda: NOW
+        ),
         relogio=lambda: NOW,
     )
     decisao = DecisaoComTrechosSoNosSinais(

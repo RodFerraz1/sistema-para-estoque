@@ -35,6 +35,13 @@ const GRUPOS = [
     cor: "var(--vendas)",
   },
   {
+    id: "estoque_divergente",
+    titulo: "Estoque divergente",
+    descricao: () => "O repositor não achou no depósito, mas o ERP diz que tem. Mande contar o estoque ou compre.",
+    cor: "var(--urgente)",
+    motivo: "estoque_divergente",
+  },
+  {
     id: "entregas_atrasadas",
     titulo: "Entregas atrasadas",
     descricao: () =>
@@ -79,6 +86,7 @@ function linkDoSku(codigo) {
 }
 
 function frase(item, grupo, piso) {
+  if (grupo === "estoque_divergente") return `O ERP diz que tem ${numero(item.disponivel)} un., mas no depósito não tem.`;
   if (grupo === "vao_faltar") {
     const naChegada = item.cobertura_na_chegada_sem_compra_dias;
     if (naChegada < 0) return `Acaba cerca de ${dias(-naChegada)} antes de uma compra feita hoje chegar.`;
@@ -102,6 +110,17 @@ function recado(item) {
   );
 }
 
+function recadoDoRepositor(verificacao) {
+  if (verificacao === null) return null;
+  return el(
+    "div",
+    { class: "recado repositor" },
+    el("strong", {}, "Não achou no depósito"),
+    ` · ${verificacao.verificado_por}, ${quando(verificacao.criado_em)}`,
+    verificacao.comentario ? [el("br"), el("q", {}, verificacao.comentario)] : null,
+  );
+}
+
 function sugestao(item) {
   if (item.quantidade_sugerida === null) {
     return el("div", { class: "item-sugestao" }, el("small", {}, "Sugestão"), el("strong", {}, "Não comprar agora"));
@@ -116,6 +135,7 @@ function sugestao(item) {
 }
 
 const MOTIVO_DO_GRUPO = {
+  estoque_divergente: "estoque_divergente",
   entregas_atrasadas: "entrega_atrasada",
   em_ruptura: "abaixo_do_piso_alerta",
   vao_faltar: "ruptura_antes_da_chegada",
@@ -142,6 +162,7 @@ function cartao(item, { id, cor }, piso) {
       "div",
       { class: "item-situacao" },
       recado(item),
+      recadoDoRepositor(item.estoque_divergente),
       frase(item, id, piso) ? el("div", { class: "frase" }, frase(item, id, piso)) : null,
       el(
         "div",

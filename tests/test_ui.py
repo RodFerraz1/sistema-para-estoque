@@ -135,6 +135,7 @@ def test_cada_pagina_chama_a_api() -> None:
     assert {caminho.split("/")[-1].split("?")[0] for _, caminho in chamadas["sku.js"]} >= {
         "analise",
         "avisos",
+        "verificacoes",
         "decisoes",
         "sugestao-compra",
         "sinais",
@@ -156,7 +157,11 @@ def test_cada_pagina_chama_a_api() -> None:
     assert chamadas["conta.js"] == [("PUT", "/eu/senha")]
     assert set(chamadas["notificacoes.js"]) == {("GET", "/notificacoes"), ("POST", "/notificacoes/vistas")}
     assert set(chamadas["estoque.js"]) == {("GET", "/estoque?${consulta}"), ("GET", "/categorias")}
-    assert set(chamadas["reposicao.js"]) == {("GET", "/reposicao/painel?${consulta}"), ("GET", "/categorias")}
+    assert set(chamadas["reposicao.js"]) == {
+        ("GET", "/reposicao/painel?${consulta}"),
+        ("GET", "/categorias"),
+        ("POST", "/skus/${encodeURIComponent(item.sku_code)}/verificacoes"),
+    }
 
 
 def test_endpoints_chamados_pelos_js_existem_no_app() -> None:

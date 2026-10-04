@@ -1,11 +1,15 @@
 """DTOs de domínio do módulo `reposicao`."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
+from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
 from src.catalog.schemas import SKU
+
+ResultadoVerificacao = Literal["repus", "estava_na_gondola", "sem_estoque_no_deposito"]
 
 
 class DiaObservado(BaseModel):
@@ -62,3 +66,19 @@ class PainelDoRepositor(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     quedas_de_venda: list[ItemQuedaDeVenda]
+
+
+class VerificacaoGondola(BaseModel):
+    """O que o repositor achou ao olhar a gôndola de um SKU. `disponivel_no_erp` é o
+    disponível do ERP no momento; `verificado_por`, o nome de quem verificou."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    sku_code: str
+    resultado: ResultadoVerificacao
+    comentario: str | None
+    disponivel_no_erp: int
+    verificado_por: str
+    usuario_id: UUID
+    criado_em: datetime

@@ -10,12 +10,16 @@ from pydantic import BaseModel, ConfigDict
 from src.catalog.schemas import SKU
 from src.inventory.schemas import StatusEmTransito
 from src.politica_compra.schemas import MotivoAlerta
+from src.reposicao.schemas import VerificacaoGondola
 
 TipoAviso = Literal["acabou", "vendendo_muito"]
 TipoDecisao = Literal["vou_comprar", "negociando", "nao_comprar_agora"]
-GrupoDoPainel = Literal["pedidos_de_vendas", "entregas_atrasadas", "em_ruptura", "vao_faltar", "outros_alertas"]
+GrupoDoPainel = Literal[
+    "pedidos_de_vendas", "estoque_divergente", "entregas_atrasadas", "em_ruptura", "vao_faltar", "outros_alertas"
+]
 GRUPOS: tuple[GrupoDoPainel, ...] = (
     "pedidos_de_vendas",
+    "estoque_divergente",
     "entregas_atrasadas",
     "em_ruptura",
     "vao_faltar",
@@ -70,7 +74,9 @@ class ItemAlerta(BaseModel):
     SKU sem giro, e `cobertura_na_chegada_sem_compra_meses` quando a sugestão de pedido
     não tem cálculo (SKU novo, sem giro ou sem fornecedor). A quantidade e o fornecedor
     sugeridos só vêm quando a sugestão tem compra. `avisos_abertos` vem do mais recente
-    para o mais antigo. `parou_de_vender`: queda de venda com o disponível zero."""
+    para o mais antigo. `parou_de_vender`: queda de venda com o disponível zero.
+    `estoque_divergente` é a verificação em que o repositor não achou no depósito o que o ERP
+    ainda diz que tem, quando o motivo está ligado."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -83,6 +89,7 @@ class ItemAlerta(BaseModel):
     fornecedor_sugerido: str | None
     avisos_abertos: list[Aviso]
     parou_de_vender: bool = False
+    estoque_divergente: VerificacaoGondola | None = None
 
     @property
     def so_por_aviso(self) -> bool:
@@ -91,11 +98,14 @@ class ItemAlerta(BaseModel):
 
     @property
     def grupo(self) -> GrupoDoPainel:
-        """Um grupo só por SKU, o primeiro que couber: aviso aberto, entrega atrasada (já
+        """Um grupo só por SKU, o primeiro que couber: aviso aberto, estoque divergente (o
+        número do ERP está errado: mandar contar antes de decidir), entrega atrasada (já
         comprou e não chegou: o problema é cobrar, não comprar), ruptura, ruptura antes da
         chegada e os outros motivos."""
         if self.avisos_abertos:
             return "pedidos_de_vendas"
+        if MotivoAlerta.ESTOQUE_DIVERGENTE in self.motivos:
+            return "estoque_divergente"
         if MotivoAlerta.ENTREGA_ATRASADA in self.motivos:
             return "entregas_atrasadas"
         if MotivoAlerta.ABAIXO_DO_PISO_ALERTA in self.motivos:

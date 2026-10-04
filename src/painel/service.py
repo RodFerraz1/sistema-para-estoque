@@ -11,9 +11,13 @@ Decisão vigente é a mais recente do SKU, com menos de `PRAZO_DA_DECISAO` e sem
 posterior. Cobrança vigente é a mais recente do pedido, até a nova previsão (inclusive) ou,
 sem ela, por `PRAZO_DA_COBRANCA`. Nada é atualizado: tudo sai das datas.
 
+Estoque divergente: a verificação de gôndola mais recente do SKU é `sem_estoque_no_deposito`
+com disponível no ERP, sem decisão de compra depois dela, e o disponível do ERP continua o
+mesmo da hora da verificação (se mudou, alguém ajustou o estoque).
+
 O painel também sabe as condições que notificam o comprador: SKU em ruptura sem decisão
-vigente e pedido com entrega atrasada sem cobrança vigente, cada uma só com o motivo
-ligado na política. `varrer_episodios` as entrega ao módulo `notificacoes`. O aviso da
+vigente, pedido com entrega atrasada sem cobrança vigente e SKU com estoque divergente,
+cada uma só com o motivo ligado na política. `varrer_episodios` as entrega ao módulo `notificacoes`. O aviso da
 equipe de vendas notifica na hora em que é registrado.
 """
 from __future__ import annotations
@@ -23,7 +27,14 @@ from datetime import UTC, date, datetime, timedelta
 from uuid import UUID, uuid4
 
 from src.catalog.schemas import SKU
-from src.catalog.service import Catalog, ordem_por_nome, palavras_da_busca, sku_contem_todas
+from src.catalog.service import (
+    Catalog,
+    SKUInativo,
+    SKUNaoEncontrado,
+    ordem_por_nome,
+    palavras_da_busca,
+    sku_contem_todas,
+)
 from src.ficha_sku.schemas import Ficha
 from src.ficha_sku.service import FichaSKU
 from src.inventory.schemas import Cobertura, EntregaAtrasada, dias_de_atraso, dias_de_cobertura
@@ -55,6 +66,7 @@ from src.politica_compra.repositorio import PoliticaCompraRepositorio
 from src.politica_compra.schemas import DIAS_POR_MES, MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import SugestaoPedido
 from src.purchasing.service import Purchasing
+from src.reposicao.schemas import VerificacaoGondola
 from src.reposicao.service import Reposicao
 from src.usuarios.schemas import Usuario
 
@@ -62,23 +74,11 @@ Relogio = Callable[[], datetime]
 
 PRAZO_DA_DECISAO = timedelta(days=7)
 PRAZO_DA_COBRANCA = timedelta(days=7)
-TIPOS_DE_EPISODIO: tuple[TipoEpisodio, ...] = ("ruptura", "entrega_atrasada")
+TIPOS_DE_EPISODIO: tuple[TipoEpisodio, ...] = ("ruptura", "entrega_atrasada", "estoque_divergente")
 
 
 def agora_utc() -> datetime:
     return datetime.now(UTC)
-
-
-class SKUNaoEncontrado(LookupError):
-    def __init__(self, sku_code: str) -> None:
-        super().__init__(f"SKU '{sku_code}' não encontrado")
-        self.sku_code = sku_code
-
-
-class SKUInativo(ValueError):
-    def __init__(self, sku_code: str) -> None:
-        super().__init__(f"O SKU '{sku_code}' está inativo: o atacadista não compra mais.")
-        self.sku_code = sku_code
 
 
 class QuantidadeObrigatoria(ValueError):
@@ -115,16 +115,34 @@ def _em_ruptura(cobertura: Cobertura, parametros: ParametrosPolitica) -> bool:
     return cobertura.meses is not None and cobertura.meses < parametros.piso_alerta_dias / DIAS_POR_MES
 
 
+def _estoque_divergente(
+    verificacao: VerificacaoGondola | None, disponivel: int, ultima: DecisaoCompra | None
+) -> VerificacaoGondola | None:
+    if verificacao is None or verificacao.resultado != "sem_estoque_no_deposito":
+        return None
+    if verificacao.disponivel_no_erp <= 0 or disponivel != verificacao.disponivel_no_erp:
+        return None
+    if ultima is not None and ultima.criado_em > verificacao.criado_em:
+        return None
+    return verificacao
+
+
 def _motivos(
-    sugestao: SugestaoPedido, cobertura: Cobertura, parametros: ParametrosPolitica, com_entrega_atrasada: bool
+    sugestao: SugestaoPedido,
+    cobertura: Cobertura,
+    parametros: ParametrosPolitica,
+    com_entrega_atrasada: bool,
+    com_estoque_divergente: bool,
 ) -> list[MotivoAlerta]:
-    """Os alertas da sugestão, o piso de alerta e a entrega atrasada, filtrados pelos motivos
-    de alerta da política."""
+    """Os alertas da sugestão, o piso de alerta, a entrega atrasada e o estoque divergente,
+    filtrados pelos motivos de alerta da política."""
     ocorridos = [MotivoAlerta(a.tipo.value) for a in sugestao.alertas]
     if _em_ruptura(cobertura, parametros):
         ocorridos.append(MotivoAlerta.ABAIXO_DO_PISO_ALERTA)
     if com_entrega_atrasada:
         ocorridos.append(MotivoAlerta.ENTREGA_ATRASADA)
+    if com_estoque_divergente:
+        ocorridos.append(MotivoAlerta.ESTOQUE_DIVERGENTE)
     return [m for m in ocorridos if m in parametros.motivos_de_alerta]
 
 
@@ -214,8 +232,10 @@ def _item(
     avisos: list[Aviso],
     com_entrega_atrasada: bool,
     com_queda_de_venda: bool,
+    divergencia: VerificacaoGondola | None,
 ) -> ItemAlerta:
     fornecedor = sugestao.fornecedor if sugestao.quantidade > 0 else None
+    motivos = _motivos(sugestao, ficha.cobertura, parametros, com_entrega_atrasada, divergencia is not None)
     return ItemAlerta(
         sku=ficha.sku,
         disponivel=ficha.estoque.quantidade_disponivel,
@@ -223,11 +243,12 @@ def _item(
         cobertura_na_chegada_sem_compra_meses=(
             sugestao.calculo.cobertura_na_chegada_sem_compra_meses if sugestao.calculo else None
         ),
-        motivos=_motivos(sugestao, ficha.cobertura, parametros, com_entrega_atrasada),
+        motivos=motivos,
         quantidade_sugerida=sugestao.quantidade if fornecedor else None,
         fornecedor_sugerido=fornecedor.fornecedor_nome if fornecedor else None,
         avisos_abertos=avisos,
         parou_de_vender=com_queda_de_venda and ficha.estoque.quantidade_disponivel == 0,
+        estoque_divergente=divergencia if MotivoAlerta.ESTOQUE_DIVERGENTE in motivos else None,
     )
 
 
@@ -457,7 +478,8 @@ class Painel:
         alertas. `skus_com_erro` não é filtrado.
 
         Um SKU com queda de venda e disponível zero leva o selo `parou_de_vender`: não vai
-        para o repositor, e a solução é comprar ou cobrar a entrega."""
+        para o repositor, e a solução é comprar ou cobrar a entrega. Um SKU com decisão
+        vigente fica nos decididos mesmo com estoque divergente."""
         filtro = filtro or FiltroPainel()
         palavras = palavras_da_busca(filtro.busca or "")
         parametros = self._politicas.ativa().parametros
@@ -470,6 +492,7 @@ class Painel:
         retrato = self._ficha_sku.retrato()
         sugestoes = self._purchasing.sugerir_pedidos(retrato)
         quedas = self._reposicao.quedas_de_venda(parametros)
+        verificacoes = self._reposicao.ultimas_verificacoes()
         cobrancas = self._cobrancas.ultimas()
         atrasadas: dict[str, list[EntregaAtrasada]] = {}
         if MotivoAlerta.ENTREGA_ATRASADA in parametros.motivos_de_alerta:
@@ -495,7 +518,13 @@ class Painel:
             if not _passa_no_sku(filtro, palavras, sku, ficha):
                 continue
             item = _item(
-                ficha, sugestoes[sku.sku_code], parametros, abertos, sku.sku_code in atrasadas, sku.sku_code in quedas
+                ficha,
+                sugestoes[sku.sku_code],
+                parametros,
+                abertos,
+                sku.sku_code in atrasadas,
+                sku.sku_code in quedas,
+                _estoque_divergente(verificacoes.get(sku.sku_code), ficha.estoque.quantidade_disponivel, ultima),
             )
             if (item.motivos or item.avisos_abertos) and _tem_o_motivo(filtro, item):
                 alertas.append(item)
@@ -514,30 +543,51 @@ class Painel:
         )
 
     def varrer_episodios(self) -> None:
-        """Abre e fecha os episódios de ruptura (por SKU) e de entrega atrasada (por pedido)
-        pelas condições de agora, com o mesmo retrato em lote do painel. Com o motivo
-        desligado na política, a condição não vale e os episódios dela fecham."""
+        """Abre e fecha os episódios de ruptura e de estoque divergente (por SKU) e de entrega
+        atrasada (por pedido) pelas condições de agora, com o mesmo retrato em lote do painel.
+        Com o motivo desligado na política, a condição não vale e os episódios dela fecham."""
         parametros = self._politicas.ativa().parametros
         agora = self._relogio()
+        motivos = parametros.motivos_de_alerta
         condicoes: list[Condicao] = []
-        if MotivoAlerta.ABAIXO_DO_PISO_ALERTA in parametros.motivos_de_alerta:
-            condicoes += self._condicoes_de_ruptura(parametros, agora)
-        if MotivoAlerta.ENTREGA_ATRASADA in parametros.motivos_de_alerta:
+        if MotivoAlerta.ABAIXO_DO_PISO_ALERTA in motivos or MotivoAlerta.ESTOQUE_DIVERGENTE in motivos:
+            condicoes += self._condicoes_por_sku(parametros, agora)
+        if MotivoAlerta.ENTREGA_ATRASADA in motivos:
             condicoes += self._condicoes_de_entrega(agora)
         self._notificacoes.varrer(TIPOS_DE_EPISODIO, condicoes)
 
-    def _condicoes_de_ruptura(self, parametros: ParametrosPolitica, agora: datetime) -> list[Condicao]:
+    def _condicoes_por_sku(self, parametros: ParametrosPolitica, agora: datetime) -> list[Condicao]:
+        motivos = parametros.motivos_de_alerta
         ultimas = self._decisoes.ultimas()
         avisos: dict[str, list[Aviso]] = {}
         for aviso in self._avisos.listar():
             avisos.setdefault(aviso.sku_code, []).append(aviso)
+        verificacoes = self._reposicao.ultimas_verificacoes() if MotivoAlerta.ESTOQUE_DIVERGENTE in motivos else {}
         retrato = self._ficha_sku.retrato()
         condicoes: list[Condicao] = []
         for sku in retrato.skus:
             ficha = retrato.fichas.get(sku.sku_code)
-            if ficha is None or not _em_ruptura(ficha.cobertura, parametros):
+            if ficha is None:
                 continue
             ultima = ultimas.get(sku.sku_code)
+            disponivel = ficha.estoque.quantidade_disponivel
+            divergencia = _estoque_divergente(verificacoes.get(sku.sku_code), disponivel, ultima)
+            if divergencia is not None:
+                condicoes.append(
+                    Condicao(
+                        tipo="estoque_divergente",
+                        sku_code=sku.sku_code,
+                        papel_destino="comprador",
+                        detalhe={
+                            **_nome_do_sku(sku),
+                            "disponivel_no_erp": divergencia.disponivel_no_erp,
+                            "verificado_por": divergencia.verificado_por,
+                            "comentario": divergencia.comentario,
+                        },
+                    )
+                )
+            if MotivoAlerta.ABAIXO_DO_PISO_ALERTA not in motivos or not _em_ruptura(ficha.cobertura, parametros):
+                continue
             if _vigente(ultima, _abertos(avisos.get(sku.sku_code, []), ultima), agora) is not None:
                 continue
             meses = ficha.cobertura.meses
@@ -548,7 +598,7 @@ class Painel:
                     papel_destino="comprador",
                     detalhe={
                         **_nome_do_sku(sku),
-                        "disponivel": ficha.estoque.quantidade_disponivel,
+                        "disponivel": disponivel,
                         "cobertura_dias": None if meses is None else dias_de_cobertura(meses),
                     },
                 )

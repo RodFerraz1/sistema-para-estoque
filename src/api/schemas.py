@@ -29,6 +29,7 @@ from src.notificacoes.schemas import TipoEpisodio
 from src.painel.schemas import GrupoDoPainel, TipoAviso, TipoDecisao
 from src.politica_compra.schemas import MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
+from src.reposicao.schemas import ResultadoVerificacao
 from src.usuarios.schemas import Papel
 
 TextoLivre = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
@@ -314,11 +315,31 @@ class RegistrarAvisoRequest(BaseModel):
     comentario: TextoLivre | None = None
 
 
+class VerificacaoGondolaResponse(BaseModel):
+    """`disponivel_no_erp` é o disponível do ERP no momento da verificação."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    sku_code: str
+    resultado: ResultadoVerificacao
+    comentario: str | None
+    disponivel_no_erp: int
+    verificado_por: str
+    criado_em: datetime
+
+
+class RegistrarVerificacaoGondolaRequest(BaseModel):
+    resultado: ResultadoVerificacao
+    comentario: TextoLivre | None = None
+
+
 class ItemAlertaResponse(BaseModel):
     """A cobertura vem em meses e em dias. A atual é nula para SKU sem giro; a na chegada sem
     a compra, nula quando a sugestão não tem cálculo. Quantidade e fornecedor só com compra.
     `so_por_aviso`: tem aviso aberto e nenhum motivo de alerta calculado. `parou_de_vender`:
-    queda de venda com o disponível zero."""
+    queda de venda com o disponível zero. `estoque_divergente`: a verificação em que o
+    repositor não achou no depósito o que o ERP ainda diz que tem."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -339,6 +360,7 @@ class ItemAlertaResponse(BaseModel):
     so_por_aviso: bool
     grupo: GrupoDoPainel
     parou_de_vender: bool
+    estoque_divergente: VerificacaoGondolaResponse | None
 
 
 class DecisaoCompraResponse(BaseModel):

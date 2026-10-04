@@ -67,6 +67,7 @@ def test_item_traz_o_que_o_comprador_precisa_sem_abrir_o_sku(client: TestClient)
         "so_por_aviso": False,
         "grupo": "em_ruptura",
         "parou_de_vender": False,
+        "estoque_divergente": None,
     }
     # Posição de 150 com o que está a caminho: acima do piso de reposição, não compra.
     assert piso["cobertura_atual_dias"] == pytest.approx(15.0)
@@ -177,6 +178,7 @@ def test_nada_pedindo_atencao_devolve_listas_vazias(client: TestClient) -> None:
         "skus_com_erro": [],
         "contagens": {
             "pedidos_de_vendas": 0,
+            "estoque_divergente": 0,
             "entregas_atrasadas": 0,
             "em_ruptura": 0,
             "vao_faltar": 0,

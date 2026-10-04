@@ -1,6 +1,7 @@
 import { montarChat } from "./chat.js";
 import {
   TIPOS_DE_AVISO,
+  TIPOS_DE_VERIFICACAO,
   alertas,
   api,
   cabecalho,
@@ -288,6 +289,26 @@ function avisos(lista) {
   );
 }
 
+const CLASSE_DA_VERIFICACAO = { repus: "bom", estava_na_gondola: "", sem_estoque_no_deposito: "urgente" };
+
+function verificacoes(lista) {
+  if (lista.length === 0) return el("p", { class: "suave" }, "O repositor ainda não verificou a gôndola deste produto.");
+  return el(
+    "ul",
+    { class: "historico" },
+    lista.map((v) =>
+      el(
+        "li",
+        {},
+        el("span", { class: `selo ${CLASSE_DA_VERIFICACAO[v.resultado]}` }, TIPOS_DE_VERIFICACAO[v.resultado] ?? v.resultado),
+        el("span", { class: "suave" }, ` ${v.verificado_por}, ${quando(v.criado_em)}`),
+        el("div", { class: "suave" }, `O ERP dizia ${numero(v.disponivel_no_erp)} un.`),
+        v.comentario ? el("div", {}, el("q", {}, v.comentario)) : null,
+      ),
+    ),
+  );
+}
+
 function decisoes(lista) {
   if (lista.length === 0) return el("p", { class: "suave" }, "Nenhuma decisão registrada para este produto.");
   return el(
@@ -387,6 +408,7 @@ if (!skuCode) {
     sugestaoAtual,
     carregar("entregas", api("GET", `/skus/${sku}/entregas`), entregas),
     carregar("avisos", api("GET", `/skus/${sku}/avisos`), avisos),
+    carregar("verificacoes", api("GET", `/skus/${sku}/verificacoes`), verificacoes),
     carregar("decisoes", api("GET", `/skus/${sku}/decisoes`), decisoes),
     carregar("precos", api("GET", `/skus/${sku}/precos`), precos),
     carregar("vendas", api("GET", `/skus/${sku}/vendas?meses=12`), vendas),

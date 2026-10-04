@@ -8,6 +8,8 @@ from src.notificacoes.dependencies import get_notificacoes
 from src.notificacoes.service import Notificacoes
 from src.painel.dependencies import get_painel
 from src.painel.service import Painel
+from src.reposicao.dependencies import get_reposicao
+from src.reposicao.service import Reposicao
 from src.usuarios.dependencies import usuario_atual
 from src.usuarios.schemas import Usuario
 
@@ -19,12 +21,15 @@ def notificacoes(
     usuario: Usuario = Depends(usuario_atual),
     notificacoes: Notificacoes = Depends(get_notificacoes),
     painel: Painel = Depends(get_painel),
+    reposicao: Reposicao = Depends(get_reposicao),
 ) -> NotificacoesResponse:
-    """Varre antes as condições dos papéis do usuário (ruptura e entrega atrasada para o
-    comprador) e devolve as notificações desses papéis, as mais recentes primeiro (no
+    """Varre antes as condições dos papéis do usuário (ruptura, entrega atrasada e estoque
+    divergente para o comprador, queda de venda para o repositor) e devolve as notificações desses papéis, as mais recentes primeiro (no
     máximo 50), com o total de não lidas. 503 com o banco fora do ar."""
     if "comprador" in usuario.papeis:
         painel.varrer_episodios()
+    if "reposicao" in usuario.papeis:
+        reposicao.varrer_episodios()
     caixa = notificacoes.caixa(usuario)
     return NotificacoesResponse(
         notificacoes=[

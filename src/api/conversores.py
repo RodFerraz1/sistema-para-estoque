@@ -16,11 +16,13 @@ from src.api.schemas import (
     SugestaoPedidoResponse,
     TrechoClassificadoResponse,
     VerificacaoCitacaoResponse,
+    VerificacaoGondolaResponse,
 )
 from src.catalog.schemas import FornecedorParaSKU
 from src.ficha_sku.schemas import Ficha
 from src.painel.schemas import Aviso, CobrancaEntrega, DecisaoCompra
 from src.purchasing.schemas import SugestaoPedido
+from src.reposicao.schemas import VerificacaoGondola
 
 
 def fornecedor_to_response(f: FornecedorParaSKU) -> FornecedorResponse:
@@ -159,4 +161,16 @@ def cobranca_to_response(cobranca: CobrancaEntrega) -> CobrancaEntregaResponse:
         comentario=cobranca.comentario,
         cobrado_por=cobranca.cobrado_por,
         criado_em=cobranca.criado_em,
+    )
+
+
+def verificacao_gondola_to_response(v: VerificacaoGondola) -> VerificacaoGondolaResponse:
+    return VerificacaoGondolaResponse(
+        id=v.id,
+        sku_code=v.sku_code,
+        resultado=v.resultado,
+        comentario=v.comentario,
+        disponivel_no_erp=v.disponivel_no_erp,
+        verificado_por=v.verificado_por,
+        criado_em=v.criado_em,
     )
