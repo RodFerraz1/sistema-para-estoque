@@ -629,6 +629,36 @@ legend + * {
 
 /* Painel de alertas */
 
+.filtros {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.4fr) repeat(3, minmax(0, 1fr)) auto;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.filtros input[type="search"],
+.filtros select {
+  width: 100%;
+  min-width: 0;
+}
+
+.filtros button {
+  white-space: nowrap;
+}
+
+#painel[aria-busy="true"] {
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.vazio button {
+  margin-top: 12px;
+}
+
+.resumo + .vazio {
+  margin-top: 32px;
+}
+
 .resumo {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -819,6 +849,43 @@ details.decididos ul {
 @media (max-width: 760px) {
   .conteudo {
     padding: 0 16px;
+  }
+
+  .filtros {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filtros input[type="search"],
+  .filtros #filtro-fornecedor,
+  .filtros button {
+    grid-column: 1 / -1;
+  }
+
+  .filtros select {
+    font-size: 0.9rem;
+    padding-left: 10px;
+    padding-right: 6px;
+  }
+
+  .grupo > header {
+    flex-wrap: wrap;
+  }
+
+  .grupo > header p {
+    flex-basis: 100%;
+  }
+
+  .resumo {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .resumo a {
+    padding: 12px 14px;
+  }
+
+  .resumo strong {
+    font-size: 1.6rem;
   }
 
   a.item {

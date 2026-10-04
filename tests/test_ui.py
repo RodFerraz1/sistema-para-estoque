@@ -108,7 +108,9 @@ def test_assets_referenciados_respondem_com_o_tipo_certo(client: TestClient) -> 
 def test_cada_pagina_chama_a_api() -> None:
     chamadas = _chamadas()
 
-    assert ("GET", "/painel") in chamadas["painel.js"]
+    assert {("GET", "/painel?${consulta}"), ("GET", "/categorias"), ("GET", "/fornecedores")} <= set(
+        chamadas["painel.js"]
+    )
     assert {metodo for metodo, _ in chamadas["aviso.js"]} == {"GET", "POST"}
     assert ("POST", "/skus/${sku}/decisoes") in chamadas["sku.js"]
     assert {caminho.split("/")[-1].split("?")[0] for _, caminho in chamadas["sku.js"]} >= {
@@ -191,6 +193,18 @@ def test_conta_monta_o_cabecalho_de_qualquer_papel_e_o_nome_leva_a_ela() -> None
 
 def test_linhas_do_painel_abrem_a_tela_do_sku() -> None:
     assert "sku.html?sku=" in (UI_DIR / "painel.js").read_text()
+
+
+def test_painel_tem_busca_e_filtros_com_os_nomes_da_api_e_guarda_na_url() -> None:
+    html = (UI_DIR / "index.html").read_text()
+    painel = (UI_DIR / "painel.js").read_text()
+    parametros = {p["name"] for p in app.openapi()["paths"]["/painel"]["get"]["parameters"] if p["in"] == "query"}
+    campos = set(re.findall(r'<(?:input|select) id="filtro-\w+" name="(\w+)"', html))
+
+    assert campos == parametros == {"busca", "categoria", "motivo", "fornecedor"}
+    assert 'id="limpar-filtros"' in html
+    assert "history.replaceState" in painel and "location.search" in painel
+    assert "Nenhum SKU com esses filtros" in painel and "Tudo em dia" in painel
 
 
 def test_decididos_ficam_recolhidos_por_padrao() -> None:

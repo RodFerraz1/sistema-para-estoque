@@ -8,6 +8,7 @@ from starlette.responses import Response
 from starlette.types import Scope
 
 from src.ai.decisao import DecisaoIndisponivel
+from src.api.catalogo import router as catalogo_router
 from src.api.chat import router as chat_router
 from src.api.health import banco_indisponivel
 from src.api.health import router as health_router
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(usuarios_router)
     app.include_router(skus_router)
+    app.include_router(catalogo_router)
     app.include_router(politica_compra_router)
     app.include_router(rag_router)
     app.include_router(chat_router)

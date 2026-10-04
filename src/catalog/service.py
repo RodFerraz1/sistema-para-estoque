@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import unicodedata
 
+from uuid import UUID
+
 from src.catalog.schemas import SKU, FornecedorParaSKU
 from src.erp_adapter.port import ERPAdapter
 
@@ -15,7 +17,13 @@ def _normalizar(texto: str) -> str:
     return sem_acento.casefold()
 
 
-def _contem_todas(sku: SKU, palavras: list[str]) -> bool:
+def palavras_da_busca(texto: str) -> list[str]:
+    return _normalizar(texto).split()
+
+
+def sku_contem_todas(sku: SKU, palavras: list[str]) -> bool:
+    """O código, o nome do produto, a cor ou o tamanho contêm cada uma das `palavras`,
+    sem diferenciar acento nem maiúscula. As palavras vêm de `palavras_da_busca`."""
     alvo = _normalizar(f"{sku.sku_code} {sku.produto_nome} {sku.cor} {sku.tamanho}")
     return all(p in alvo for p in palavras)
 
@@ -38,13 +46,26 @@ class Catalog:
         """`fornecedores_de` dos SKUs ativos numa leitura só. SKU sem fornecedor fica de fora."""
         return self._erp.fornecedores_por_sku()
 
+    def categorias(self) -> list[str]:
+        """As categorias com algum SKU ativo, em ordem alfabética."""
+        return sorted({sku.categoria for sku in self._erp.listar_skus()})
+
+    def fornecedores_com_sku_ativo(self) -> list[tuple[UUID, str]]:
+        """Id e nome dos fornecedores que vendem algum SKU ativo, pelo nome."""
+        nomes = {
+            f.fornecedor_id: f.fornecedor_nome
+            for fornecedores in self._erp.fornecedores_por_sku().values()
+            for f in fornecedores
+        }
+        return sorted(nomes.items(), key=lambda par: _normalizar(par[1]))
+
     def buscar_skus(self, texto: str, limite: int = 20) -> list[SKU]:
         """SKUs ativos cujo código, nome do produto, cor ou tamanho contêm todas as
         palavras de `texto`, sem diferenciar acento nem maiúscula. Ordem: nome do
         produto, cor e tamanho."""
-        palavras = _normalizar(texto).split()
+        palavras = palavras_da_busca(texto)
         if not palavras:
             return []
-        achados = [sku for sku in self._erp.listar_skus() if _contem_todas(sku, palavras)]
+        achados = [sku for sku in self._erp.listar_skus() if sku_contem_todas(sku, palavras)]
         achados.sort(key=lambda s: (_normalizar(s.produto_nome), _normalizar(s.cor), _normalizar(s.tamanho)))
         return achados[:limite]

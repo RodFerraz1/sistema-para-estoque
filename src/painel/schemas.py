@@ -12,6 +12,9 @@ from src.politica_compra.schemas import MotivoAlerta
 
 TipoAviso = Literal["acabou", "vendendo_muito"]
 TipoDecisao = Literal["vou_comprar", "negociando", "nao_comprar_agora"]
+GrupoDoPainel = Literal["pedidos_de_vendas", "em_ruptura", "vao_faltar", "outros_alertas"]
+GRUPOS: tuple[GrupoDoPainel, ...] = ("pedidos_de_vendas", "em_ruptura", "vao_faltar", "outros_alertas")
+MotivoDoFiltro = Literal["aviso"] | MotivoAlerta
 
 
 class Aviso(BaseModel):
@@ -75,6 +78,18 @@ class ItemAlerta(BaseModel):
         """No painel só pelo aviso: o cálculo não vê motivo de alerta."""
         return bool(self.avisos_abertos) and not self.motivos
 
+    @property
+    def grupo(self) -> GrupoDoPainel:
+        """Um grupo só por SKU, o primeiro que couber: aviso aberto, ruptura, ruptura antes
+        da chegada e os outros motivos."""
+        if self.avisos_abertos:
+            return "pedidos_de_vendas"
+        if MotivoAlerta.ABAIXO_DO_PISO_ALERTA in self.motivos:
+            return "em_ruptura"
+        if MotivoAlerta.RUPTURA_ANTES_DA_CHEGADA in self.motivos:
+            return "vao_faltar"
+        return "outros_alertas"
+
 
 class ItemDecidido(BaseModel):
     """SKU com decisão de compra vigente: fica fora dos alertas até ela vencer ou chegar
@@ -86,6 +101,19 @@ class ItemDecidido(BaseModel):
     decisao: DecisaoCompra
 
 
+class FiltroPainel(BaseModel):
+    """Vazio, não filtra. `busca` segue a regra do `catalog.buscar_skus`; `fornecedor_id` é
+    de um fornecedor que vende o SKU; `motivo` é um motivo de alerta ou `aviso` (aviso
+    aberto da equipe de vendas)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    busca: str | None = None
+    categoria: str | None = None
+    motivo: MotivoDoFiltro | None = None
+    fornecedor_id: UUID | None = None
+
+
 class PainelDeAlertas(BaseModel):
     """`skus_com_erro` lista os SKUs que o painel pulou por dado quebrado no ERP (sem a
     linha de estoque)."""
@@ -95,3 +123,11 @@ class PainelDeAlertas(BaseModel):
     alertas: list[ItemAlerta]
     decididos: list[ItemDecidido]
     skus_com_erro: list[str]
+
+    @property
+    def contagens(self) -> dict[GrupoDoPainel, int]:
+        """Quantos SKUs dos alertas cada grupo tem, com zero nos vazios."""
+        contagens = dict.fromkeys(GRUPOS, 0)
+        for item in self.alertas:
+            contagens[item.grupo] += 1
+        return contagens

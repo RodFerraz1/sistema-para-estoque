@@ -230,6 +230,12 @@ export function selosDePapel(papeis) {
   return papeis.map((p) => el("span", { class: "selo" }, PAPEIS[p]?.rotulo ?? p));
 }
 
+const CATEGORIAS = { felpudo: "Felpudo", jogo_cama: "Jogo de cama", mesa: "Mesa", cozinha: "Cozinha", banho: "Banho" };
+
+export function nomeDaCategoria(categoria) {
+  return CATEGORIAS[categoria] ?? categoria.replaceAll("_", " ");
+}
+
 export const TIPOS_DE_AVISO = { acabou: "Acabou", vendendo_muito: "Vendendo muito" };
 
 export const TIPOS_DE_DECISAO = {

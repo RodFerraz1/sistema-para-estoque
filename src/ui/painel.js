@@ -1,5 +1,6 @@
 import { montarChat } from "./chat.js";
 import {
+  MOTIVOS,
   TIPOS_DE_AVISO,
   api,
   cabecalho,
@@ -8,6 +9,7 @@ import {
   dias,
   el,
   mensagem,
+  nomeDaCategoria,
   numero,
   quando,
   resumoDaDecisao,
@@ -17,18 +19,24 @@ import {
 cabecalho("comprador");
 montarChat();
 
+const ESPERA_DA_BUSCA_MS = 300;
+const FILTROS = ["busca", "categoria", "motivo", "fornecedor"];
+
 const carregando = document.getElementById("carregando");
 const conteudo = document.getElementById("painel");
+const formulario = document.getElementById("filtros");
+const campos = Object.fromEntries(FILTROS.map((f) => [f, document.getElementById(`filtro-${f}`)]));
+const limpar = document.getElementById("limpar-filtros");
 
 const GRUPOS = [
   {
-    id: "pedidos-de-vendas",
+    id: "pedidos_de_vendas",
     titulo: "Pedidos da equipe de vendas",
     descricao: () => "Avisos que as vendedoras mandaram e ainda não têm decisão.",
     cor: "var(--vendas)",
   },
   {
-    id: "em-ruptura",
+    id: "em_ruptura",
     titulo: "Em ruptura",
     descricao: (piso) =>
       `O estoque segura menos de ${dias(piso)} de venda, o mínimo da sua política. Os zerados vêm primeiro, depois o que acaba antes.`,
@@ -36,14 +44,14 @@ const GRUPOS = [
     motivo: "abaixo_do_piso_alerta",
   },
   {
-    id: "vao-faltar",
+    id: "vao_faltar",
     titulo: "Vão faltar antes da compra chegar",
     descricao: () => "Pelo prazo do fornecedor, mesmo comprando hoje o estoque acaba antes da mercadoria chegar.",
     cor: "var(--urgente)",
     motivo: "ruptura_antes_da_chegada",
   },
   {
-    id: "outros-alertas",
+    id: "outros_alertas",
     titulo: "Outros alertas",
     descricao: () => "Outros motivos de alerta que você escolheu na política de compra.",
     cor: "var(--destaque)",
@@ -63,15 +71,8 @@ function linkDoSku(codigo) {
   return `sku.html?sku=${encodeURIComponent(codigo)}`;
 }
 
-function grupoDo(item) {
-  if (item.avisos_abertos > 0) return "pedidos-de-vendas";
-  if (item.motivos.includes("abaixo_do_piso_alerta")) return "em-ruptura";
-  if (item.motivos.includes("ruptura_antes_da_chegada")) return "vao-faltar";
-  return "outros-alertas";
-}
-
 function frase(item, grupo, piso) {
-  if (grupo === "vao-faltar") {
+  if (grupo === "vao_faltar") {
     const naChegada = item.cobertura_na_chegada_sem_compra_dias;
     if (naChegada < 0) return `Acaba cerca de ${dias(-naChegada)} antes de uma compra feita hoje chegar.`;
     return `Quando uma compra feita hoje chegar, ainda sobram ${dias(naChegada)} de estoque.`;
@@ -107,7 +108,7 @@ function sugestao(item) {
   );
 }
 
-const MOTIVO_DO_GRUPO = { "em-ruptura": "abaixo_do_piso_alerta", "vao-faltar": "ruptura_antes_da_chegada" };
+const MOTIVO_DO_GRUPO = { em_ruptura: "abaixo_do_piso_alerta", vao_faltar: "ruptura_antes_da_chegada" };
 
 function motivosAlemDoGrupo(item, grupo) {
   return item.motivos.filter((m) => m !== MOTIVO_DO_GRUPO[grupo]);
@@ -164,15 +165,15 @@ function grupo({ id, titulo, descricao, cor }, itens, piso) {
   );
 }
 
-function resumo(grupos, porGrupo, decididos) {
+function resumo(grupos, contagens, decididos) {
   return el(
     "div",
     { class: "resumo" },
     grupos.map((g) =>
       el(
         "a",
-        { href: `#${g.id}`, style: `--cor: ${porGrupo[g.id].length ? g.cor : "var(--borda-forte)"}` },
-        el("strong", {}, String(porGrupo[g.id].length)),
+        { href: `#${g.id}`, style: `--cor: ${contagens[g.id] ? g.cor : "var(--borda-forte)"}` },
+        el("strong", {}, String(contagens[g.id])),
         el("span", {}, g.titulo),
       ),
     ),
@@ -223,27 +224,107 @@ function tudoEmDia() {
   );
 }
 
+function nenhumComFiltros() {
+  return el(
+    "div",
+    { class: "card vazio" },
+    el("strong", {}, "Nenhum SKU com esses filtros"),
+    el("p", { class: "suave" }, "Nada pedindo atenção com essa busca. Tente outra palavra ou veja o painel inteiro."),
+    el("button", { type: "button", onclick: limparFiltros }, "Limpar filtros"),
+  );
+}
+
+function filtrosAtuais() {
+  return Object.fromEntries(FILTROS.map((f) => [f, campos[f].value.trim()]).filter(([, valor]) => valor));
+}
+
 function mostrar(painel, politica) {
   const { motivos_de_alerta: motivos, piso_alerta_dias: piso } = politica.parametros;
   const grupos = GRUPOS.filter((g) => !g.motivo || motivos.includes(g.motivo));
   const porGrupo = Object.fromEntries(GRUPOS.map((g) => [g.id, []]));
-  for (const item of painel.alertas) porGrupo[grupoDo(item)].push(item);
-  porGrupo["pedidos-de-vendas"].sort((a, b) => b.ultimo_aviso.criado_em.localeCompare(a.ultimo_aviso.criado_em));
+  for (const item of painel.alertas) porGrupo[item.grupo].push(item);
+  porGrupo.pedidos_de_vendas.sort((a, b) => b.ultimo_aviso.criado_em.localeCompare(a.ultimo_aviso.criado_em));
+  const comFiltro = Object.keys(filtrosAtuais()).length > 0;
+  const vazio = comFiltro ? nenhumComFiltros() : tudoEmDia();
   conteudo.replaceChildren(
     el(
       "div",
       {},
       skusComErro(painel.skus_com_erro),
-      resumo(grupos, porGrupo, painel.decididos),
-      painel.alertas.length ? grupos.map((g) => grupo(g, porGrupo[g.id], piso)) : tudoEmDia(),
+      resumo(grupos, painel.contagens, painel.decididos),
+      painel.alertas.length ? grupos.map((g) => grupo(g, porGrupo[g.id], piso)) : vazio,
       decididos(painel.decididos),
     ),
   );
 }
 
+function opcoes(select, lista, valorDaUrl) {
+  const valores = new Set(lista.map(([valor]) => valor));
+  if (valorDaUrl && !valores.has(valorDaUrl)) lista.push([valorDaUrl, valorDaUrl]);
+  select.append(...lista.map(([valor, rotulo]) => el("option", { value: valor }, rotulo)));
+  select.value = valorDaUrl ?? "";
+}
+
+function montarFiltros(politica, categorias, fornecedores) {
+  const daUrl = new URLSearchParams(location.search);
+  const ruptura = "abaixo_do_piso_alerta";
+  const motivos = [...politica.parametros.motivos_de_alerta].sort((a, b) => (b === ruptura) - (a === ruptura));
+  campos.busca.value = daUrl.get("busca") ?? "";
+  opcoes(campos.categoria, categorias.map((c) => [c, nomeDaCategoria(c)]), daUrl.get("categoria"));
+  opcoes(campos.motivo, [["aviso", "Aviso da equipe de vendas"], ...motivos.map((m) => [m, MOTIVOS[m] ?? m])], daUrl.get("motivo"));
+  opcoes(campos.fornecedor, fornecedores.map((f) => [f.id, f.nome]), daUrl.get("fornecedor"));
+  formulario.hidden = false;
+}
+
+let politica;
+let ultimaConsulta = 0;
+let espera;
+
+async function carregar() {
+  const filtros = filtrosAtuais();
+  const consulta = new URLSearchParams(filtros).toString();
+  history.replaceState(null, "", consulta ? `?${consulta}` : location.pathname);
+  limpar.hidden = consulta === "";
+  const numero = ++ultimaConsulta;
+  conteudo.setAttribute("aria-busy", "true");
+  try {
+    const painel = await api("GET", `/painel?${consulta}`);
+    if (numero === ultimaConsulta) mostrar(painel, politica);
+  } catch (e) {
+    if (numero !== ultimaConsulta) return;
+    conteudo.replaceChildren(mensagem("erro", e.status === 503 ? e.message : `Não foi possível calcular o painel: ${e.message}`));
+  } finally {
+    if (numero === ultimaConsulta) conteudo.removeAttribute("aria-busy");
+  }
+}
+
+function limparFiltros() {
+  for (const campo of Object.values(campos)) campo.value = "";
+  carregar();
+  campos.busca.focus();
+}
+
+formulario.addEventListener("submit", (evento) => {
+  evento.preventDefault();
+  clearTimeout(espera);
+  carregar();
+});
+campos.busca.addEventListener("input", () => {
+  clearTimeout(espera);
+  espera = setTimeout(carregar, ESPERA_DA_BUSCA_MS);
+});
+for (const f of ["categoria", "motivo", "fornecedor"]) campos[f].addEventListener("change", carregar);
+limpar.addEventListener("click", limparFiltros);
+
 try {
-  const [painel, politica] = await Promise.all([api("GET", "/painel"), api("GET", "/politica-compra")]);
-  mostrar(painel, politica);
+  const [politicaAtiva, categorias, fornecedores] = await Promise.all([
+    api("GET", "/politica-compra"),
+    api("GET", "/categorias"),
+    api("GET", "/fornecedores"),
+  ]);
+  politica = politicaAtiva;
+  montarFiltros(politica, categorias, fornecedores);
+  await carregar();
 } catch (e) {
   conteudo.replaceChildren(mensagem("erro", e.status === 503 ? e.message : `Não foi possível calcular o painel: ${e.message}`));
 } finally {

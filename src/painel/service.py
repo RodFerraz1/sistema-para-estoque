@@ -17,14 +17,16 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from src.catalog.schemas import SKU
-from src.catalog.service import Catalog
+from src.catalog.service import Catalog, palavras_da_busca, sku_contem_todas
 from src.ficha_sku.schemas import Ficha
 from src.ficha_sku.service import FichaSKU
 from src.inventory.schemas import Cobertura
 from src.painel.repositorio import AvisosRepositorio, DecisoesRepositorio
 from src.painel.schemas import (
+    GRUPOS,
     Aviso,
     DecisaoCompra,
+    FiltroPainel,
     ItemAlerta,
     ItemDecidido,
     PainelDeAlertas,
@@ -97,23 +99,29 @@ def _vigente(ultima: DecisaoCompra | None, abertos: list[Aviso], agora: datetime
     return ultima
 
 
-def _grupo(item: ItemAlerta) -> int:
-    """Os grupos do painel, na ordem: aviso aberto, ruptura, ruptura antes da chegada e
-    os outros motivos."""
-    if item.avisos_abertos:
-        return 0
-    if MotivoAlerta.ABAIXO_DO_PISO_ALERTA in item.motivos:
-        return 1
-    if MotivoAlerta.RUPTURA_ANTES_DA_CHEGADA in item.motivos:
-        return 2
-    return 3
-
-
 def _ordem(item: ItemAlerta) -> tuple[int, bool, bool, float, str]:
     """Pelo grupo; em cada grupo, disponível zero no topo, depois a menor cobertura atual,
     os sem giro no fim e o código para desempatar."""
     cobertura = item.cobertura_atual_meses
-    return (_grupo(item), item.disponivel > 0, cobertura is None, cobertura or 0.0, item.sku.sku_code)
+    return (GRUPOS.index(item.grupo), item.disponivel > 0, cobertura is None, cobertura or 0.0, item.sku.sku_code)
+
+
+def _passa_no_sku(filtro: FiltroPainel, palavras: list[str], sku: SKU, ficha: Ficha | None) -> bool:
+    if palavras and not sku_contem_todas(sku, palavras):
+        return False
+    if filtro.categoria and sku.categoria != filtro.categoria:
+        return False
+    if filtro.fornecedor_id is not None:
+        return ficha is not None and any(f.fornecedor_id == filtro.fornecedor_id for f in ficha.fornecedores)
+    return True
+
+
+def _tem_o_motivo(filtro: FiltroPainel, item: ItemAlerta) -> bool:
+    if filtro.motivo is None:
+        return True
+    if filtro.motivo == "aviso":
+        return bool(item.avisos_abertos)
+    return filtro.motivo in item.motivos
 
 
 def _item(ficha: Ficha, sugestao: SugestaoPedido, parametros: ParametrosPolitica, avisos: list[Aviso]) -> ItemAlerta:
@@ -224,11 +232,16 @@ class Painel:
         """Da mais recente para a mais antiga."""
         return self._decisoes.listar(sku_code)
 
-    def painel(self) -> PainelDeAlertas:
+    def painel(self, filtro: FiltroPainel | None = None) -> PainelDeAlertas:
         """Os SKUs ativos com decisão vigente vão para `decididos` (a decisão mais recente
         primeiro), para o comprador acompanhar o que decidiu. Os outros com aviso aberto ou
         algum motivo de alerta da política ativa vão para `alertas`, na ordem do painel. Um
-        SKU sem estoque no ERP vai para `skus_com_erro` sem derrubar o painel."""
+        SKU sem estoque no ERP vai para `skus_com_erro` sem derrubar o painel.
+
+        O `filtro` vale para os alertas e os decididos, menos o motivo, que só vale para os
+        alertas. `skus_com_erro` não é filtrado."""
+        filtro = filtro or FiltroPainel()
+        palavras = palavras_da_busca(filtro.busca or "")
         parametros = self._politicas.ativa().parametros
         agora = self._relogio()
         ultimas = self._decisoes.ultimas()
@@ -246,15 +259,18 @@ class Painel:
             ultima = ultimas.get(sku.sku_code)
             abertos = _abertos(avisos.get(sku.sku_code, []), ultima)
             vigente = _vigente(ultima, abertos, agora)
-            if vigente is not None:
-                decididos.append(ItemDecidido(sku=sku, decisao=vigente))
-                continue
             ficha = retrato.fichas.get(sku.sku_code)
+            if vigente is not None:
+                if _passa_no_sku(filtro, palavras, sku, ficha):
+                    decididos.append(ItemDecidido(sku=sku, decisao=vigente))
+                continue
             if ficha is None:
                 com_erro.append(sku.sku_code)
                 continue
+            if not _passa_no_sku(filtro, palavras, sku, ficha):
+                continue
             item = _item(ficha, sugestoes[sku.sku_code], parametros, abertos)
-            if item.motivos or item.avisos_abertos:
+            if (item.motivos or item.avisos_abertos) and _tem_o_motivo(filtro, item):
                 alertas.append(item)
         decididos.sort(key=lambda d: (d.decisao.criado_em, d.sku.sku_code), reverse=True)
         return PainelDeAlertas(alertas=sorted(alertas, key=_ordem), decididos=decididos, skus_com_erro=com_erro)

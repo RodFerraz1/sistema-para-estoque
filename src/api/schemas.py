@@ -25,7 +25,7 @@ from src.ai.schemas import (
 )
 from src.erp_adapter.schemas import StatusPedidoCompra
 from src.inventory.schemas import Cobertura, Estoque
-from src.painel.schemas import TipoAviso, TipoDecisao
+from src.painel.schemas import GrupoDoPainel, TipoAviso, TipoDecisao
 from src.politica_compra.schemas import MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
 from src.usuarios.schemas import Papel
@@ -335,6 +335,7 @@ class ItemAlertaResponse(BaseModel):
     avisos_abertos: int
     ultimo_aviso: AvisoResponse | None
     so_por_aviso: bool
+    grupo: GrupoDoPainel
 
 
 class DecisaoCompraResponse(BaseModel):
@@ -373,13 +374,22 @@ class ItemDecididoResponse(BaseModel):
 
 
 class PainelResponse(BaseModel):
-    """`decididos`: os SKUs com decisão de compra vigente, a mais recente primeiro."""
+    """`decididos`: os SKUs com decisão de compra vigente, a mais recente primeiro.
+    `contagens`: quantos alertas cada grupo tem, com o filtro aplicado."""
 
     model_config = ConfigDict(frozen=True)
 
     alertas: list[ItemAlertaResponse]
     decididos: list[ItemDecididoResponse]
     skus_com_erro: list[str]
+    contagens: dict[GrupoDoPainel, int]
+
+
+class FornecedorResumoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    nome: str
 
 
 class LoginRequest(BaseModel):

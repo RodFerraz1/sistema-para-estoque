@@ -65,6 +65,7 @@ def test_item_traz_o_que_o_comprador_precisa_sem_abrir_o_sku(client: TestClient)
         "avisos_abertos": 0,
         "ultimo_aviso": None,
         "so_por_aviso": False,
+        "grupo": "em_ruptura",
     }
     # Posição de 150 com o que está a caminho: acima do piso de reposição, não compra.
     assert piso["cobertura_atual_dias"] == pytest.approx(15.0)
@@ -169,7 +170,12 @@ def test_sku_sem_estoque_vai_para_skus_com_erro_sem_derrubar_o_painel(client: Te
 def test_nada_pedindo_atencao_devolve_listas_vazias(client: TestClient) -> None:
     preparar(erp=montar_erp([SOBRANDO]))
 
-    assert painel(client) == {"alertas": [], "decididos": [], "skus_com_erro": []}
+    assert painel(client) == {
+        "alertas": [],
+        "decididos": [],
+        "skus_com_erro": [],
+        "contagens": {"pedidos_de_vendas": 0, "em_ruptura": 0, "vao_faltar": 0, "outros_alertas": 0},
+    }
 
 
 class ERPForaDoAr(InMemoryERPAdapter):

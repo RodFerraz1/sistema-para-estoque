@@ -2,7 +2,10 @@
 e as decisões de compra do comprador chefe."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.api.conversores import aviso_to_response, decisao_to_response
 from src.api.schemas import (
@@ -19,7 +22,7 @@ from src.catalog.dependencies import get_catalog
 from src.catalog.service import Catalog
 from src.inventory.schemas import dias_de_cobertura
 from src.painel.dependencies import get_painel
-from src.painel.schemas import ItemAlerta, ItemDecidido
+from src.painel.schemas import FiltroPainel, ItemAlerta, ItemDecidido, MotivoDoFiltro
 from src.painel.service import (
     MotivoObrigatorio,
     Painel,
@@ -57,6 +60,7 @@ def _item_to_response(item: ItemAlerta) -> ItemAlertaResponse:
         avisos_abertos=len(item.avisos_abertos),
         ultimo_aviso=aviso_to_response(item.avisos_abertos[0]) if item.avisos_abertos else None,
         so_por_aviso=item.so_por_aviso,
+        grupo=item.grupo,
     )
 
 
@@ -71,13 +75,24 @@ def _decidido_to_response(item: ItemDecidido) -> ItemDecididoResponse:
 
 
 @router.get("/painel", response_model=PainelResponse, dependencies=COMPRADOR)
-def painel(painel: Painel = Depends(get_painel)) -> PainelResponse:
-    """Calculado na hora com a política ativa. 503 com o banco fora do ar."""
-    resultado = painel.painel()
+def painel(
+    busca: Annotated[str | None, Query(max_length=100)] = None,
+    categoria: str | None = None,
+    motivo: MotivoDoFiltro | None = None,
+    fornecedor: UUID | None = None,
+    painel: Painel = Depends(get_painel),
+) -> PainelResponse:
+    """Calculado na hora com a política ativa. 503 com o banco fora do ar. `busca` acha
+    todas as palavras no código, produto, cor e tamanho, sem acento nem maiúscula;
+    `fornecedor` é o id de um fornecedor que vende o SKU; `motivo` é um motivo de alerta ou
+    `aviso`. Busca, categoria e fornecedor filtram também os decididos."""
+    filtro = FiltroPainel(busca=busca, categoria=categoria, motivo=motivo, fornecedor_id=fornecedor)
+    resultado = painel.painel(filtro)
     return PainelResponse(
         alertas=[_item_to_response(i) for i in resultado.alertas],
         decididos=[_decidido_to_response(i) for i in resultado.decididos],
         skus_com_erro=resultado.skus_com_erro,
+        contagens=resultado.contagens,
     )
 
 

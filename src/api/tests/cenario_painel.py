@@ -7,7 +7,9 @@ lead time ignorado, piso de alerta de 20 dias, piso de reposição de 30 dias e 
 Em ruptura (abaixo de 20 dias): `ZERADO` (0 dias), `SEM_FORNECEDOR` (3 dias, sem cálculo),
 `MAIS_URGENTE` (6 dias), `URGENTE` (15 dias) e `PISO` (15 dias, com 100 a caminho, sem compra).
 `REGULAR` segura 45 dias e `SOBRANDO` 270. Com o lead time observado ligado, `URGENTE` e
-`MAIS_URGENTE` acabam antes da compra chegar.
+`MAIS_URGENTE` acabam antes da compra chegar. Todos são da categoria `felpudo`, menos o
+`SEM_FORNECEDOR` (`cama`) e o `INATIVO` (`mesa`). A Katrina também vende `ZERADO` e
+`MAIS_URGENTE`, mais cara que a Boa Vista.
 """
 from __future__ import annotations
 
@@ -39,14 +41,15 @@ from tests.fakes import (
 )
 
 BOA_VISTA = make_fornecedor("Boa Vista Têxtil", lead_time_dias_contratado=30)
+KATRINA = make_fornecedor("Katrina Têxtil", lead_time_dias_contratado=45)
 ZERADO = make_sku("TBC-LILA-70140-01", produto_nome="Toalha Banho Conforto", cor="lilás")
 URGENTE = make_sku("TBC-BRAN-70140-01", produto_nome="Toalha Banho Conforto", cor="branco")
 MAIS_URGENTE = make_sku("TBC-AZUL-70140-01", produto_nome="Toalha Banho Conforto", cor="azul")
 PISO = make_sku("TBC-ROSA-70140-01", produto_nome="Toalha Banho Conforto", cor="rosa")
-SEM_FORNECEDOR = make_sku("LC-BRAN-CASAL-01", produto_nome="Lençol Casal", tamanho="casal")
+SEM_FORNECEDOR = make_sku("LC-BRAN-CASAL-01", produto_nome="Lençol Casal", categoria="cama", tamanho="casal")
 REGULAR = make_sku("TBC-BEGE-70140-01", produto_nome="Toalha Banho Conforto", cor="bege")
 SOBRANDO = make_sku("TBC-VERD-70140-01", produto_nome="Toalha Banho Conforto", cor="verde")
-INATIVO = make_sku("TBC-PRET-70140-01", produto_nome="Toalha Banho Conforto", cor="preto", ativo=False)
+INATIVO = make_sku("PM-PRET-140-01", produto_nome="Pano de Mesa", categoria="mesa", cor="preto", ativo=False)
 QUEBRADO = make_sku("TBC-CINZ-70140-01", produto_nome="Toalha Banho Conforto", cor="cinza")
 DISPONIVEIS = [
     (ZERADO, 0),
@@ -90,9 +93,12 @@ def montar_erp(skus: list[SKU] | None = None) -> InMemoryERPAdapter:
     com_venda = [*(sku for sku, _ in DISPONIVEIS), QUEBRADO]
     return InMemoryERPAdapter(
         skus=skus or com_venda,
-        fornecedores=[BOA_VISTA],
+        fornecedores=[BOA_VISTA, KATRINA],
         fornecedores_por_sku={
-            sku.sku_code: [make_fornecedor_sku(BOA_VISTA, preco_unitario_reais=2000, lead_time_dias_observado=30)]
+            sku.sku_code: [
+                make_fornecedor_sku(BOA_VISTA, preco_unitario_reais=2000, lead_time_dias_observado=30),
+                *([make_fornecedor_sku(KATRINA, preco_unitario_reais=3000)] if sku in (ZERADO, MAIS_URGENTE) else []),
+            ]
             for sku in com_venda
             if sku != SEM_FORNECEDOR
         },

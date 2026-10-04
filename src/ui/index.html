@@ -25,6 +25,13 @@
         <a id="link-aviso" class="botao" href="aviso.html" target="_blank" rel="noopener" data-papel="vendas" hidden>Página das vendedoras ↗</a>
       </div>
     </div>
+    <form id="filtros" class="filtros" role="search" aria-label="Buscar e filtrar o painel" hidden>
+      <input id="filtro-busca" name="busca" type="search" autocomplete="off" enterkeyhint="search" maxlength="100" placeholder="Buscar código, nome, cor, tamanho" aria-label="Buscar por código, nome, cor ou tamanho">
+      <select id="filtro-categoria" name="categoria" aria-label="Categoria"><option value="">Todas as categorias</option></select>
+      <select id="filtro-motivo" name="motivo" aria-label="Motivo"><option value="">Todos os motivos</option></select>
+      <select id="filtro-fornecedor" name="fornecedor" aria-label="Fornecedor"><option value="">Todos os fornecedores</option></select>
+      <button id="limpar-filtros" type="button" hidden>Limpar filtros</button>
+    </form>
     <p id="carregando" class="carregando">Calculando o painel...</p>
     <div id="painel"></div>
   </main>
