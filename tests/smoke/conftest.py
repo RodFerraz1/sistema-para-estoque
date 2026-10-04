@@ -7,8 +7,10 @@ o Postgres não estiver acessível, o suite inteiro é `skip`.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from uuid import UUID
 
 import pytest
 from alembic import command
@@ -71,3 +73,55 @@ def sku_code() -> str:
             text("SELECT sku_code FROM erp.skus ORDER BY sku_code LIMIT 1")
         ).one()
     return row[0]
+
+
+@pytest.fixture
+def criados() -> Iterator[dict[str, list[UUID]]]:
+    """Os ids do que o teste gravou, por tabela do `copilot`, para apagar no fim."""
+    ids: dict[str, list[UUID]] = {
+        "avisos": [],
+        "avisos_gondola": [],
+        "decisoes_compra": [],
+        "cobrancas_entrega": [],
+        "verificacoes_gondola": [],
+    }
+    yield ids
+    with get_engine().begin() as conn:
+        for tabela, lista in ids.items():
+            conn.execute(text(f"DELETE FROM copilot.{tabela} WHERE id = ANY(:ids)"), {"ids": lista})
+
+
+@contextmanager
+def _tabela_restaurada(tabela: str) -> Iterator[None]:
+    backup = f"backup_{tabela}_smoke"
+    with get_engine().connect() as conn:
+        conn.execute(text(f"CREATE TEMP TABLE {backup} AS SELECT * FROM copilot.{tabela}"))
+        conn.commit()
+        try:
+            yield
+        finally:
+            conn.execute(text(f"DELETE FROM copilot.{tabela}"))
+            conn.execute(text(f"INSERT INTO copilot.{tabela} SELECT * FROM {backup}"))
+            conn.execute(text(f"DROP TABLE {backup}"))
+            conn.commit()
+
+
+@pytest.fixture
+def episodios_restaurados() -> Iterator[None]:
+    """A varredura do `/notificacoes` abre e fecha episódios do seed inteiro, e avisos,
+    decisões e verificações gravam eventos: devolve no fim os episódios de antes."""
+    with _tabela_restaurada("episodios_alerta"):
+        yield
+
+
+@pytest.fixture
+def setores_restaurados() -> Iterator[None]:
+    """O aviso de gôndola vazia e a verificação regravam o setor conhecido do SKU."""
+    with _tabela_restaurada("setores_sku"):
+        yield
+
+
+@pytest.fixture
+def capacidades_restauradas() -> Iterator[None]:
+    with _tabela_restaurada("capacidades_gondola"):
+        yield

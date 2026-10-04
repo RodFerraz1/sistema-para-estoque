@@ -1,9 +1,7 @@
-"""Smoke do fluxo do comprador contra o Postgres real com o seed: a equipe de vendas
-avisa, o SKU entra no painel de alertas, o comprador chefe registra a decisão de compra
-e o SKU sai dos alertas para os decididos. O painel não chama o Jev.
-
-O SKU do smoke é um que o cálculo não põe no painel, para o aviso ser o único motivo de
-ele aparecer. No fim, a fixture apaga só o aviso e a decisão que o smoke criou.
+"""Smoke do painel do comprador contra o Postgres real, com os cenários do seed: aviso da
+equipe de vendas e decisão de compra, ruptura com notificação, queda de venda com
+verificação e estoque divergente, e entrega atrasada com cobrança. O painel não chama o
+Jev. No fim, as fixtures apagam só o que o smoke gravou e devolvem os episódios de antes.
 """
 from __future__ import annotations
 
@@ -40,34 +38,6 @@ from src.db.engine import get_engine
 from src.usuarios.schemas import Usuario
 
 pytestmark = pytest.mark.smoke
-
-
-@pytest.fixture
-def criados() -> Iterator[dict[str, list[UUID]]]:
-    ids: dict[str, list[UUID]] = {
-        "avisos": [],
-        "decisoes_compra": [],
-        "cobrancas_entrega": [],
-        "verificacoes_gondola": [],
-    }
-    yield ids
-    with get_engine().begin() as conn:
-        conn.execute(
-            text(
-                "DELETE FROM copilot.episodios_alerta e USING copilot.avisos a WHERE a.id = ANY(:ids) "
-                "AND e.tipo = 'aviso' AND e.sku_code = a.sku_code AND e.aberto_em = a.criado_em"
-            ),
-            {"ids": ids["avisos"]},
-        )
-        conn.execute(
-            text(
-                "DELETE FROM copilot.episodios_alerta e USING copilot.decisoes_compra d WHERE d.id = ANY(:ids) "
-                "AND e.tipo = 'decisao_sobre_aviso' AND e.sku_code = d.sku_code AND e.aberto_em = d.criado_em"
-            ),
-            {"ids": ids["decisoes_compra"]},
-        )
-        for tabela, lista in ids.items():
-            conn.execute(text(f"DELETE FROM copilot.{tabela} WHERE id = ANY(:ids)"), {"ids": lista})
 
 
 def _painel(client: TestClient) -> PainelResponse:
@@ -138,6 +108,31 @@ def test_cenarios_de_ruptura_do_seed_no_painel(client: TestClient) -> None:
     assert TAPETE_MARROM not in alertas
 
 
+def test_ruptura_do_seed_notifica_o_comprador_uma_vez_e_a_decisao_fecha(
+    client: TestClient, criados: dict[str, list[UUID]], episodios_restaurados: None
+) -> None:
+    def rupturas() -> list[dict]:
+        notificacoes = client.get("/notificacoes").json()["notificacoes"]
+        return [n for n in notificacoes if n["tipo"] == "ruptura" and n["sku_code"] == RUPTURA_SEM_PEDIDO]
+
+    [ruptura] = rupturas()
+    assert ruptura["fechado_em"] is None
+    piso = client.get("/politica-compra").json()["parametros"]["piso_alerta_dias"]
+    assert ruptura["detalhe"]["cobertura_dias"] < piso
+    assert rupturas() == [ruptura]
+    entregas = [n for n in client.get("/notificacoes").json()["notificacoes"] if n["tipo"] == "entrega_atrasada"]
+    assert [n["detalhe"]["fornecedor_nome"] for n in entregas] == [KATRINA]
+    assert RUPTURA_COM_PEDIDO_ATRASADO in entregas[0]["detalhe"]["skus"]
+
+    response = client.post(f"/skus/{RUPTURA_SEM_PEDIDO}/decisoes", json={"tipo": "vou_comprar", "quantidade": 48})
+    assert response.status_code == 201
+    criados["decisoes_compra"].append(UUID(response.json()["id"]))
+
+    [fechada] = rupturas()
+    assert fechada["id"] == ruptura["id"] and fechada["fechado_em"] is not None
+    assert RUPTURA_SEM_PEDIDO in {d.sku_code for d in _painel(client).decididos}
+
+
 def test_queda_de_venda_do_seed_vai_para_o_repositor_ou_para_o_comprador(client: TestClient) -> None:
     response = client.get("/reposicao/painel")
     assert response.status_code == 200
@@ -149,22 +144,6 @@ def test_queda_de_venda_do_seed_vai_para_o_repositor_ou_para_o_comprador(client:
     assert tapete.disponivel > 0
     parou = {i.sku_code for i in _painel(client).alertas if i.parou_de_vender}
     assert parou == {QUEDA_SEM_ESTOQUE}
-
-
-@pytest.fixture
-def episodios_restaurados() -> Iterator[None]:
-    """A varredura do `/notificacoes` abre e fecha episódios do seed inteiro: guarda os do
-    banco e os devolve no fim."""
-    with get_engine().connect() as conn:
-        conn.execute(text("CREATE TEMP TABLE backup_episodios_smoke AS SELECT * FROM copilot.episodios_alerta"))
-        conn.commit()
-        try:
-            yield
-        finally:
-            conn.execute(text("DELETE FROM copilot.episodios_alerta"))
-            conn.execute(text("INSERT INTO copilot.episodios_alerta SELECT * FROM backup_episodios_smoke"))
-            conn.execute(text("DROP TABLE backup_episodios_smoke"))
-            conn.commit()
 
 
 def test_verificacao_do_tapete_vira_estoque_divergente(

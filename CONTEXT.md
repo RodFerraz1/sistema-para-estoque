@@ -107,7 +107,7 @@ Resultado determinístico de `purchasing` para um SKU: quantidade, fornecedor, m
 _Avoid_: recomendação, pedido sugerido, proposta.
 
 **Aviso (da equipe de vendas)**:
-Recado da equipe de vendas sobre um SKU: `acabou` ou `vendendo muito`, com comentário opcional e o nome de quem avisou. Fica aberto até o comprador chefe registrar uma decisão de compra para o SKU. É um sinal humano e põe o SKU no painel mesmo quando o cálculo não vê problema.
+Recado da equipe de vendas ao comprador chefe sobre um SKU: `acabou` ou `vendendo muito`, com comentário opcional, em nome do usuário que avisou. Fica aberto até o comprador chefe registrar uma decisão de compra para o SKU. É um sinal humano e põe o SKU no painel mesmo quando o cálculo não vê problema. A vendedora acompanha o desfecho em "Meus avisos".
 _Avoid_: alerta (é o que o `purchasing` calcula), pedido, solicitação, chamado.
 
 **Motivo de alerta**:
@@ -115,7 +115,7 @@ Alerta do `purchasing` que o comprador chefe escolheu, na política de compra, p
 _Avoid_: prioridade, risco (genérico demais), motivo de destaque (nome antigo, da fila de aprovação).
 
 **Painel de alertas**:
-Tela inicial do comprador chefe. Lista os SKUs que pedem atenção agora: os que têm aviso aberto ou algum motivo de alerta. Vêm primeiro os com aviso, depois os em ruptura (disponível zero no topo e, em seguida, a menor cobertura em dias), os que acabam antes da compra chegar (quando a política usa o lead time) e os outros motivos. É calculado na hora a partir do ERP fake e não guarda estado próprio. Um SKU some do painel enquanto houver decisão de compra vigente e nenhum aviso novo.
+Tela inicial do comprador chefe. Lista os SKUs que pedem atenção agora: os que têm aviso aberto ou algum motivo de alerta. Vêm primeiro os com aviso, depois os com estoque divergente, os com entrega atrasada (agrupados por fornecedor), os em ruptura (disponível zero no topo e, em seguida, a menor cobertura em dias), os que acabam antes da compra chegar (quando a política usa o lead time) e os outros motivos. É calculado na hora a partir do ERP fake e não guarda estado próprio. Um SKU some do painel enquanto houver decisão de compra vigente e nenhum aviso novo.
 _Avoid_: dashboard, fila, caixa de entrada, relatório (é o que o BI emite sob demanda).
 
 **Decisão de compra**:
@@ -161,7 +161,7 @@ SKU que vende com regularidade e cuja venda nos últimos dias abertos ficou muit
 _Avoid_: venda parada, anomalia, encalhe (é o sinal do corpus sobre compra anterior).
 
 **Aviso de gôndola vazia**:
-Recado da vendedora ao repositor de que a gôndola de um SKU está vazia, com o setor. Fica aberto até a verificação de gôndola do SKU. Não é o aviso ao comprador: tem outro destino e fecha de outro jeito.
+Recado da vendedora ao repositor de que a gôndola de um SKU está vazia, com o setor. Fica aberto até a verificação de gôndola do SKU, cujo resultado a vendedora vê em "Meus avisos". Não é o aviso ao comprador: tem outro destino e fecha de outro jeito.
 _Avoid_: aviso (sozinho é o recado ao comprador), pedido de reposição, chamado.
 
 **Setor**:
@@ -173,8 +173,16 @@ O que o repositor registra depois de olhar um SKU com queda de venda ou com avis
 _Avoid_: conferência, inventário, contagem.
 
 **Estoque divergente**:
-Motivo de alerta de um SKU em que o repositor não achou mercadoria no depósito, mas o ERP diz que há disponível.
+Motivo de alerta de um SKU em que o repositor não achou mercadoria no depósito, mas o ERP diz que há disponível. Vale até o comprador chefe decidir sobre o SKU ou o saldo do ERP mudar.
 _Avoid_: furo de estoque, quebra.
+
+**Dia aberto**:
+Dia em que a loja vendeu alguma coisa. É a régua da queda de venda e da participação nas vendas: domingo e outros dias sem venda nenhuma não contam.
+_Avoid_: dia útil, dia de loja (sozinho).
+
+**Painel do repositor**:
+Tela inicial do repositor. Lista os SKUs que provavelmente faltam na gôndola: primeiro os avisos de gôndola vazia abertos, depois a queda de venda com estoque disponível. Um SKU com os dois aparece uma vez.
+_Avoid_: fila do repositor, lista de reposição.
 
 **Participação nas vendas**:
 Fração da venda de um produto que vem de um SKU dele (uma cor e um tamanho), numa janela de dias abertos. Base do mix de gôndola. Aparece também para o comprador chefe.
@@ -191,7 +199,7 @@ _Avoid_: sugestão (sozinho é a sugestão de pedido), planograma, grade (é a d
 ### Usuários e notificações
 
 **Usuário**:
-Pessoa cadastrada no Copilot, com e-mail, senha e um ou mais papéis. Ver ADR-0007.
+Pessoa cadastrada no Copilot pelo admin, com e-mail, senha e um ou mais papéis. Avisos, decisões, cobranças e verificações registram o usuário que os fez. Ver ADR-0007.
 _Avoid_: conta, login, cliente (é o varejista).
 
 **Papel**:
@@ -199,11 +207,11 @@ O que o usuário faz no Copilot e decide o que ele vê: `comprador`, `vendas`, `
 _Avoid_: perfil, permissão, cargo.
 
 **Episódio de alerta**:
-Intervalo em que uma condição vale para um SKU ou para um pedido de compra (ruptura, entrega atrasada, queda de venda, estoque divergente), aberto e fechado pela varredura. Avisos e decisões sobre avisos também abrem episódios. Garante que a mesma condição notifica uma vez só.
+Intervalo em que uma condição vale para um SKU (ruptura, queda de venda, estoque divergente) ou para um pedido de compra (entrega atrasada), aberto e fechado pela varredura. Garante que a mesma condição notifica uma vez só, e que ela notifica de novo se sair e voltar. Os recados e as respostas a eles (aviso, aviso de gôndola vazia, decisão sobre um aviso, verificação sobre um aviso de gôndola vazia) entram como episódios que já nascem fechados, porque não são condições que duram.
 _Avoid_: evento, incidente, ocorrência.
 
 **Notificação**:
-Um episódio de alerta visto por um usuário do papel de destino. É não lida enquanto o episódio foi aberto depois do cursor de visto do usuário. Aparece no sino e, quando é nova, num pop-up.
+Um episódio de alerta visto por um usuário do papel de destino, ou pela pessoa de destino quando é a resposta a um recado dela (a vendedora que avisou recebe o desfecho do aviso). É não lida enquanto o episódio foi aberto depois do cursor de visto do usuário. Aparece no sino e, quando é nova, num pop-up.
 _Avoid_: alerta (é o que o `purchasing` calcula), aviso (é o recado da equipe de vendas), mensagem.
 
 ### Sistemas

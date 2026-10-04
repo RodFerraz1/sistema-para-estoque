@@ -4,12 +4,16 @@
 
 **Blocked by:** 08, 14, 15
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** `.scratch/plataforma/spec.md` (seções "Testing Decisions" e "Documentação e domínio")
 
-- [ ] Smoke tests contra o Postgres: login, ruptura com notificação, queda de venda com verificação e estoque divergente, aviso de gôndola vazia com verificação, mix de gôndola, e entrega atrasada com cobrança.
-- [ ] README com as telas por papel, o comando do primeiro admin e screenshots novas.
-- [ ] Roteiro de demo com a história acima, usando os cenários do seed.
-- [ ] As perguntas abertas da seção "Pormenores e suposições" da spec entram em `.scratch/sugestao-compra/perguntas-comprador.md`.
-- [ ] Suíte completa, smoke e pyright sem erro novo.
+- [x] Smoke tests contra o Postgres: login, ruptura com notificação, queda de venda com verificação e estoque divergente, aviso de gôndola vazia com verificação, mix de gôndola, e entrega atrasada com cobrança.
+- [x] README com as telas por papel, o comando do primeiro admin e screenshots novas.
+- [x] Roteiro de demo com a história acima, usando os cenários do seed.
+- [x] As perguntas abertas da seção "Pormenores e suposições" da spec entram em `.scratch/sugestao-compra/perguntas-comprador.md`.
+- [x] Suíte completa, smoke e pyright sem erro novo.
+
+## Comments
+
+**2026-10-04 (agente):** smoke novo contra o Postgres: `tests/smoke/test_login.py` (login de verdade com uma vendedora criada e apagada pelo teste: 403 sem `X-Requested-With`, 401 com senha errada, 403 no `/painel`, a disponibilidade sem preço nem fornecedor, saída que revoga), `test_ruptura_do_seed_notifica_o_comprador_uma_vez_e_a_decisao_fecha` em `test_painel.py` (episódio de ruptura do `JDCP-BRAN-CASAL-01` abre uma vez, a entrega atrasada da Katrina notifica e a decisão fecha o episódio) e `tests/smoke/test_reposicao.py` (aviso de gôndola vazia do tapete marrom com a queda junto, filtro de setor, notificação, verificação que fecha e chega à vendedora; mix de 12 lugares do Tapete Banheiro com capacidade gravada). Os fixtures `criados`, `episodios_restaurados`, `setores_restaurados` e `capacidades_restauradas` foram para `tests/smoke/conftest.py` (restauram a tabela inteira por uma cópia temporária). README: visão da plataforma por papel, primeiro admin e pessoas pelo terminal, tabela de endpoints com a coluna "Quem" e as rotas novas (usuários, conta, notificações, estoque, entregas, reposição, setores, mix), painel com os grupos novos e as contagens atuais (13 consultas, 10 em ruptura com o seed, 1,22 s com 5.085 SKUs), seções de entregas e cobrança, notificações, operação da loja, usuários, telas por papel com dez capturas novas em `docs/img/` (`aviso.png` saiu para `consulta.png` e `meus-avisos.png`) e limites atualizados. `docs/demo.md` reescrito na história da reunião com a Carla, a Bia e o Rafa, com `curl` autenticado (`entrar`/`como`, cookie e `X-Requested-With`) e os ids fixos do seed (pedido da Katrina, setor Tapetes, produto do tapete); todos os blocos rodaram em sequência contra o banco recém-semeado e os números do texto saíram dessa execução. `CONTEXT.md`: aviso em nome do usuário e "Meus avisos", ordem dos grupos do painel, estoque divergente até a decisão ou o saldo mudar, termos novos "Dia aberto" e "Painel do repositor", episódio com os recados que nascem fechados e notificação dirigida a uma pessoa. As 15 suposições da spec viraram as perguntas 15 a 29 de `perguntas-comprador.md`, e as perguntas 5 e 7 ganharam o "Hoje" atual (ciclo de 2 meses, lead time ignorado). Ficou registrado no README: o smoke conta com os cenários do seed intactos (com dados de demo no banco, a cobrança e a verificação do roteiro derrubam o smoke), então rode o reset antes. Banco local no seed padrão, sem avisos, decisões, cobranças, verificações, episódios, capacidades nem registros, e sem o usuário "Testes automáticos" (o smoke o recria na próxima rodada); ficam as quatro pessoas locais. Suíte com 1237 testes verde (29 de smoke); pyright com os mesmos 79 erros por arquivo.
