@@ -8,6 +8,7 @@ ele aparecer. No fim, a fixture apaga só o aviso e a decisão que o smoke criou
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import pytest
@@ -15,6 +16,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from scripts.seed import (
+    ATRASO_NAS_ENTREGAS_DA_KATRINA,
+    DIAS_DE_ATRASO,
+    KATRINA,
     QUEDA_SEM_ESTOQUE,
     RUPTURA_COM_PEDIDO_ATRASADO,
     RUPTURA_SEM_PEDIDO,
@@ -22,7 +26,10 @@ from scripts.seed import (
 )
 from src.api.schemas import (
     AvisoResponse,
+    CobrancaEntregaResponse,
     DecisaoCompraResponse,
+    EntregaPendenteResponse,
+    HistoricoDeAtrasosResponse,
     PainelResponse,
     PrecosResponse,
     SKUResumoResponse,
@@ -35,7 +42,7 @@ pytestmark = pytest.mark.smoke
 
 @pytest.fixture
 def criados() -> Iterator[dict[str, list[UUID]]]:
-    ids: dict[str, list[UUID]] = {"avisos": [], "decisoes_compra": []}
+    ids: dict[str, list[UUID]] = {"avisos": [], "decisoes_compra": [], "cobrancas_entrega": []}
     yield ids
     with get_engine().begin() as conn:
         for tabela, lista in ids.items():
@@ -127,3 +134,42 @@ def test_precos_contra_o_seed(client: TestClient) -> None:
     assert precos.precos_atuais
     assert len(precos.substitutos) <= 10
     assert all(s.sku_code != sku_code for s in precos.substitutos)
+
+
+def test_entrega_atrasada_do_seed_e_cobranca(
+    client: TestClient, criados: dict[str, list[UUID]], usuario_logado: Usuario
+) -> None:
+    antes = _painel(client)
+    katrina = antes.entregas_atrasadas[0]
+    assert katrina.fornecedor_nome == KATRINA and katrina.tem_sku_em_ruptura
+    [pedido] = katrina.pedidos
+    assert pedido.dias_de_atraso == DIAS_DE_ATRASO
+    assert RUPTURA_COM_PEDIDO_ATRASADO in {s.sku_code for s in pedido.skus}
+    item = next(i for i in antes.alertas if i.sku_code == RUPTURA_COM_PEDIDO_ATRASADO)
+    assert item.grupo == "entregas_atrasadas"
+
+    nova_previsao = (datetime.now(UTC) + timedelta(days=3)).date()
+    response = client.post(
+        f"/pedidos/{pedido.pedido_id}/cobrancas",
+        json={"nova_previsao": nova_previsao.isoformat(), "comentario": "Smoke."},
+    )
+    assert response.status_code == 201
+    cobranca = CobrancaEntregaResponse.model_validate(response.json())
+    criados["cobrancas_entrega"].append(cobranca.id)
+    assert cobranca.cobrado_por == usuario_logado.nome
+
+    depois = _painel(client)
+    assert pedido.pedido_id not in {p.pedido_id for f in depois.entregas_atrasadas for p in f.pedidos}
+    assert RUPTURA_COM_PEDIDO_ATRASADO not in {i.sku_code for i in depois.alertas if i.grupo == "entregas_atrasadas"}
+    entregas = [
+        EntregaPendenteResponse.model_validate(e)
+        for e in client.get(f"/skus/{RUPTURA_COM_PEDIDO_ATRASADO}/entregas").json()
+    ]
+    cobrada = next(e for e in entregas if e.pedido_id == pedido.pedido_id)
+    assert cobrada.atrasada and cobrada.cobranca_vigente and cobrada.cobrancas == [cobranca]
+
+    historico = HistoricoDeAtrasosResponse.model_validate(
+        client.get(f"/fornecedores/{katrina.fornecedor_id}/atrasos").json()
+    )
+    assert historico.entregas_recebidas == historico.entregas_atrasadas > 0
+    assert historico.media_dias_de_atraso == ATRASO_NAS_ENTREGAS_DA_KATRINA

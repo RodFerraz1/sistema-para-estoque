@@ -24,8 +24,17 @@ from src.catalog.schemas import SKU
 from src.erp_adapter.dependencies import get_erp_adapter
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.main import app
-from src.painel.dependencies import get_avisos_repositorio, get_decisoes_repositorio, get_relogio
-from src.painel.in_memory import InMemoryAvisosRepositorio, InMemoryDecisoesRepositorio
+from src.painel.dependencies import (
+    get_avisos_repositorio,
+    get_cobrancas_repositorio,
+    get_decisoes_repositorio,
+    get_relogio,
+)
+from src.painel.in_memory import (
+    InMemoryAvisosRepositorio,
+    InMemoryCobrancasRepositorio,
+    InMemoryDecisoesRepositorio,
+)
 from src.politica_compra.dependencies import get_politica_compra_repositorio
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
 from src.politica_compra.schemas import PARAMETROS_V1
@@ -67,6 +76,7 @@ DEPENDENCIAS = (
     get_politica_compra_repositorio,
     get_avisos_repositorio,
     get_decisoes_repositorio,
+    get_cobrancas_repositorio,
     get_relogio,
 )
 
@@ -119,6 +129,7 @@ class Cenario:
     politicas: InMemoryPoliticaCompraRepositorio
     avisos: InMemoryAvisosRepositorio
     decisoes: InMemoryDecisoesRepositorio
+    cobrancas: InMemoryCobrancasRepositorio
     relogio: RelogioFake
 
 
@@ -129,6 +140,7 @@ def preparar(*, erp: InMemoryERPAdapter | None = None, **parametros: object) -> 
         politicas=InMemoryPoliticaCompraRepositorio(),
         avisos=InMemoryAvisosRepositorio(),
         decisoes=InMemoryDecisoesRepositorio(),
+        cobrancas=InMemoryCobrancasRepositorio(),
         relogio=RelogioFake(AGORA),
     )
     if parametros:
@@ -137,6 +149,7 @@ def preparar(*, erp: InMemoryERPAdapter | None = None, **parametros: object) -> 
     app.dependency_overrides[get_politica_compra_repositorio] = lambda: cenario.politicas
     app.dependency_overrides[get_avisos_repositorio] = lambda: cenario.avisos
     app.dependency_overrides[get_decisoes_repositorio] = lambda: cenario.decisoes
+    app.dependency_overrides[get_cobrancas_repositorio] = lambda: cenario.cobrancas
     app.dependency_overrides[get_relogio] = lambda: cenario.relogio
     return cenario
 

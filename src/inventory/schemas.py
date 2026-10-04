@@ -94,6 +94,7 @@ class ItemEmTransito(BaseModel):
 
     pedido_id: UUID
     fornecedor_id: UUID
+    fornecedor_nome: str
     status: StatusEmTransito
     quantidade_pendente: int
     data_prevista_entrega: date | None
@@ -104,3 +105,66 @@ class EmTransito(BaseModel):
 
     total_unidades: int
     itens: list[ItemEmTransito]
+
+
+class EntregaRecebida(BaseModel):
+    """Pedido de compra `recebido_total` com data prevista: quando devia chegar e quando chegou."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pedido_id: UUID
+    data_prevista_entrega: date
+    recebido_em: datetime
+
+
+def dias_de_atraso(data_prevista: date | None, hoje: date) -> int | None:
+    """Dias desde a data prevista de entrega, só quando ela já passou. Sem data prevista,
+    nunca há atraso."""
+    if data_prevista is None or data_prevista >= hoje:
+        return None
+    return (hoje - data_prevista).days
+
+
+class EntregaAtrasada(BaseModel):
+    """Item de pedido de compra aberto, com quantidade pendente e a data prevista de entrega
+    já vencida."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pedido_id: UUID
+    fornecedor_id: UUID
+    fornecedor_nome: str
+    sku_code: str
+    status: StatusEmTransito
+    quantidade_pendente: int
+    data_prevista_entrega: date
+    dias_de_atraso: int
+
+
+class AtrasoRecebido(BaseModel):
+    """Entrega recebida depois da data prevista."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pedido_id: UUID
+    data_prevista_entrega: date
+    recebido_em: datetime
+    dias_de_atraso: int
+
+
+class HistoricoDeAtrasos(BaseModel):
+    """As entregas recebidas de um fornecedor e as que chegaram atrasadas, do recebimento
+    mais recente para o mais antigo. A média é só das atrasadas, nula sem nenhuma."""
+
+    model_config = ConfigDict(frozen=True)
+
+    fornecedor_id: UUID
+    fornecedor_nome: str
+    entregas_recebidas: int
+    atrasos: list[AtrasoRecebido]
+
+    @property
+    def media_dias_de_atraso(self) -> float | None:
+        if not self.atrasos:
+            return None
+        return sum(a.dias_de_atraso for a in self.atrasos) / len(self.atrasos)

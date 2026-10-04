@@ -23,6 +23,7 @@ NOW = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
 
 
 def _inv(**kwargs) -> Inventory:
+    kwargs.setdefault("fornecedores", [make_fornecedor()])
     adapter = InMemoryERPAdapter(**kwargs)
     return Inventory(adapter, Sales(adapter, now=NOW))
 
@@ -312,6 +313,7 @@ def test_em_transito_soma_pedidos_e_ignora_outros_skus() -> None:
     )
     inv = _inv(
         skus=[sku, outro],
+        fornecedores=[katrina, buddemeyer],
         pedidos_compra=[tardio, cedo],
         itens_pedido_compra=[
             make_item_pedido_compra(tardio, sku, quantidade=30),

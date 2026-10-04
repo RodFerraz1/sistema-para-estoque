@@ -658,4 +658,4 @@ def test_modo_ignorar_nunca_alerta_sazonalidade() -> None:
 
 
 def test_motivos_de_alerta_sao_os_tipos_de_alerta_mais_o_piso() -> None:
-    assert {m.value for m in MotivoAlerta} == {t.value for t in TipoAlerta} | {"abaixo_do_piso_alerta"}
+    assert {m.value for m in MotivoAlerta} == {t.value for t in TipoAlerta} | {"abaixo_do_piso_alerta", "entrega_atrasada"}

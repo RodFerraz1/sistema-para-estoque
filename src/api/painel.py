@@ -7,17 +7,20 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from src.api.conversores import aviso_to_response, decisao_to_response
+from src.api.conversores import aviso_to_response, cobranca_to_response, decisao_to_response
 from src.api.schemas import (
     AvisoResponse,
     DecisaoCompraResponse,
     EstoqueResponse,
+    FornecedorComAtrasoResponse,
     ItemAlertaResponse,
     ItemDecididoResponse,
     ItemEstoqueResponse,
     PainelResponse,
+    PedidoAtrasadoResponse,
     RegistrarAvisoRequest,
     RegistrarDecisaoRequest,
+    SKUComEntregaAtrasadaResponse,
 )
 from src.api.skus import sku_ou_404
 from src.catalog.dependencies import get_catalog
@@ -28,11 +31,13 @@ from src.painel.schemas import (
     POR_PAGINA_MAXIMO,
     FiltroEstoque,
     FiltroPainel,
+    FornecedorComAtraso,
     ItemAlerta,
     ItemDecidido,
     ItemEstoque,
     MotivoDoFiltro,
     OrdemEstoque,
+    PedidoAtrasado,
     SituacaoEstoque,
 )
 from src.painel.service import (
@@ -86,6 +91,39 @@ def _decidido_to_response(item: ItemDecidido) -> ItemDecididoResponse:
     )
 
 
+def _pedido_atrasado_to_response(pedido: PedidoAtrasado) -> PedidoAtrasadoResponse:
+    return PedidoAtrasadoResponse(
+        pedido_id=pedido.pedido_id,
+        status=pedido.status,
+        data_prevista_entrega=pedido.data_prevista_entrega,
+        dias_de_atraso=pedido.dias_de_atraso,
+        ultima_cobranca=cobranca_to_response(pedido.ultima_cobranca) if pedido.ultima_cobranca else None,
+        skus=[
+            SKUComEntregaAtrasadaResponse(
+                sku_code=s.sku.sku_code,
+                produto_nome=s.sku.produto_nome,
+                cor=s.sku.cor,
+                tamanho=s.sku.tamanho,
+                quantidade_pendente=s.quantidade_pendente,
+                disponivel=s.disponivel,
+                cobertura_dias=_dias(s.cobertura_meses),
+                em_ruptura=s.em_ruptura,
+            )
+            for s in pedido.skus
+        ],
+    )
+
+
+def _fornecedor_com_atraso_to_response(fornecedor: FornecedorComAtraso) -> FornecedorComAtrasoResponse:
+    return FornecedorComAtrasoResponse(
+        fornecedor_id=fornecedor.fornecedor_id,
+        fornecedor_nome=fornecedor.fornecedor_nome,
+        tem_sku_em_ruptura=fornecedor.tem_sku_em_ruptura,
+        maior_atraso_dias=fornecedor.maior_atraso_dias,
+        pedidos=[_pedido_atrasado_to_response(p) for p in fornecedor.pedidos],
+    )
+
+
 def _item_de_estoque_to_response(item: ItemEstoque) -> ItemEstoqueResponse:
     return ItemEstoqueResponse(
         sku_code=item.sku.sku_code,
@@ -112,7 +150,8 @@ def painel(
     """Calculado na hora com a política ativa. 503 com o banco fora do ar. `busca` acha
     todas as palavras no código, produto, cor e tamanho, sem acento nem maiúscula;
     `fornecedor` é o id de um fornecedor que vende o SKU; `motivo` é um motivo de alerta ou
-    `aviso`. Busca, categoria e fornecedor filtram também os decididos."""
+    `aviso`. Busca, categoria e fornecedor filtram também os decididos. As entregas
+    atrasadas são as dos SKUs que ficaram nos alertas."""
     filtro = FiltroPainel(busca=busca, categoria=categoria, motivo=motivo, fornecedor_id=fornecedor)
     resultado = painel.painel(filtro)
     return PainelResponse(
@@ -120,6 +159,7 @@ def painel(
         decididos=[_decidido_to_response(i) for i in resultado.decididos],
         skus_com_erro=resultado.skus_com_erro,
         contagens=resultado.contagens,
+        entregas_atrasadas=[_fornecedor_com_atraso_to_response(f) for f in resultado.entregas_atrasadas],
     )
 
 

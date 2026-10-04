@@ -224,6 +224,7 @@ def test_itens_em_transito_de_filtra_e_ordena_por_previsao() -> None:
     rascunho = make_pedido_compra(fornecedor, "rascunho")
     erp = InMemoryERPAdapter(
         skus=[sku],
+        fornecedores=[fornecedor],
         pedidos_compra=[sem_data, tardio, cedo, rascunho],
         itens_pedido_compra=[
             make_item_pedido_compra(sem_data, sku, quantidade=10),

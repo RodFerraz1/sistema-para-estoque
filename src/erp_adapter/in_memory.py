@@ -25,6 +25,7 @@ from src.erp_adapter.port import ERPAdapter
 from src.erp_adapter.schemas import ItemDePedido, StatusPedidoCompra
 from src.inventory.schemas import (
     STATUS_EM_TRANSITO,
+    EntregaRecebida,
     Estoque,
     ItemEmTransito,
     Movimentacao,
@@ -41,6 +42,7 @@ class PedidoCompra(BaseModel):
     status: StatusPedidoCompra
     data_prevista_entrega: date | None
     criado_em: datetime
+    recebido_em: datetime | None = None
 
 
 class ItemPedidoCompra(BaseModel):
@@ -131,6 +133,7 @@ class InMemoryERPAdapter(ERPAdapter):
         pedidos = {
             p.id: p for p in self.pedidos_compra if p.status in STATUS_EM_TRANSITO
         }
+        nomes = {f.id: f.nome for f in self.fornecedores}
         por_sku: dict[UUID, list[ItemEmTransito]] = defaultdict(list)
         for i in self.itens_pedido_compra:
             pedido = pedidos.get(i.pedido_id)
@@ -140,6 +143,7 @@ class InMemoryERPAdapter(ERPAdapter):
                 ItemEmTransito(
                     pedido_id=pedido.id,
                     fornecedor_id=pedido.fornecedor_id,
+                    fornecedor_nome=nomes[pedido.fornecedor_id],
                     status=cast(StatusEmTransito, pedido.status),
                     quantidade_pendente=i.quantidade - i.quantidade_recebida,
                     data_prevista_entrega=pedido.data_prevista_entrega,
@@ -173,6 +177,17 @@ class InMemoryERPAdapter(ERPAdapter):
             if i.sku_id == sku_id and (pedido := pedidos.get(i.pedido_id)) is not None
         ]
         return sorted(itens, key=lambda i: (i.criado_em, str(i.pedido_id)), reverse=True)
+
+    def entregas_recebidas_de(self, fornecedor_id: UUID) -> list[EntregaRecebida]:
+        entregas = [
+            EntregaRecebida(pedido_id=p.id, data_prevista_entrega=p.data_prevista_entrega, recebido_em=p.recebido_em)
+            for p in self.pedidos_compra
+            if p.fornecedor_id == fornecedor_id
+            and p.status == "recebido_total"
+            and p.data_prevista_entrega is not None
+            and p.recebido_em is not None
+        ]
+        return sorted(entregas, key=lambda e: (e.recebido_em, str(e.pedido_id)), reverse=True)
 
     def _ativos(self) -> dict[UUID, str]:
         return {s.id: s.sku_code for s in self.skus if s.ativo}

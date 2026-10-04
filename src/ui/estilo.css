@@ -714,6 +714,7 @@ legend + * {
 
 .grupo > header h2 {
   margin: 0;
+  white-space: nowrap;
 }
 
 .grupo > header .contagem {
@@ -835,6 +836,131 @@ a.item::after {
   margin-bottom: 4px;
 }
 
+.fornecedor-atrasado {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-left: 4px solid var(--cor, var(--destaque));
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 16px 20px;
+}
+
+.fornecedor-atrasado > header {
+  position: static;
+  background: none;
+  backdrop-filter: none;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.fornecedor-atrasado > header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.historico-atrasos {
+  margin: 4px 0 0;
+  font-size: 0.88rem;
+}
+
+.pedido-atrasado {
+  border-top: 1px solid var(--borda);
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.pedido-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  font-weight: 500;
+}
+
+.recado-cobranca {
+  background: var(--destaque-fundo);
+  border: 1px solid #fde68a;
+  border-radius: var(--raio-pequeno);
+  padding: 8px 12px;
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+}
+
+ul.skus-atrasados {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+ul.skus-atrasados li {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.3fr) minmax(0, 2fr) 110px;
+  align-items: center;
+  gap: 6px 24px;
+  background: var(--superficie-2);
+  border-radius: var(--raio-pequeno);
+  padding: 10px 12px;
+}
+
+ul.skus-atrasados .item-produto a {
+  color: var(--texto);
+}
+
+ul.skus-atrasados .item-produto code {
+  font-size: 0.8rem;
+}
+
+ul.skus-atrasados .selos {
+  justify-content: flex-end;
+}
+
+details.cobrar {
+  margin-top: 12px;
+}
+
+details.cobrar > summary {
+  list-style: none;
+  color: var(--texto);
+}
+
+details.cobrar > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.cobrar[open] > summary {
+  background: var(--superficie-2);
+}
+
+.form-cobranca {
+  display: grid;
+  grid-template-columns: minmax(160px, auto) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.form-cobranca .campo {
+  margin: 0;
+}
+
+.form-cobranca input {
+  width: 100%;
+}
+
+.form-cobranca > div:last-child {
+  grid-column: 1 / -1;
+}
+
+.form-cobranca > div:last-child:empty {
+  display: none;
+}
+
 details.decididos {
   margin-top: 40px;
 }
@@ -891,6 +1017,19 @@ details.decididos ul {
 
   a.item {
     grid-template-columns: 1fr;
+  }
+
+  ul.skus-atrasados li,
+  .form-cobranca {
+    grid-template-columns: 1fr;
+  }
+
+  ul.skus-atrasados .selos {
+    justify-content: flex-start;
+  }
+
+  .fornecedor-atrasado {
+    padding: 14px 16px;
   }
 
   a.item::after {
@@ -1231,6 +1370,24 @@ details.decididos ul {
 
 .historico li:last-child {
   border-bottom: 0;
+}
+
+.entrega-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+ul.cobrancas {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.9rem;
+}
+
+ul.cobrancas li {
+  margin-bottom: 4px;
 }
 
 /* Política */

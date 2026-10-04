@@ -24,7 +24,7 @@ from src.ai.schemas import (
     Veredito,
 )
 from src.erp_adapter.schemas import StatusPedidoCompra
-from src.inventory.schemas import Cobertura, Estoque
+from src.inventory.schemas import Cobertura, Estoque, StatusEmTransito
 from src.painel.schemas import GrupoDoPainel, TipoAviso, TipoDecisao
 from src.politica_compra.schemas import MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
@@ -373,9 +373,108 @@ class ItemDecididoResponse(BaseModel):
     decisao: DecisaoCompraResponse
 
 
+class CobrancaEntregaResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    pedido_id: UUID
+    fornecedor_id: UUID
+    nova_previsao: date | None
+    comentario: str | None
+    cobrado_por: str
+    criado_em: datetime
+
+
+class RegistrarCobrancaRequest(BaseModel):
+    """`nova_previsao` opcional, de hoje em diante."""
+
+    nova_previsao: date | None = None
+    comentario: TextoLivre | None = None
+
+
+class SKUComEntregaAtrasadaResponse(BaseModel):
+    """`cobertura_dias` é nula para SKU sem giro."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    produto_nome: str
+    cor: str
+    tamanho: str
+    quantidade_pendente: int
+    disponivel: int
+    cobertura_dias: float | None
+    em_ruptura: bool
+
+
+class PedidoAtrasadoResponse(BaseModel):
+    """`ultima_cobranca`: a cobrança que venceu sem a mercadoria chegar, se houve."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pedido_id: UUID
+    status: StatusEmTransito
+    data_prevista_entrega: date
+    dias_de_atraso: int
+    ultima_cobranca: CobrancaEntregaResponse | None
+    skus: list[SKUComEntregaAtrasadaResponse]
+
+
+class FornecedorComAtrasoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    fornecedor_id: UUID
+    fornecedor_nome: str
+    tem_sku_em_ruptura: bool
+    maior_atraso_dias: int
+    pedidos: list[PedidoAtrasadoResponse]
+
+
+class EntregaPendenteResponse(BaseModel):
+    """`dias_de_atraso` só quando a data prevista já passou. `cobrancas`: da mais recente
+    para a mais antiga; a nova previsão é a da primeira."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pedido_id: UUID
+    fornecedor_nome: str
+    status: StatusEmTransito
+    quantidade_pendente: int
+    data_prevista_entrega: date | None
+    atrasada: bool
+    dias_de_atraso: int | None
+    cobranca_vigente: bool
+    cobrancas: list[CobrancaEntregaResponse]
+
+
+class AtrasoRecebidoResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    pedido_id: UUID
+    data_prevista_entrega: date
+    recebido_em: datetime
+    dias_de_atraso: int
+
+
+class HistoricoDeAtrasosResponse(BaseModel):
+    """`media_dias_de_atraso` é só das entregas atrasadas, nula sem nenhuma. `atrasos`: do
+    recebimento mais recente para o mais antigo."""
+
+    model_config = ConfigDict(frozen=True)
+
+    fornecedor_id: UUID
+    fornecedor_nome: str
+    entregas_recebidas: int
+    entregas_atrasadas: int
+    media_dias_de_atraso: float | None
+    atrasos: list[AtrasoRecebidoResponse]
+
+
 class PainelResponse(BaseModel):
     """`decididos`: os SKUs com decisão de compra vigente, a mais recente primeiro.
-    `contagens`: quantos alertas cada grupo tem, com o filtro aplicado."""
+    `contagens`: quantos alertas cada grupo tem, com o filtro aplicado.
+    `entregas_atrasadas`: os pedidos atrasados sem cobrança vigente dos SKUs dos alertas,
+    por fornecedor, primeiro os que têm SKU em ruptura e depois o maior atraso."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -383,6 +482,7 @@ class PainelResponse(BaseModel):
     decididos: list[ItemDecididoResponse]
     skus_com_erro: list[str]
     contagens: dict[GrupoDoPainel, int]
+    entregas_atrasadas: list[FornecedorComAtrasoResponse]
 
 
 class ItemEstoqueResponse(BaseModel):

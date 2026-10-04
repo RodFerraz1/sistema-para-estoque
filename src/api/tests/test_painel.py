@@ -174,7 +174,14 @@ def test_nada_pedindo_atencao_devolve_listas_vazias(client: TestClient) -> None:
         "alertas": [],
         "decididos": [],
         "skus_com_erro": [],
-        "contagens": {"pedidos_de_vendas": 0, "em_ruptura": 0, "vao_faltar": 0, "outros_alertas": 0},
+        "contagens": {
+            "pedidos_de_vendas": 0,
+            "entregas_atrasadas": 0,
+            "em_ruptura": 0,
+            "vao_faltar": 0,
+            "outros_alertas": 0,
+        },
+        "entregas_atrasadas": [],
     }
 
 

@@ -53,6 +53,9 @@ RUPTURA_SEM_PEDIDO = "JDCP-BRAN-CASAL-01"
 RUPTURA_COM_PEDIDO_ATRASADO = "TBC-BEGE-70140-02"
 QUEDA_SEM_ESTOQUE = "PM-AMAR-3040-01"
 DIAS_DE_ATRASO = 10
+# As entregas já recebidas da Katrina chegaram atrasadas, para o histórico de atrasos do
+# fornecedor ter o que mostrar na negociação; as dos outros fornecedores chegaram no prazo.
+ATRASO_NAS_ENTREGAS_DA_KATRINA = 6
 KATRINA = "Katrina Têxtil"
 
 
@@ -770,7 +773,8 @@ def _seed_pedidos_compra(
         )
         recebido_em = None
         if enviado_em is not None and status == "recebido_total":
-            recebido_em = enviado_em + lead_time
+            atraso = ATRASO_NAS_ENTREGAS_DA_KATRINA if fornecedor["nome"] == KATRINA else 0
+            recebido_em = enviado_em + lead_time + timedelta(days=atraso)
         elif enviado_em is not None and status == "recebido_parcial":
             recebido_em = agora - timedelta(days=2)
         n_itens = rng.randint(3, 6)

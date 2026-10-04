@@ -93,8 +93,8 @@ def erp_no_banco(erp: InMemoryERPAdapter) -> Iterator[None]:
                 text(
                     """
                     INSERT INTO erp.pedidos_compra
-                      (id, fornecedor_id, status, data_prevista_entrega, valor_total_reais, criado_em)
-                    VALUES (:id, :fornecedor_id, :status, :data_prevista_entrega, 0, :criado_em)
+                      (id, fornecedor_id, status, data_prevista_entrega, valor_total_reais, criado_em, recebido_em)
+                    VALUES (:id, :fornecedor_id, :status, :data_prevista_entrega, 0, :criado_em, :recebido_em)
                     """
                 ),
                 pedido.model_dump(),

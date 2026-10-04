@@ -5,13 +5,20 @@ dependência intra-módulo explícita (documentada em module-interfaces.md).
 """
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from uuid import UUID
+
 from src.erp_adapter.port import ERPAdapter
 from src.inventory.schemas import (
+    AtrasoRecebido,
     Cobertura,
     EmTransito,
+    EntregaAtrasada,
     Estoque,
+    HistoricoDeAtrasos,
     ItemEmTransito,
     SKUAbaixoDoPiso,
+    dias_de_atraso,
 )
 from src.sales.schemas import GiroMedioMensal
 from src.sales.service import Sales
@@ -51,6 +58,53 @@ class Inventory:
     def em_transito_por_sku(self) -> dict[str, EmTransito]:
         """`em_transito` dos SKUs ativos numa leitura só. SKU sem nada a caminho fica de fora."""
         return {codigo: _em_transito(itens) for codigo, itens in self._erp.itens_em_transito().items()}
+
+    def entregas_atrasadas(self, agora: datetime) -> list[EntregaAtrasada]:
+        """Os itens em trânsito dos SKUs ativos com a data prevista de entrega antes de hoje,
+        numa leitura só, do maior atraso para o menor (o pedido e o código desempatam)."""
+        hoje = agora.date()
+        entregas = [
+            EntregaAtrasada(
+                pedido_id=item.pedido_id,
+                fornecedor_id=item.fornecedor_id,
+                fornecedor_nome=item.fornecedor_nome,
+                sku_code=codigo,
+                status=item.status,
+                quantidade_pendente=item.quantidade_pendente,
+                data_prevista_entrega=item.data_prevista_entrega,
+                dias_de_atraso=atraso,
+            )
+            for codigo, itens in self._erp.itens_em_transito().items()
+            for item in itens
+            if item.data_prevista_entrega is not None
+            and (atraso := dias_de_atraso(item.data_prevista_entrega, hoje)) is not None
+        ]
+        entregas.sort(key=lambda e: (-e.dias_de_atraso, str(e.pedido_id), e.sku_code))
+        return entregas
+
+    def atrasos_do_fornecedor(self, fornecedor_id: UUID) -> HistoricoDeAtrasos | None:
+        """`None` para fornecedor inexistente. O atraso compara o dia do recebimento (UTC)
+        com a data prevista."""
+        fornecedor = self._erp.carregar_fornecedor(fornecedor_id)
+        if fornecedor is None:
+            return None
+        recebidas = self._erp.entregas_recebidas_de(fornecedor_id)
+        atrasos = [
+            AtrasoRecebido(
+                pedido_id=e.pedido_id,
+                data_prevista_entrega=e.data_prevista_entrega,
+                recebido_em=e.recebido_em,
+                dias_de_atraso=atraso,
+            )
+            for e in recebidas
+            if (atraso := dias_de_atraso(e.data_prevista_entrega, e.recebido_em.astimezone(UTC).date())) is not None
+        ]
+        return HistoricoDeAtrasos(
+            fornecedor_id=fornecedor.id,
+            fornecedor_nome=fornecedor.nome,
+            entregas_recebidas=len(recebidas),
+            atrasos=atrasos,
+        )
 
     def abaixo_do_piso(self, dias_piso: int = 20) -> list[SKUAbaixoDoPiso]:
         """SKUs ativos com cobertura abaixo do piso, ordenados por urgência.

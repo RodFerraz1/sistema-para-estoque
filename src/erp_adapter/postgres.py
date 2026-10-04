@@ -17,6 +17,7 @@ from src.erp_adapter.port import ERPAdapter
 from src.erp_adapter.schemas import ItemDePedido
 from src.inventory.schemas import (
     STATUS_EM_TRANSITO,
+    EntregaRecebida,
     Estoque,
     ItemEmTransito,
     Movimentacao,
@@ -74,12 +75,13 @@ def _row_to_fornecedor(r: Row) -> FornecedorParaSKU:
 
 
 _EM_TRANSITO_SELECT = """
-    SELECT s.sku_code, p.id AS pedido_id, p.fornecedor_id,
+    SELECT s.sku_code, p.id AS pedido_id, p.fornecedor_id, f.nome AS fornecedor_nome,
            p.status::text AS status,
            i.quantidade - i.quantidade_recebida AS quantidade_pendente,
            p.data_prevista_entrega
     FROM erp.pedidos_compra_itens i
     JOIN erp.pedidos_compra p ON p.id = i.pedido_id
+    JOIN erp.fornecedores f ON f.id = p.fornecedor_id
     JOIN erp.skus s ON s.id = i.sku_id
     WHERE p.status::text = ANY(:status)
       AND i.quantidade > i.quantidade_recebida
@@ -90,6 +92,7 @@ def _row_to_em_transito(r: Row) -> ItemEmTransito:
     return ItemEmTransito(
         pedido_id=r.pedido_id,
         fornecedor_id=r.fornecedor_id,
+        fornecedor_nome=r.fornecedor_nome,
         status=r.status,
         quantidade_pendente=r.quantidade_pendente,
         data_prevista_entrega=r.data_prevista_entrega,
@@ -272,6 +275,22 @@ class PostgresERPAdapter(ERPAdapter):
             )
             for r in rows
         ]
+
+    def entregas_recebidas_de(self, fornecedor_id: UUID) -> list[EntregaRecebida]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT id AS pedido_id, data_prevista_entrega, recebido_em
+                    FROM erp.pedidos_compra
+                    WHERE fornecedor_id = :fornecedor_id AND status = 'recebido_total'
+                      AND data_prevista_entrega IS NOT NULL AND recebido_em IS NOT NULL
+                    ORDER BY recebido_em DESC, id::text DESC
+                    """
+                ),
+                {"fornecedor_id": fornecedor_id},
+            ).all()
+        return [EntregaRecebida.model_validate(r._asdict()) for r in rows]
 
     def estoques(self) -> dict[str, Estoque]:
         with self._engine.connect() as conn:

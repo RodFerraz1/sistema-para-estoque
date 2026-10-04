@@ -49,12 +49,12 @@ A UI fica em `http://localhost:8000/ui/` (a raiz redireciona para o painel de al
 
 ### Resetar o ambiente local
 
-O seed (`uv run python -m scripts.seed`) apaga e recria só o schema `erp`. As tabelas do Copilot (schema `copilot`) não são tocadas por ele e acumulam o que o uso grava: avisos da equipe de vendas, decisões de compra, registros de decisão do chat e versões da política. Para voltar ao estado inicial:
+O seed (`uv run python -m scripts.seed`) apaga e recria só o schema `erp`. As tabelas do Copilot (schema `copilot`) não são tocadas por ele e acumulam o que o uso grava: avisos da equipe de vendas, decisões de compra, cobranças de entrega, registros de decisão do chat e versões da política. Para voltar ao estado inicial:
 
 ```bash
 uv run python -m scripts.seed
 docker compose exec db psql -U copilot -d copilot -c "
-  TRUNCATE copilot.avisos, copilot.decisoes_compra, copilot.registros_decisao;
+  TRUNCATE copilot.avisos, copilot.decisoes_compra, copilot.cobrancas_entrega, copilot.registros_decisao;
   DELETE FROM copilot.politicas_compra WHERE versao > 1;"
 ```
 

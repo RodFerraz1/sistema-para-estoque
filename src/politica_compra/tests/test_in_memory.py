@@ -22,7 +22,7 @@ def test_nasce_com_a_v1_padrao() -> None:
     assert ativa.parametros.dias_historico_minimo == 60
     assert ativa.parametros.ciclo_compra_meses == 2.0
     assert ativa.parametros.lead_time_base == "ignorar"
-    assert ativa.parametros.motivos_de_alerta == ("abaixo_do_piso_alerta",)
+    assert ativa.parametros.motivos_de_alerta == ("abaixo_do_piso_alerta", "entrega_atrasada")
 
 
 def test_salvar_nova_versao_incrementa_e_vira_ativa() -> None:

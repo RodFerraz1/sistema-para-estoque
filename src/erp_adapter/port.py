@@ -14,7 +14,7 @@ from uuid import UUID
 
 from src.catalog.schemas import SKU, Fornecedor, FornecedorParaSKU
 from src.erp_adapter.schemas import ItemDePedido
-from src.inventory.schemas import Estoque, ItemEmTransito, Movimentacao
+from src.inventory.schemas import EntregaRecebida, Estoque, ItemEmTransito, Movimentacao
 from src.sales.schemas import Venda, VendasDoDia, VendasDoMes
 
 
@@ -52,6 +52,11 @@ class ERPAdapter(Protocol):
     def itens_de_pedido_de(self, sku_code: str) -> list[ItemDePedido]:
         """Itens de pedido de compra do SKU, de todos os status, do pedido mais recente
         para o mais antigo."""
+        ...
+
+    def entregas_recebidas_de(self, fornecedor_id: UUID) -> list[EntregaRecebida]:
+        """Pedidos `recebido_total` do fornecedor com data prevista e data de recebimento,
+        do recebido mais recente para o mais antigo."""
         ...
 
     def estoques(self) -> dict[str, Estoque]: ...

@@ -5,6 +5,7 @@ import {
   api,
   cabecalho,
   coberturaEmDias,
+  dataCurta,
   dataHora,
   dias,
   el,
@@ -222,6 +223,54 @@ function precos(p) {
   ];
 }
 
+function cobranca(c) {
+  const previsao = c.nova_previsao ? `nova previsão ${dataCurta(c.nova_previsao)}` : "sem nova previsão";
+  return el(
+    "li",
+    {},
+    el("span", {}, `${c.cobrado_por} cobrou em ${dataHora(c.criado_em)}: ${previsao}`),
+    c.comentario ? el("div", {}, el("q", {}, c.comentario)) : null,
+  );
+}
+
+function situacaoDaEntrega(e) {
+  const novaPrevisao = e.cobrancas[0]?.nova_previsao;
+  if (e.cobranca_vigente) {
+    return el("span", { class: "selo bom" }, novaPrevisao ? `Cobrado, nova previsão ${dataCurta(novaPrevisao)}` : "Cobrado");
+  }
+  if (e.atrasada) return el("span", { class: "selo urgente" }, `Atrasada há ${dias(e.dias_de_atraso)}`);
+  if (e.data_prevista_entrega === null) return el("span", { class: "selo" }, "Sem data prevista");
+  return el("span", { class: "selo" }, "No prazo");
+}
+
+function entregas(lista) {
+  if (lista.length === 0) return el("p", { class: "suave" }, "Nenhum pedido de compra a caminho deste produto.");
+  return el(
+    "ul",
+    { class: "historico entregas" },
+    lista.map((e) =>
+      el(
+        "li",
+        {},
+        el(
+          "div",
+          { class: "entrega-cabecalho" },
+          el("strong", {}, `${numero(e.quantidade_pendente)} un. da ${e.fornecedor_nome}`),
+          situacaoDaEntrega(e),
+        ),
+        el(
+          "div",
+          { class: "suave" },
+          `Pedido ${e.pedido_id.slice(0, 8).toUpperCase()} · ${STATUS_DO_PEDIDO[e.status] ?? e.status} · `,
+          e.data_prevista_entrega ? `previsto para ${dataCurta(e.data_prevista_entrega)}` : "sem data prevista no ERP",
+          e.atrasada && e.cobranca_vigente ? `, ${dias(e.dias_de_atraso)} de atraso` : "",
+        ),
+        e.cobrancas.length ? el("ul", { class: "cobrancas" }, e.cobrancas.map(cobranca)) : null,
+      ),
+    ),
+  );
+}
+
 function avisos(lista) {
   if (lista.length === 0) return el("p", { class: "suave" }, "Nenhum aviso aberto.");
   return el(
@@ -336,6 +385,7 @@ if (!skuCode) {
   const principais = [
     analise,
     sugestaoAtual,
+    carregar("entregas", api("GET", `/skus/${sku}/entregas`), entregas),
     carregar("avisos", api("GET", `/skus/${sku}/avisos`), avisos),
     carregar("decisoes", api("GET", `/skus/${sku}/decisoes`), decisoes),
     carregar("precos", api("GET", `/skus/${sku}/precos`), precos),

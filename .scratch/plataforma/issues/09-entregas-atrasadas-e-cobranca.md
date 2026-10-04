@@ -4,14 +4,18 @@
 
 **Blocked by:** 04, 06
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** `.scratch/plataforma/spec.md` (seção "Entregas atrasadas e cobrança")
 
-- [ ] `inventory.entregas_atrasadas(agora)` a partir do retrato: status `aprovado`, `enviado` ou `recebido_parcial`, pendente maior que zero e data prevista anterior a hoje. Sem data prevista, nunca atrasada.
-- [ ] `MotivoAlerta`/`TipoAlerta` ganham `entrega_atrasada`. Migration: a versão padrão da política passa a incluí-lo. A tela de política mostra a caixa nova.
-- [ ] Tabela `cobrancas_entrega` no schema `copilot`, com `usuario_id`. Cobrança vigente: a mais recente do pedido, até `nova_previsao` ou por `PRAZO_DA_COBRANCA` (7 dias).
-- [ ] `GET /painel` ganha `entregas_atrasadas` (fornecedores, pedidos e SKUs) e o filtro `motivo=entrega_atrasada`. `POST /pedidos/{id}/cobrancas` e `GET /fornecedores/{id}/atrasos`.
-- [ ] UI: grupo "Entregas atrasadas" no painel com o botão "Cobrei o fornecedor" (nova previsão e comentário), e bloco de entregas pendentes na tela do SKU.
-- [ ] Testes HTTP com relógio injetado: data ontem entra, hoje não, sem data nunca, `recebido_total` nunca, a cobrança tira até a nova previsão, a previsão vencida traz de volta, e o fornecedor com SKU em ruptura vem primeiro. Contrato do repositório em memória e no Postgres.
-- [ ] Verificado no navegador com o cenário do pedido atrasado do seed. Typecheck e suíte completa verdes.
+- [x] `inventory.entregas_atrasadas(agora)` a partir do retrato: status `aprovado`, `enviado` ou `recebido_parcial`, pendente maior que zero e data prevista anterior a hoje. Sem data prevista, nunca atrasada.
+- [x] `MotivoAlerta`/`TipoAlerta` ganham `entrega_atrasada`. Migration: a versão padrão da política passa a incluí-lo. A tela de política mostra a caixa nova.
+- [x] Tabela `cobrancas_entrega` no schema `copilot`, com `usuario_id`. Cobrança vigente: a mais recente do pedido, até `nova_previsao` ou por `PRAZO_DA_COBRANCA` (7 dias).
+- [x] `GET /painel` ganha `entregas_atrasadas` (fornecedores, pedidos e SKUs) e o filtro `motivo=entrega_atrasada`. `POST /pedidos/{id}/cobrancas` e `GET /fornecedores/{id}/atrasos`.
+- [x] UI: grupo "Entregas atrasadas" no painel com o botão "Cobrei o fornecedor" (nova previsão e comentário), e bloco de entregas pendentes na tela do SKU.
+- [x] Testes HTTP com relógio injetado: data ontem entra, hoje não, sem data nunca, `recebido_total` nunca, a cobrança tira até a nova previsão, a previsão vencida traz de volta, e o fornecedor com SKU em ruptura vem primeiro. Contrato do repositório em memória e no Postgres.
+- [x] Verificado no navegador com o cenário do pedido atrasado do seed. Typecheck e suíte completa verdes.
+
+## Comments
+
+**2026-10-04 (agente):** `Inventory.entregas_atrasadas(agora)` lê o lote `itens_em_transito()` (o painel passou de 9 para 11 consultas fixas: essa leitura e as cobranças) e `Inventory.atrasos_do_fornecedor(id)` lê a porta nova `entregas_recebidas_de(fornecedor_id)` (só `recebido_total` com data prevista e `recebido_em`). `ItemEmTransito` ganhou `fornecedor_nome` e o `PedidoCompra` em memória ganhou `recebido_em` (o `InMemoryERPAdapter` agora exige o fornecedor do pedido em `fornecedores`). Migration `0017_entregas_atrasadas`: `entrega_atrasada` na constraint de motivos, v1 padrão com `abaixo_do_piso_alerta` e `entrega_atrasada`, e a tabela `copilot.cobrancas_entrega` (`usuario_id` NOT NULL com FK). Repositório de cobranças em memória e Postgres com contrato (`src/painel/tests/test_contrato_cobrancas.py`). Rotas em `src/api/entregas.py`: `POST /pedidos/{id}/cobrancas` (404 para pedido sem entrega atrasada, 422 com nova previsão antes de hoje), `GET /fornecedores/{id}/atrasos` e `GET /skus/{sku}/entregas`. Decisões: `TipoAlerta` não ganhou `entrega_atrasada` (o motivo é calculado no `painel`, como a ruptura, porque depende da cobrança; o teste de paridade lista os dois). Grupo novo `entregas_atrasadas` em `GRUPOS`, logo depois dos avisos e antes da ruptura: SKU em ruptura com pedido atrasado vai para as entregas ("já comprou e não chegou", spec, Solution 6). A seção `entregas_atrasadas` do `/painel` sai dos SKUs que ficaram nos alertas com o motivo, então os filtros valem para ela; SKU com decisão vigente fica fora dela. A cobrança vigente vale até a nova previsão inclusive (volta no dia seguinte) ou 7 dias (`PRAZO_DA_COBRANCA`); os dias de atraso contam da data prevista original, e `ultima_cobranca` mostra a cobrança vencida. Quando o pedido é cobrado, o SKU em ruptura volta para "Em ruptura" com a sugestão de compra, porque o motivo de ruptura continua valendo. Fora do texto do ticket: `GET /skus/{sku}/entregas` (o bloco da tela do SKU precisa dele), `cobrado_por` na tabela (no padrão de `avisado_por`/`decidido_por`), o histórico de atrasos numa linha de cada card de fornecedor do painel, e o seed com as entregas já recebidas da Katrina 6 dias atrasadas (`ATRASO_NAS_ENTREGAS_DA_KATRINA`), para o histórico ter o que mostrar. README: o reset também esvazia `copilot.cobrancas_entrega`. Smoke `test_entrega_atrasada_do_seed_e_cobranca`. Para o ticket 10: o episódio de `entrega_atrasada` é por pedido, e "atrasado sem cobrança vigente" é o que o `Painel.painel` monta antes de agrupar (`_cobranca_vigente` em `painel.service`). Suíte com 1013 testes verde; pyright com os mesmos 79 erros por arquivo.

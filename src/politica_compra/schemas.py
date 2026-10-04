@@ -35,9 +35,10 @@ class SazonalidadeModo(StrEnum):
 
 class MotivoAlerta(StrEnum):
     """Alertas que o comprador pode escolher para pôr um SKU no painel de alertas. Os
-    valores são os de `TipoAlerta`, que fica num módulo acima deste, mais
-    `abaixo_do_piso_alerta` (cobertura atual abaixo de `piso_alerta_dias`), que o comprador
-    chama de ruptura (ADR-0006)."""
+    valores são os de `TipoAlerta`, que fica num módulo acima deste, mais os que o `painel`
+    calcula: `abaixo_do_piso_alerta` (cobertura atual abaixo de `piso_alerta_dias`), que o
+    comprador chama de ruptura (ADR-0006), e `entrega_atrasada` (pedido de compra com a data
+    prevista vencida e sem cobrança vigente)."""
 
     RUPTURA_ANTES_DA_CHEGADA = "ruptura_antes_da_chegada"
     VIOLA_TETO = "viola_teto"
@@ -45,6 +46,7 @@ class MotivoAlerta(StrEnum):
     ABAIXO_PEDIDO_MINIMO = "abaixo_pedido_minimo"
     PERIODO_SAZONAL = "periodo_sazonal"
     ABAIXO_DO_PISO_ALERTA = "abaixo_do_piso_alerta"
+    ENTREGA_ATRASADA = "entrega_atrasada"
 
 
 Mes = Annotated[int, Field(ge=1, le=12)]
@@ -92,7 +94,7 @@ PARAMETROS_V1 = ParametrosPolitica(
     meses_quentes=(5, 6, 11, 12),
     extra_sazonal_meses=2.0,
     dias_historico_minimo=60,
-    motivos_de_alerta=(MotivoAlerta.ABAIXO_DO_PISO_ALERTA,),
+    motivos_de_alerta=(MotivoAlerta.ABAIXO_DO_PISO_ALERTA, MotivoAlerta.ENTREGA_ATRASADA),
 )
 
 

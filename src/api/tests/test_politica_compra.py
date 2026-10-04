@@ -64,7 +64,7 @@ def test_get_devolve_a_politica_ativa(client: TestClient) -> None:
             "meses_quentes": [5, 6, 11, 12],
             "extra_sazonal_meses": 2.0,
             "dias_historico_minimo": 60,
-            "motivos_de_alerta": ["abaixo_do_piso_alerta"],
+            "motivos_de_alerta": ["abaixo_do_piso_alerta", "entrega_atrasada"],
         },
     }
 

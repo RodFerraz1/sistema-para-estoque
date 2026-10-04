@@ -6,10 +6,12 @@ import {
   barraDeFiltros,
   cabecalho,
   coberturaEmDias,
+  dataCurta,
   dataHora,
   dias,
   el,
   guardarNaUrl,
+  hojeIso,
   mensagem,
   nomeDaCategoria,
   numero,
@@ -31,6 +33,14 @@ const GRUPOS = [
     titulo: "Pedidos da equipe de vendas",
     descricao: () => "Avisos que as vendedoras mandaram e ainda não têm decisão.",
     cor: "var(--vendas)",
+  },
+  {
+    id: "entregas_atrasadas",
+    titulo: "Entregas atrasadas",
+    descricao: () =>
+      "Já comprou e não chegou: pedidos com a data prevista vencida, por fornecedor, para você ligar uma vez e cobrar tudo. Primeiro quem tem produto em ruptura.",
+    cor: "var(--destaque)",
+    motivo: "entrega_atrasada",
   },
   {
     id: "em_ruptura",
@@ -105,7 +115,11 @@ function sugestao(item) {
   );
 }
 
-const MOTIVO_DO_GRUPO = { em_ruptura: "abaixo_do_piso_alerta", vao_faltar: "ruptura_antes_da_chegada" };
+const MOTIVO_DO_GRUPO = {
+  entregas_atrasadas: "entrega_atrasada",
+  em_ruptura: "abaixo_do_piso_alerta",
+  vao_faltar: "ruptura_antes_da_chegada",
+};
 
 function motivosAlemDoGrupo(item, grupo) {
   return item.motivos.filter((m) => m !== MOTIVO_DO_GRUPO[grupo]);
@@ -145,19 +159,154 @@ function cartao(item, { id, cor }, piso) {
   );
 }
 
-function grupo({ id, titulo, descricao, cor }, itens, piso) {
-  const doGrupo = { id, cor };
-  if (itens.length === 0) return null;
+function plural(n, singular, varios) {
+  return `${numero(n)} ${n === 1 ? singular : varios}`;
+}
+
+function textoDoHistorico(h) {
+  if (h.entregas_recebidas === 0) return "ainda não tem entrega recebida com data prevista no ERP.";
+  if (h.entregas_atrasadas === 0) return `entregou no prazo ${plural(h.entregas_recebidas, "entrega recebida", "entregas recebidas")}.`;
+  return `atrasou ${numero(h.entregas_atrasadas)} de ${plural(h.entregas_recebidas, "entrega recebida", "entregas recebidas")}, em média ${dias(h.media_dias_de_atraso)}.`;
+}
+
+function historicoDeAtrasos(fornecedorId) {
+  const linha = el("p", { class: "suave historico-atrasos" }, "Carregando o histórico de entregas...");
+  api("GET", `/fornecedores/${fornecedorId}/atrasos`)
+    .then((h) => linha.replaceChildren("Histórico: ", textoDoHistorico(h)))
+    .catch(() => linha.remove());
+  return linha;
+}
+
+function textoDaCobranca(c) {
+  const quem = `${c.cobrado_por} cobrou em ${dataHora(c.criado_em)}`;
+  if (c.nova_previsao) return `${quem}: a nova previsão de ${dataCurta(c.nova_previsao)} passou e a mercadoria não chegou.`;
+  return `${quem}, sem nova previsão, e a mercadoria não chegou em 7 dias.`;
+}
+
+function skuAtrasado(s) {
   return el(
-    "section",
-    { class: "grupo", id, "aria-labelledby": `t-${id}` },
+    "li",
+    {},
+    el(
+      "div",
+      { class: "item-produto" },
+      el("a", { href: linkDoSku(s.sku_code) }, el("strong", {}, `${s.produto_nome}, ${s.cor}, ${s.tamanho}`)),
+      el("code", {}, s.sku_code),
+    ),
+    el(
+      "div",
+      { class: "item-numeros" },
+      el("span", {}, "Faltam chegar ", el("b", {}, `${numero(s.quantidade_pendente)} un.`)),
+      el("span", {}, "Em estoque ", el("b", {}, `${numero(s.disponivel)} un.`)),
+      s.cobertura_dias === null
+        ? el("span", {}, "Sem vendas recentes")
+        : el("span", {}, "Segura ", el("b", {}, coberturaEmDias(s.cobertura_dias))),
+    ),
+    el(
+      "div",
+      { class: "selos" },
+      s.disponivel === 0 ? el("span", { class: "selo urgente" }, "Zerado") : null,
+      s.em_ruptura && s.disponivel > 0 ? el("span", { class: "selo urgente" }, "Em ruptura") : null,
+    ),
+  );
+}
+
+function formularioDeCobranca(pedido, fornecedor) {
+  const id = pedido.pedido_id;
+  const previsao = el("input", { id: `previsao-${id}`, type: "date", min: hojeIso() });
+  const comentario = el("input", { id: `comentario-${id}`, type: "text", maxlength: "2000", placeholder: "Ex.: caminhão parado na estrada" });
+  const botao = el("button", { type: "submit", class: "primario" }, "Registrar cobrança");
+  const resultado = el("div", {});
+  const formulario = el(
+    "form",
+    { class: "form-cobranca", novalidate: true },
+    el("div", { class: "campo" }, el("label", { for: `previsao-${id}` }, "Nova previsão ", el("span", { class: "suave" }, "(opcional)")), previsao),
+    el("div", { class: "campo" }, el("label", { for: `comentario-${id}` }, "O que o fornecedor disse ", el("span", { class: "suave" }, "(opcional)")), comentario),
+    botao,
+    resultado,
+  );
+  formulario.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    botao.disabled = true;
+    try {
+      const cobranca = await api("POST", `/pedidos/${id}/cobrancas`, {
+        nova_previsao: previsao.value || null,
+        comentario: comentario.value.trim() || null,
+      });
+      const ate = cobranca.nova_previsao ? `depois de ${dataCurta(cobranca.nova_previsao)}` : "em 7 dias";
+      recadoDaCobranca = `Cobrança da ${fornecedor} registrada. O pedido sai do painel e volta ${ate} se a mercadoria não chegar.`;
+      await carregar();
+    } catch (e) {
+      resultado.replaceChildren(mensagem("erro", `A cobrança não foi registrada: ${e.message}`));
+      botao.disabled = false;
+    }
+  });
+  return el(
+    "details",
+    { class: "cobrar" },
+    el("summary", { class: "botao" }, "Cobrei o fornecedor"),
+    formulario,
+  );
+}
+
+function pedidoAtrasado(pedido, fornecedor) {
+  return el(
+    "div",
+    { class: "pedido-atrasado" },
+    el(
+      "div",
+      { class: "pedido-cabecalho" },
+      el("span", {}, "Pedido ", el("code", {}, pedido.pedido_id.slice(0, 8).toUpperCase()), ` · previsto para ${dataCurta(pedido.data_prevista_entrega)}`),
+      el("span", { class: "selo destaque" }, `${plural(pedido.dias_de_atraso, "dia", "dias")} de atraso`),
+    ),
+    pedido.ultima_cobranca ? el("p", { class: "recado-cobranca" }, textoDaCobranca(pedido.ultima_cobranca)) : null,
+    el("ul", { class: "skus-atrasados" }, pedido.skus.map(skuAtrasado)),
+    formularioDeCobranca(pedido, fornecedor),
+  );
+}
+
+function fornecedorAtrasado(f) {
+  return el(
+    "article",
+    { class: "fornecedor-atrasado", style: `--cor: ${f.tem_sku_em_ruptura ? "var(--urgente)" : "var(--destaque)"}` },
     el(
       "header",
       {},
-      el("h2", { id: `t-${id}` }, titulo),
-      el("span", { class: "contagem" }, String(itens.length)),
-      el("p", { class: "suave" }, descricao(piso)),
+      el("h3", {}, f.fornecedor_nome),
+      f.tem_sku_em_ruptura ? el("span", { class: "selo urgente" }, "Tem produto em ruptura") : null,
     ),
+    historicoDeAtrasos(f.fornecedor_id),
+    f.pedidos.map((p) => pedidoAtrasado(p, f.fornecedor_nome)),
+  );
+}
+
+function cabecalhoDoGrupo({ id, titulo, descricao }, contagem, piso) {
+  return el(
+    "header",
+    {},
+    el("h2", { id: `t-${id}` }, titulo),
+    el("span", { class: "contagem" }, String(contagem)),
+    el("p", { class: "suave" }, descricao(piso)),
+  );
+}
+
+function grupoDeEntregas(g, itens, fornecedores) {
+  if (fornecedores.length === 0) return null;
+  return el(
+    "section",
+    { class: "grupo", id: g.id, "aria-labelledby": `t-${g.id}` },
+    cabecalhoDoGrupo(g, itens.length),
+    el("div", { class: "itens" }, fornecedores.map(fornecedorAtrasado)),
+  );
+}
+
+function grupo(g, itens, piso) {
+  const doGrupo = { id: g.id, cor: g.cor };
+  if (itens.length === 0) return null;
+  return el(
+    "section",
+    { class: "grupo", id: g.id, "aria-labelledby": `t-${g.id}` },
+    cabecalhoDoGrupo(g, itens.length, piso),
     el("div", { class: "itens" }, itens.map((item) => cartao(item, doGrupo, piso))),
   );
 }
@@ -239,13 +388,22 @@ function mostrar(painel, politica) {
   porGrupo.pedidos_de_vendas.sort((a, b) => b.ultimo_aviso.criado_em.localeCompare(a.ultimo_aviso.criado_em));
   const comFiltro = Object.keys(filtros.valores()).length > 0;
   const vazio = comFiltro ? nenhumComFiltros() : tudoEmDia();
+  const recado = recadoDaCobranca;
+  recadoDaCobranca = null;
   conteudo.replaceChildren(
     el(
       "div",
       {},
+      recado ? mensagem("sucesso", recado) : null,
       skusComErro(painel.skus_com_erro),
       resumo(grupos, painel.contagens, painel.decididos),
-      painel.alertas.length ? grupos.map((g) => grupo(g, porGrupo[g.id], piso)) : vazio,
+      painel.alertas.length
+        ? grupos.map((g) =>
+            g.id === "entregas_atrasadas"
+              ? grupoDeEntregas(g, porGrupo[g.id], painel.entregas_atrasadas)
+              : grupo(g, porGrupo[g.id], piso),
+          )
+        : vazio,
       decididos(painel.decididos),
     ),
   );
@@ -262,6 +420,7 @@ function montarFiltros(politica, categorias, fornecedores) {
 
 let politica;
 let ultimaConsulta = 0;
+let recadoDaCobranca = null;
 
 async function carregar() {
   const consulta = guardarNaUrl(filtros.valores());

@@ -5,6 +5,7 @@ from src.ai.schemas import SinaisDoSKU, SinalCorpus, SugestaoComSinais, TrechoCl
 from src.api.schemas import (
     AnaliseSKUResponse,
     AvisoResponse,
+    CobrancaEntregaResponse,
     DecisaoCompraResponse,
     AvaliacaoTrechoResponse,
     FornecedorResponse,
@@ -18,7 +19,7 @@ from src.api.schemas import (
 )
 from src.catalog.schemas import FornecedorParaSKU
 from src.ficha_sku.schemas import Ficha
-from src.painel.schemas import Aviso, DecisaoCompra
+from src.painel.schemas import Aviso, CobrancaEntrega, DecisaoCompra
 from src.purchasing.schemas import SugestaoPedido
 
 
@@ -146,4 +147,16 @@ def decisao_to_response(decisao: DecisaoCompra) -> DecisaoCompraResponse:
         quantidade_sugerida=decisao.quantidade_sugerida,
         politica_versao=decisao.politica_versao,
         criado_em=decisao.criado_em,
+    )
+
+
+def cobranca_to_response(cobranca: CobrancaEntrega) -> CobrancaEntregaResponse:
+    return CobrancaEntregaResponse(
+        id=cobranca.id,
+        pedido_id=cobranca.pedido_id,
+        fornecedor_id=cobranca.fornecedor_id,
+        nova_previsao=cobranca.nova_previsao,
+        comentario=cobranca.comentario,
+        cobrado_por=cobranca.cobrado_por,
+        criado_em=cobranca.criado_em,
     )

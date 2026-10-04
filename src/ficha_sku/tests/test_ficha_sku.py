@@ -104,6 +104,7 @@ def test_completa_soma_o_que_falta_chegar_dos_pedidos_abertos() -> None:
     parcial = make_pedido_compra(katrina, "recebido_parcial")
     ficha_sku = _ficha_sku(
         skus=[sku],
+        fornecedores=[katrina],
         estoques={sku.sku_code: make_estoque(disponivel=50)},
         pedidos_compra=[enviado, parcial],
         itens_pedido_compra=[

@@ -145,6 +145,16 @@ export function dataHora(iso) {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+export function dataCurta(isoDia) {
+  const [, mes, dia] = isoDia.split("-");
+  return `${dia}/${mes}`;
+}
+
+export function hojeIso() {
+  const agora = new Date();
+  return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-${String(agora.getDate()).padStart(2, "0")}`;
+}
+
 const formatoRelativo = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
 
 export function quando(iso) {
@@ -165,6 +175,7 @@ export const MOTIVOS = {
   lead_time_observado_acima_do_contratado: "Fornecedor atrasando",
   abaixo_pedido_minimo: "Abaixo do pedido mínimo",
   periodo_sazonal: "Chega em data forte",
+  entrega_atrasada: "Entrega atrasada",
 };
 
 const MOTIVOS_URGENTES = ["abaixo_do_piso_alerta", "ruptura_antes_da_chegada"];

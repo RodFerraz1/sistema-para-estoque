@@ -1,12 +1,14 @@
-"""Implementações Postgres dos repositórios do módulo `painel` sobre `copilot.avisos` e
-`copilot.decisoes_compra`."""
+"""Implementações Postgres dos repositórios do módulo `painel` sobre `copilot.avisos`,
+`copilot.decisoes_compra` e `copilot.cobrancas_entrega`."""
 from __future__ import annotations
+
+from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from src.painel.repositorio import AvisosRepositorio, DecisoesRepositorio
-from src.painel.schemas import Aviso, DecisaoCompra
+from src.painel.repositorio import AvisosRepositorio, CobrancasRepositorio, DecisoesRepositorio
+from src.painel.schemas import Aviso, CobrancaEntrega, DecisaoCompra
 
 _CAMPOS_AVISO = list(Aviso.model_fields)
 _INSERT_AVISO = text(
@@ -64,3 +66,36 @@ class PostgresDecisoesRepositorio(DecisoesRepositorio):
         with self._engine.connect() as conn:
             rows = conn.execute(text(sql)).all()
         return {row.sku_code: DecisaoCompra.model_validate(row._asdict()) for row in rows}
+
+
+_CAMPOS_COBRANCA = list(CobrancaEntrega.model_fields)
+_INSERT_COBRANCA = text(
+    f"INSERT INTO copilot.cobrancas_entrega ({', '.join(_CAMPOS_COBRANCA)}) "
+    f"VALUES ({', '.join(f':{c}' for c in _CAMPOS_COBRANCA)})"
+)
+_SELECT_COBRANCA = f"SELECT {', '.join(_CAMPOS_COBRANCA)} FROM copilot.cobrancas_entrega"
+
+
+class PostgresCobrancasRepositorio(CobrancasRepositorio):
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+
+    def gravar(self, cobranca: CobrancaEntrega) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(_INSERT_COBRANCA, cobranca.model_dump())
+
+    def listar(self, pedido_id: UUID) -> list[CobrancaEntrega]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(f"{_SELECT_COBRANCA} WHERE pedido_id = :pedido_id {_ORDEM}"), {"pedido_id": pedido_id}
+            ).all()
+        return [CobrancaEntrega.model_validate(row._asdict()) for row in rows]
+
+    def ultimas(self) -> dict[UUID, CobrancaEntrega]:
+        sql = (
+            f"SELECT DISTINCT ON (pedido_id) {', '.join(_CAMPOS_COBRANCA)} FROM copilot.cobrancas_entrega "
+            "ORDER BY pedido_id, criado_em DESC, id::text DESC"
+        )
+        with self._engine.connect() as conn:
+            rows = conn.execute(text(sql)).all()
+        return {row.pedido_id: CobrancaEntrega.model_validate(row._asdict()) for row in rows}

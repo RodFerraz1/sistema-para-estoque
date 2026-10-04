@@ -32,7 +32,7 @@ from src.catalog.service import Catalog
 from src.erp_adapter.in_memory import InMemoryERPAdapter
 from src.ficha_sku.service import FichaSKU
 from src.inventory.service import Inventory
-from src.painel.in_memory import InMemoryAvisosRepositorio, InMemoryDecisoesRepositorio
+from src.painel.in_memory import InMemoryAvisosRepositorio, InMemoryCobrancasRepositorio, InMemoryDecisoesRepositorio
 from src.painel.schemas import Aviso, TipoAviso
 from src.painel.service import Painel
 from src.politica_compra.in_memory import InMemoryPoliticaCompraRepositorio
@@ -130,10 +130,12 @@ def copilot(
     painel = Painel(
         catalog,
         ficha_sku,
+        inventory,
         purchasing,
         politicas,
         repositorio_avisos,
         InMemoryDecisoesRepositorio(),
+        InMemoryCobrancasRepositorio(),
         relogio=lambda: NOW,
     )
     decisao = DecisaoComTrechosSoNosSinais(

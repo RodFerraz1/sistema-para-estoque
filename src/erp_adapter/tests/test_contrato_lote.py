@@ -58,7 +58,16 @@ def _utc(*partes: int) -> datetime:
 def _montar() -> InMemoryERPAdapter:
     enviado = make_pedido_compra(CARO, "enviado", key="lote-enviado", data_prevista_entrega=date(2026, 10, 5))
     aprovado = make_pedido_compra(BARATO, "aprovado", key="lote-aprovado")
-    recebido = make_pedido_compra(CARO, "recebido_total", key="lote-recebido")
+    recebido = make_pedido_compra(
+        CARO, "recebido_total", key="lote-recebido", data_prevista_entrega=date(2026, 8, 10), recebido_em=_utc(2026, 8, 14, 15)
+    )
+    no_prazo = make_pedido_compra(
+        CARO, "recebido_total", key="lote-no-prazo", data_prevista_entrega=date(2026, 9, 10), recebido_em=_utc(2026, 9, 10, 18)
+    )
+    sem_previsao = make_pedido_compra(CARO, "recebido_total", key="lote-sem-previsao", recebido_em=_utc(2026, 9, 1))
+    parcial = make_pedido_compra(
+        CARO, "recebido_parcial", key="lote-parcial", data_prevista_entrega=date(2026, 9, 1), recebido_em=_utc(2026, 9, 20)
+    )
     rascunho = make_pedido_compra(CARO, "rascunho", key="lote-rascunho")
     tardio = make_pedido_compra(BARATO, "enviado", key="lote-tardio", data_prevista_entrega=date(2026, 11, 1))
     return InMemoryERPAdapter(
@@ -88,13 +97,16 @@ def _montar() -> InMemoryERPAdapter:
             make_venda(SEM_ESTOQUE, _utc(2026, 9, 1, 12), 6),
             make_venda(INATIVO, _utc(2026, 9, 2, 12), 9),
         ],
-        pedidos_compra=[enviado, aprovado, recebido, rascunho, tardio],
+        pedidos_compra=[enviado, aprovado, recebido, no_prazo, sem_previsao, parcial, rascunho, tardio],
         itens_pedido_compra=[
             make_item_pedido_compra(tardio, VENDENDO, quantidade=10),
             make_item_pedido_compra(aprovado, VENDENDO, quantidade=20),
             make_item_pedido_compra(enviado, VENDENDO, quantidade=100, quantidade_recebida=40),
             make_item_pedido_compra(recebido, VENDENDO, quantidade=50, quantidade_recebida=50),
             make_item_pedido_compra(rascunho, VENDENDO, quantidade=30),
+            make_item_pedido_compra(no_prazo, PARADO, quantidade=10, quantidade_recebida=10),
+            make_item_pedido_compra(sem_previsao, PARADO, quantidade=10, quantidade_recebida=10),
+            make_item_pedido_compra(parcial, PARADO, quantidade=10, quantidade_recebida=4),
             make_item_pedido_compra(enviado, SEM_ESTOQUE, quantidade=12),
             make_item_pedido_compra(enviado, INATIVO, quantidade=5),
         ],
@@ -176,7 +188,19 @@ def test_itens_em_transito_dos_skus_ativos_pela_data_prevista(erp: ERPAdapter) -
             ("aprovado", 20, None),
         ],
         SEM_ESTOQUE.sku_code: [("enviado", 12, date(2026, 10, 5))],
+        PARADO.sku_code: [("recebido_parcial", 6, date(2026, 9, 1))],
     }
+    assert [(i.fornecedor_id, i.fornecedor_nome) for i in itens[SEM_ESTOQUE.sku_code]] == [(CARO.id, CARO.nome)]
+
+
+def test_entregas_recebidas_do_fornecedor_com_a_data_prevista_e_a_do_recebimento(erp: ERPAdapter) -> None:
+    entregas = erp.entregas_recebidas_de(CARO.id)
+
+    assert [(e.data_prevista_entrega, e.recebido_em) for e in entregas] == [
+        (date(2026, 9, 10), _utc(2026, 9, 10, 18)),
+        (date(2026, 8, 10), _utc(2026, 8, 14, 15)),
+    ]
+    assert erp.entregas_recebidas_de(BARATO.id) == []
 
 
 def test_leituras_em_lote_batem_com_as_leituras_por_sku(erp: ERPAdapter) -> None:

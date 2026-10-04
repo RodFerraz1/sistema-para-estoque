@@ -153,6 +153,7 @@ def make_pedido_compra(
     key: str | None = None,
     data_prevista_entrega: date | None = None,
     criado_em: datetime | None = None,
+    recebido_em: datetime | None = None,
 ) -> PedidoCompra:
     return PedidoCompra(
         id=uid("pedido", key or f"{fornecedor.nome}|{status}"),
@@ -160,6 +161,7 @@ def make_pedido_compra(
         status=status,
         data_prevista_entrega=data_prevista_entrega,
         criado_em=criado_em or datetime(2026, 6, 1, tzinfo=UTC),
+        recebido_em=recebido_em,
     )
 
 

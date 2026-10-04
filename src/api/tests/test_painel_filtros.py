@@ -23,7 +23,7 @@ from src.api.tests.cenario_painel import (
 )
 from src.politica_compra.schemas import LeadTimeBase, MotivoAlerta
 
-SEM_NADA = {"pedidos_de_vendas": 0, "em_ruptura": 0, "vao_faltar": 0, "outros_alertas": 0}
+SEM_NADA = {"pedidos_de_vendas": 0, "entregas_atrasadas": 0, "em_ruptura": 0, "vao_faltar": 0, "outros_alertas": 0}
 
 
 def painel(client: TestClient, **filtros: str) -> dict:
