@@ -201,6 +201,7 @@ def test_o_aviso_notifica_na_hora_o_papel_reposicao(client: TestClient) -> None:
         "avisado_por": "Bia",
         "comentario": "Cliente procurou.",
         "disponivel_no_erp": 500,
+        "pecas": None,
     }
     como(cenario, CARLA)
     assert notificacoes(client, "gondola_vazia") == []
@@ -391,6 +392,44 @@ def test_avisos_de_gondola_de_mais_de_30_dias_saem_de_meus_avisos(client: TestCl
     cenario.relogio.avancar(days=31)
 
     assert meus_avisos(client) == []
+
+
+def abertos(client: TestClient, sku: SKU) -> list[dict]:
+    response = client.get(f"/skus/{sku.sku_code}/avisos-gondola")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_a_vendedora_ve_os_avisos_abertos_do_sku_antes_de_avisar_de_novo(client: TestClient) -> None:
+    cenario = preparar()
+    como(cenario, BIA)
+    avisar_gondola(client, TAPETE_CINZA)
+    avisar_gondola(client, RARO, MESA)
+    cenario.relogio.avancar(minutes=1)
+    como(cenario, ANA)
+    avisar_gondola(client, TAPETE_CINZA, comentario="Ainda vazia.")
+
+    avisos = abertos(client, TAPETE_CINZA)
+
+    assert [(a["avisado_por"], a["meu"]) for a in avisos] == [("Ana", True), ("Bia", False)]
+    assert avisos[1]["criado_em"] == iso(AGORA)
+
+
+def test_os_avisos_fechados_pela_verificacao_nao_contam_como_abertos(client: TestClient) -> None:
+    cenario = preparar()
+    como(cenario, BIA)
+    avisar_gondola(client, TAPETE_CINZA)
+    cenario.relogio.avancar(minutes=20)
+    como(cenario, RAFA)
+    verificar(client, TAPETE_CINZA, "repus")
+
+    assert abertos(client, TAPETE_CINZA) == []
+
+
+def test_avisos_abertos_de_sku_desconhecido_responde_404(client: TestClient) -> None:
+    como(preparar(), BIA)
+
+    assert client.get("/skus/NAO-EXISTE/avisos-gondola").status_code == 404
 
 
 def test_sku_desconhecido_responde_404_e_inativo_422(client: TestClient) -> None:

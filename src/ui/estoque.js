@@ -180,9 +180,10 @@ async function carregar() {
 }
 
 try {
-  const categorias = await api("GET", "/categorias");
+  const [categorias, fornecedores] = await Promise.all([api("GET", "/categorias"), api("GET", "/fornecedores")]);
   filtros.opcoes("categoria", categorias.map((c) => [c, nomeDaCategoria(c)]));
   filtros.opcoes("situacao", SITUACOES);
+  filtros.opcoes("fornecedor", fornecedores.map((f) => [f.id, f.nome]));
   filtros.mostrar();
   await carregar();
 } catch (e) {

@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.catalog.schemas import SKU
 
 ResultadoVerificacao = Literal["repus", "estava_na_gondola", "sem_estoque_no_deposito"]
+Prioridade = Literal["mais_de_um_motivo", "parou_de_vender", "gondola_vazia", "hora_de_repor"]
 
 
 class DiaObservado(BaseModel):
@@ -67,7 +68,8 @@ class SetorDoSku(BaseModel):
 class AvisoGondola(BaseModel):
     """Recado da vendedora ao repositor: a gôndola do SKU está vazia. Fica aberto até uma
     verificação de gôndola do mesmo SKU registrada depois dele: não há coluna de status.
-    `disponivel_no_erp` é o do momento; `avisado_por`, o nome de quem avisou."""
+    `disponivel_no_erp` é o do momento; `avisado_por`, o nome de quem avisou. `pecas`:
+    quantas peças a vendedora pede para levar do depósito, nula quando ela não disse."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -79,6 +81,7 @@ class AvisoGondola(BaseModel):
     avisado_por: str
     usuario_id: UUID
     criado_em: datetime
+    pecas: int | None = None
 
 
 class ItemQuedaDeVenda(BaseModel):
@@ -106,6 +109,38 @@ class ItemAvisoGondola(BaseModel):
     setor: Setor | None
 
 
+class ItemHoraDeRepor(BaseModel):
+    """SKU de um produto com capacidade da gôndola cuja gôndola, pelo que vendeu desde a
+    última verificação `repus`, segura no máximo `piso_gondola_dias` dias de venda, e que
+    tem no estoque mais do que se estima na gôndola. `pecas_no_mix` é o que o mix de gôndola
+    de hoje põe dele; `venda_media_diaria`, a do mix."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku: SKU
+    disponivel: int
+    pecas_no_mix: int
+    venda_media_diaria: float
+    reposicao: VerificacaoGondola
+    vendido_desde: int
+    setor: Setor | None = None
+
+    @property
+    def na_gondola(self) -> int:
+        """Estimativa das peças ainda na gôndola, nunca negativa."""
+        return max(self.pecas_no_mix - self.vendido_desde, 0)
+
+    @property
+    def dias_na_gondola(self) -> float:
+        return self.na_gondola / self.venda_media_diaria
+
+    @property
+    def a_repor(self) -> int:
+        """Quantas peças levar do depósito para a gôndola voltar ao mix. O disponível do ERP
+        inclui o que está na gôndola."""
+        return min(self.pecas_no_mix, self.disponivel) - self.na_gondola
+
+
 class FiltroReposicao(BaseModel):
     """Vazio, não filtra. `busca` segue a regra do `catalog.buscar_skus`."""
 
@@ -117,13 +152,32 @@ class FiltroReposicao(BaseModel):
 
 
 class PainelDoRepositor(BaseModel):
-    """`avisos_de_gondola` vem do aviso aberto mais antigo para o mais recente e
-    `quedas_de_venda`, da maior venda perdida para a menor. Um SKU fica num grupo só."""
+    """`avisos_de_gondola` vem do aviso aberto mais antigo para o mais recente,
+    `quedas_de_venda` da maior venda perdida para a menor e `hora_de_repor` de quem segura
+    menos dias na gôndola para quem segura mais. Um SKU fica num grupo só."""
 
     model_config = ConfigDict(frozen=True)
 
     avisos_de_gondola: list[ItemAvisoGondola]
     quedas_de_venda: list[ItemQuedaDeVenda]
+    hora_de_repor: list[ItemHoraDeRepor] = []
+
+
+class ItemDoDashboard(BaseModel):
+    """Uma gôndola a repor no dashboard do repositor. `queda`, `avisos` e `hora_de_repor`
+    são os motivos; com mais de um, a prioridade é `mais_de_um_motivo`. `a_repor`: quantas
+    peças levar do depósito, nulo quando não se sabe."""
+
+    model_config = ConfigDict(frozen=True)
+
+    prioridade: Prioridade
+    sku: SKU
+    disponivel: int
+    setor: Setor | None
+    queda: QuedaDeVenda | None = None
+    avisos: list[AvisoGondola] = []
+    hora_de_repor: ItemHoraDeRepor | None = None
+    a_repor: int | None = None
 
 
 class VerificacaoGondola(BaseModel):
@@ -191,6 +245,18 @@ class MixDeGondola(BaseModel):
     capacidade: int | None
     dias_abertos: int
     skus: list[SkuNoMix]
+
+
+class SugestaoDeReposicao(BaseModel):
+    """Quantas peças levar do depósito para a gôndola vazia de um SKU: as do mix de gôndola
+    de hoje. `pecas` nula quando o produto não tem capacidade da gôndola; zero quando o mix
+    não põe nenhuma peça dele (sem disponível, ou não coube)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pecas: int | None
+    capacidade: int | None
+    disponivel: int
 
 
 class MeuAvisoGondola(BaseModel):

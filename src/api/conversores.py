@@ -135,6 +135,7 @@ def aviso_to_response(aviso: Aviso) -> AvisoResponse:
         comentario=aviso.comentario,
         avisado_por=aviso.avisado_por,
         criado_em=aviso.criado_em,
+        quantidade=aviso.quantidade,
     )
 
 

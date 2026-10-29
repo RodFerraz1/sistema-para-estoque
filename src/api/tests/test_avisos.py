@@ -41,6 +41,7 @@ def test_aviso_valido_responde_201_e_fica_aberto(client: TestClient, usuario_log
         "comentario": "Cliente X quer 200 peças.",
         "avisado_por": usuario_logado.nome,
         "criado_em": "2026-10-01T09:00:00Z",
+        "quantidade": None,
     }
     [gravado] = cenario.avisos.listar()
     assert (str(gravado.id), gravado.usuario_id) == (aviso["id"], usuario_logado.id)
@@ -191,6 +192,15 @@ def test_busca_ignora_sku_inativo_e_acha_pelo_codigo(client: TestClient) -> None
     assert [s["sku_code"] for s in client.get("/skus", params={"busca": "tbc-azul"}).json()] == [
         MAIS_URGENTE.sku_code
     ]
+
+
+def test_busca_pelo_codigo_de_barras_traz_so_o_sku_dele(client: TestClient) -> None:
+    lido = make_sku("TB-BEGE-70140", produto_nome="Toalha Banho", cor="bege", tamanho="70x140", ean="7890000000014")
+    outro = make_sku("TB-AZUL-70140", produto_nome="Toalha Banho", cor="azul", tamanho="70x140", ean="7890000001400")
+    preparar(erp=montar_erp([lido, outro]))
+
+    assert [s["sku_code"] for s in client.get("/skus", params={"busca": " 7890000000014 "}).json()] == [lido.sku_code]
+    assert client.get("/skus", params={"busca": "7890000"}).json() == []
 
 
 def test_busca_traz_no_maximo_20(client: TestClient) -> None:

@@ -7,6 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.tests.cenario_painel import (
+    BOA_VISTA,
+    KATRINA,
     MAIS_URGENTE,
     PISO,
     REGULAR,
@@ -144,6 +146,14 @@ def test_busca_e_categoria_usam_a_regra_do_painel(client: TestClient) -> None:
     assert estoque(client, busca="toalha", situacao="com_transito", categoria="felpudo")["total"] == 1
 
 
+def test_filtra_pelo_fornecedor_que_vende_o_sku(client: TestClient) -> None:
+    preparar_estoque()
+
+    assert codigos(estoque(client, fornecedor=str(KATRINA.id))["itens"]) == [ZERADO.sku_code, MAIS_URGENTE.sku_code]
+    assert SEM_FORNECEDOR.sku_code not in codigos(estoque(client, fornecedor=str(BOA_VISTA.id))["itens"])
+    assert estoque(client, fornecedor=str(KATRINA.id), situacao="em_ruptura", busca="toalha")["total"] == 2
+
+
 def test_pagina_os_skus_na_mesma_ordem(client: TestClient) -> None:
     preparar_estoque()
 
@@ -183,6 +193,7 @@ def test_por_pagina_padrao_e_50_e_aceita_ate_100(client: TestClient) -> None:
         {"pagina": 0},
         {"situacao": "qualquer"},
         {"ordem": "preco"},
+        {"fornecedor": "katrina"},
     ],
 )
 def test_parametro_invalido_responde_422(client: TestClient, parametros: dict) -> None:

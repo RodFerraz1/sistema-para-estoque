@@ -6,6 +6,7 @@ produto no `SKU` para evitar N+1 nos consumidores.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
@@ -28,7 +29,7 @@ from src.sales.schemas import Venda, VendasDoDia, VendasDoMes
 _SKU_SELECT = """
     SELECT
         s.id, s.produto_id, s.sku_code, s.cor, s.tamanho, s.gramatura,
-        s.material, s.ativo, p.nome AS produto_nome, p.categoria AS produto_categoria
+        s.material, s.ativo, s.ean, p.nome AS produto_nome, p.categoria AS produto_categoria
     FROM erp.skus s
     JOIN erp.produtos p ON p.id = s.produto_id
 """
@@ -46,6 +47,7 @@ def _row_to_sku(row: Row) -> SKU:
         gramatura=row.gramatura,
         material=row.material,
         ativo=row.ativo,
+        ean=row.ean,
     )
 
 
@@ -367,6 +369,24 @@ class PostgresERPAdapter(ERPAdapter):
             ]
             for sku_code, dias, quantidades in rows
         }
+
+    def vendido_depois_de(self, momentos: Mapping[str, datetime]) -> dict[str, int]:
+        if not momentos:
+            return {}
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT s.sku_code, sum(v.quantidade)::int AS quantidade
+                    FROM unnest(CAST(:codigos AS text[]), CAST(:momentos AS timestamptz[])) AS m(sku_code, momento)
+                    JOIN erp.skus s ON s.sku_code = m.sku_code AND s.ativo = TRUE
+                    JOIN erp.vendas v ON v.sku_id = s.id AND v.data > m.momento
+                    GROUP BY s.sku_code
+                    """
+                ),
+                {"codigos": list(momentos), "momentos": list(momentos.values())},
+            ).all()
+        return {r.sku_code: r.quantidade for r in rows}
 
     def fornecedores_por_sku(self) -> dict[str, list[FornecedorParaSKU]]:
         with self._engine.connect() as conn:

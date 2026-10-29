@@ -1,4 +1,4 @@
-import { api, cabecalho, el, guardarNaUrl, mensagem, nomeDaCategoria, numero } from "./comum.js";
+import { api, cabecalho, el, guardarNaUrl, mensagem, nomeDaCategoria, numero, porDia } from "./comum.js";
 
 cabecalho("reposicao");
 
@@ -12,11 +12,6 @@ function pecas(n) {
 
 function coresETamanhos(n) {
   return `${numero(n)} ${n === 1 ? "cor e tamanho" : "cores e tamanhos"}`;
-}
-
-function porDia(valor) {
-  const arredondado = Math.round(valor * 10) / 10;
-  return numero(arredondado, Number.isInteger(arredondado) ? 0 : 1);
 }
 
 function emEspera(funcao) {
@@ -155,8 +150,39 @@ async function montarGondola() {
     lembrar.disabled = digitada() === null || digitada() === capacidadeGravada;
   }
 
+  function botaoMontei(mix) {
+    const total = mix.skus.reduce((soma, s) => soma + s.quantidade, 0);
+    if (!total) return null;
+    const recado = el("div", { "aria-live": "polite" });
+    const botao = el("button", { type: "button", class: "primario montei" }, "Montei a gôndola");
+    botao.addEventListener("click", async () => {
+      botao.disabled = true;
+      try {
+        const repostos = await api("POST", `/reposicao/produtos/${produtoId}/montagem`, { capacidade: mix.capacidade });
+        capacidadeGravada = mix.capacidade;
+        mostrarGravada();
+        recado.replaceChildren(
+          mensagem(
+            "sucesso",
+            `Pronto: ${coresETamanhos(repostos.length)} ${repostos.length === 1 ? "reposto" : "repostos"}. O Copilot avisa quando for hora de repor de novo.`,
+          ),
+        );
+      } catch (e) {
+        recado.replaceChildren(mensagem("erro", `Não foi registrado: ${e.message}`));
+        botao.disabled = false;
+      }
+    });
+    return el(
+      "div",
+      { class: "montagem" },
+      botao,
+      el("p", { class: "suave" }, "Depois de pôr as peças, toque aqui. O Copilot desconta as vendas e mostra no dashboard quando a gôndola estiver perto de esvaziar."),
+      recado,
+    );
+  }
+
   function mostrar(mix) {
-    document.title = `Montar gôndola: ${mix.produto_nome} - Copilot de Compras`;
+    document.title = `Montar gôndola: ${mix.produto_nome} - Integração - Bandfashion`;
     document.getElementById("titulo").textContent = mix.produto_nome;
     document.getElementById("subtitulo").textContent = `${nomeDaCategoria(mix.categoria)} · ${coresETamanhos(mix.skus.length)}`;
     capacidadeGravada = mix.capacidade_gravada;
@@ -169,6 +195,7 @@ async function montarGondola() {
         el("h2", { id: "t-mix" }, comQuantidade ? "Pôr na gôndola" : "O que mais vende"),
         el("ol", { class: "lista-mix" }, mix.skus.map((s) => linhaDoSku(s, comQuantidade))),
         resumo(mix, comQuantidade),
+        comQuantidade ? botaoMontei(mix) : null,
       ),
     );
   }

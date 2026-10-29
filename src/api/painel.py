@@ -15,6 +15,7 @@ from src.api.conversores import (
 )
 from src.api.schemas import (
     AvisoResponse,
+    CompraACaminhoResponse,
     DecisaoCompraResponse,
     DecisaoSobreAvisoResponse,
     DisponibilidadeResponse,
@@ -29,6 +30,7 @@ from src.api.schemas import (
     PrevisaoDeChegadaResponse,
     RegistrarAvisoRequest,
     RegistrarDecisaoRequest,
+    RegistrarFaltaNaGondolaRequest,
     SKUComEntregaAtrasadaResponse,
     VerificacaoSobreAvisoResponse,
 )
@@ -52,6 +54,7 @@ from src.painel.schemas import (
     SituacaoEstoque,
 )
 from src.painel.service import (
+    FaltaSemFalta,
     MotivoObrigatorio,
     Painel,
     QuantidadeObrigatoria,
@@ -61,7 +64,7 @@ from src.painel.service import (
 )
 from src.reposicao.dependencies import get_reposicao
 from src.reposicao.schemas import MeuAvisoGondola
-from src.reposicao.service import Reposicao
+from src.reposicao.service import Reposicao, SetorInativo, SetorNaoEncontrado
 from src.usuarios.dependencies import exige_papel
 from src.usuarios.schemas import Usuario
 
@@ -197,6 +200,30 @@ def registrar_aviso(
     return aviso_to_response(aviso)
 
 
+@router.post("/skus/{sku_code}/falta-na-gondola", response_model=AvisoResponse, status_code=status.HTTP_201_CREATED)
+def registrar_falta_na_gondola(
+    sku_code: str,
+    corpo: RegistrarFaltaNaGondolaRequest,
+    usuario: Usuario = Depends(exige_papel("reposicao")),
+    painel: Painel = Depends(get_painel),
+) -> AvisoResponse:
+    """O repositor repôs só parte do que a gôndola precisava porque faltou no depósito.
+    Registra a verificação `repus` (fecha os avisos de gôndola vazia e notifica as
+    vendedoras com quantas foram) e avisa o comprador das peças que faltaram: o SKU entra no
+    painel dele com o aviso `faltou_na_gondola` até a decisão de compra, que notifica o
+    repositor. 404 sem o SKU, 422 sem falta (repostas fora de 1 até menos que as pedidas),
+    com o SKU inativo ou com o setor desconhecido ou inativo."""
+    try:
+        aviso = painel.registrar_falta_na_gondola(
+            sku_code, corpo.pecas_pedidas, corpo.pecas_repostas, usuario, corpo.comentario, corpo.setor_id
+        )
+    except SKUNaoEncontrado as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except (FaltaSemFalta, SKUInativo, SetorNaoEncontrado, SetorInativo) as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e)) from e
+    return aviso_to_response(aviso)
+
+
 def _meu_aviso_to_response(item: MeuAviso) -> MeuAvisoResponse:
     decisao = item.decisao
     return MeuAvisoResponse(
@@ -229,6 +256,7 @@ def _meu_aviso_gondola_to_response(item: MeuAvisoGondola) -> MeuAvisoResponse:
         tipo="gondola_vazia",
         setor=item.setor.nome,
         comentario=item.aviso.comentario,
+        pecas=item.aviso.pecas,
         criado_em=item.aviso.criado_em,
         verificacao=None
         if verificacao is None
@@ -276,6 +304,29 @@ def disponibilidade(sku_code: str, painel: Painel = Depends(get_painel)) -> Disp
         situacao=resultado.situacao,
         entregas=[PrevisaoDeChegadaResponse(**e.model_dump()) for e in resultado.entregas],
     )
+
+
+@router.get(
+    "/skus/{sku_code}/compras-do-produto", response_model=list[CompraACaminhoResponse], dependencies=QUEM_CONSULTA_SKU
+)
+def compras_do_produto(sku_code: str, painel: Painel = Depends(get_painel)) -> list[CompraACaminhoResponse]:
+    """A consulta da vendedora: o que falta chegar de todas as cores e tamanhos do produto
+    do SKU, como na disponibilidade, pela previsão e depois pela cor e pelo tamanho. 404 sem
+    o SKU."""
+    try:
+        compras = painel.compras_do_produto(sku_code)
+    except SKUNaoEncontrado as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    return [
+        CompraACaminhoResponse(
+            sku_code=c.sku.sku_code,
+            cor=c.sku.cor,
+            tamanho=c.sku.tamanho,
+            gramatura=c.sku.gramatura,
+            **c.chegada.model_dump(),
+        )
+        for c in compras
+    ]
 
 
 @router.get("/skus/{sku_code}/avisos", response_model=list[AvisoResponse], dependencies=COMPRADOR)
@@ -329,16 +380,18 @@ def estoque(
     busca: Annotated[str | None, Query(max_length=100)] = None,
     categoria: str | None = None,
     situacao: SituacaoEstoque | None = None,
+    fornecedor: UUID | None = None,
     ordem: OrdemEstoque = "cobertura",
     pagina: Annotated[int, Query(ge=1)] = 1,
     por_pagina: Annotated[int, Query(ge=1, le=POR_PAGINA_MAXIMO)] = 50,
     painel: Painel = Depends(get_painel),
 ) -> EstoqueResponse:
     """Todos os SKUs ativos com estoque no ERP, paginados. `busca` segue a regra de
-    `/painel`; `situacao` é `em_ruptura`, `sem_venda` ou `com_transito`; `ordem` é
+    `/painel`; `situacao` é `em_ruptura`, `sem_venda` ou `com_transito`; `fornecedor` é o id
+    de um fornecedor que vende o SKU; `ordem` é
     `cobertura` (a menor primeiro), `venda_diaria` (a maior primeiro) ou `nome`. Página
     depois da última vem vazia, com o total. 503 com o banco fora do ar."""
-    filtro = FiltroEstoque(busca=busca, categoria=categoria, situacao=situacao)
+    filtro = FiltroEstoque(busca=busca, categoria=categoria, situacao=situacao, fornecedor_id=fornecedor)
     resultado = painel.estoque(filtro, ordem=ordem, pagina=pagina, por_pagina=por_pagina)
     return EstoqueResponse(
         itens=[_item_de_estoque_to_response(i) for i in resultado.itens],

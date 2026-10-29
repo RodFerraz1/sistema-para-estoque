@@ -1,6 +1,5 @@
 import { montarChat } from "./chat.js";
 import {
-  TIPOS_DE_AVISO,
   TIPOS_DE_VERIFICACAO,
   alertas,
   api,
@@ -17,6 +16,7 @@ import {
   reais,
   resumoDaDecisao,
   sinais,
+  tipoDoAviso,
 } from "./comum.js";
 
 cabecalho("comprador");
@@ -81,7 +81,7 @@ async function carregar(id, pedido, mostrar) {
 }
 
 function situacao(a) {
-  document.title = `${a.produto_nome} ${a.cor} ${a.tamanho} - Copilot de Compras`;
+  document.title = `${a.produto_nome} ${a.cor} ${a.tamanho} - Integração - Bandfashion`;
   bloco("titulo").textContent = `${a.produto_nome}, ${a.cor}, ${a.tamanho}`;
   bloco("subtitulo").replaceChildren(el("code", {}, a.sku_code), ` · ${a.categoria.replaceAll("_", " ")}`);
   const disponivel = a.estoque.quantidade_disponivel;
@@ -281,7 +281,7 @@ function avisos(lista) {
       el(
         "li",
         {},
-        el("span", { class: "selo vendas" }, TIPOS_DE_AVISO[a.tipo] ?? a.tipo),
+        el("span", { class: "selo vendas" }, tipoDoAviso(a)),
         el("span", { class: "suave" }, ` ${a.avisado_por}, ${quando(a.criado_em)}`),
         a.comentario ? el("div", {}, el("q", {}, a.comentario)) : null,
       ),

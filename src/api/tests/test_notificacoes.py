@@ -218,6 +218,7 @@ def test_aviso_da_equipe_de_vendas_notifica_o_comprador_na_hora_cada_vez(client:
         "tipo": "vendendo_muito",
         "avisado_por": "Pessoa Teste",
         "comentario": "cliente levou 10",
+        "quantidade": None,
     }
 
 

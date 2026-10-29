@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard do repositor - Integração - Bandfashion</title>
+  <link rel="icon" href="logo.png">
+  <link rel="stylesheet" href="estilo.css">
+  <script type="module" src="dashboard.js"></script>
+</head>
+<body class="dashboard">
+  <header>
+    <div class="conteudo">
+      <strong class="marca">Integração - Bandfashion</strong>
+      <nav aria-label="Telas do Copilot"></nav>
+    </div>
+  </header>
+  <main class="conteudo">
+    <div class="dashboard-topo">
+      <div>
+        <h1>Gôndolas para repor</h1>
+        <p id="atualizado" class="atualizado" aria-live="polite"></p>
+      </div>
+      <button id="tela-cheia" type="button" class="tela-cheia">Tela cheia</button>
+    </div>
+    <ul id="resumo" class="dashboard-resumo" aria-label="Quantas gôndolas em cada prioridade"></ul>
+    <p id="carregando" class="carregando">Procurando as gôndolas para repor...</p>
+    <ol id="gondolas" class="dashboard-lista" aria-label="Gôndolas para repor, da mais urgente para a menos urgente"></ol>
+  </main>
+</body>
+</html>

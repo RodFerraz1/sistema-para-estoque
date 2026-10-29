@@ -164,6 +164,24 @@ def test_vendas_diarias_soma_por_sku_e_dia_em_utc(erp: ERPAdapter) -> None:
     }
 
 
+def test_vendido_depois_de_soma_so_as_vendas_depois_do_momento_de_cada_sku(erp: ERPAdapter) -> None:
+    vendido = erp.vendido_depois_de(
+        {
+            VENDENDO.sku_code: _utc(2026, 8, 31, 23, 30),
+            SEM_ESTOQUE.sku_code: _utc(2026, 9, 1, 11),
+            PARADO.sku_code: _utc(2026, 7, 1),
+            INATIVO.sku_code: _utc(2026, 7, 1),
+            "LOTE-NAO-EXISTE": _utc(2026, 7, 1),
+        }
+    )
+
+    assert vendido == {VENDENDO.sku_code: 7, SEM_ESTOQUE.sku_code: 6}
+
+
+def test_vendido_depois_de_sem_momentos_nao_le_nada(erp: ERPAdapter) -> None:
+    assert erp.vendido_depois_de({}) == {}
+
+
 def test_fornecedores_por_sku_so_os_ativos_do_mais_barato_ao_mais_caro(erp: ERPAdapter) -> None:
     fornecedores = _do_teste(erp.fornecedores_por_sku())
 

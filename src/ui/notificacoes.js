@@ -1,13 +1,18 @@
 import { VERIFICACAO_PARA_VENDAS, api, coberturaEmDias, decisaoParaVendas, el, mensagem, numero, quando } from "./comum.js";
 
 const INTERVALO_MS = 2 * 60 * 1000;
+const FRASES_DO_AVISO = {
+  acabou: () => "acabou",
+  vendendo_muito: () => "está vendendo muito",
+  faltou_na_gondola: (d) => `faltou no depósito: ${numero(d.quantidade)} peças a menos na gôndola`,
+};
 const POPUP_FECHA_EM_MS = 12 * 1000;
 const CHAVE_DO_POPUP = "copilot.notificacoes-no-popup-ate";
 
 const TIPOS = {
   ruptura: { rotulo: "Ruptura", classe: "urgente", grupo: ["SKU entrou em ruptura", "SKUs entraram em ruptura"] },
   entrega_atrasada: { rotulo: "Entrega atrasada", classe: "destaque", grupo: ["entrega atrasou", "entregas atrasaram"] },
-  aviso: { rotulo: "Aviso das vendas", classe: "vendas", grupo: ["aviso da equipe de vendas", "avisos da equipe de vendas"] },
+  aviso: { rotulo: "Aviso da loja", classe: "vendas", grupo: ["aviso da loja", "avisos da loja"] },
   estoque_divergente: { rotulo: "Estoque divergente", classe: "urgente", grupo: ["estoque divergente", "estoques divergentes"] },
   decisao_sobre_aviso: {
     rotulo: "Decisão do comprador",
@@ -56,7 +61,7 @@ function conteudoDe(n) {
   if (n.tipo === "aviso") {
     return {
       href: `sku.html?sku=${encodeURIComponent(n.sku_code)}`,
-      titulo: `${d.avisado_por} avisou: ${nomeDoSku(d)} ${d.tipo === "acabou" ? "acabou" : "está vendendo muito"}`,
+      titulo: `${d.avisado_por} avisou: ${nomeDoSku(d)} ${FRASES_DO_AVISO[d.tipo]?.(d) ?? d.tipo}`,
       linha: d.comentario ? `"${d.comentario}"` : null,
     };
   }
@@ -78,7 +83,7 @@ function conteudoDe(n) {
     return {
       href: `reposicao.html?busca=${encodeURIComponent(n.sku_code)}`,
       titulo: `${d.avisado_por}: gôndola vazia de ${nomeDoSku(d)}`,
-      linha: `Setor ${d.setor} · ${numero(d.disponivel_no_erp)} no estoque (ERP)${d.comentario ? ` · "${d.comentario}"` : ""}`,
+      linha: `Setor ${d.setor}${d.pecas ? ` · levar ${numero(d.pecas)} peças` : ""} · ${numero(d.disponivel_no_erp)} no estoque (ERP)${d.comentario ? ` · "${d.comentario}"` : ""}`,
     };
   }
   if (n.tipo === "verificacao_sobre_aviso") {
@@ -90,7 +95,7 @@ function conteudoDe(n) {
   }
   if (n.tipo === "decisao_sobre_aviso") {
     return {
-      href: "aviso.html#meus-avisos",
+      href: d.tipo_do_aviso === "faltou_na_gondola" ? "reposicao.html" : "aviso.html#meus-avisos",
       titulo: `${d.decidido_por} decidiu sobre ${nomeDoSku(d)}`,
       linha: `${decisaoParaVendas(d).texto}${d.motivo ? ` · ${d.motivo}` : ""}`,
     };

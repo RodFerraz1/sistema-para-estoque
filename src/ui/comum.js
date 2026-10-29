@@ -59,6 +59,7 @@ export const TELAS = [
   { papel: "comprador", href: "estoque.html", rotulo: "Estoque" },
   { papel: "comprador", href: "politica.html", rotulo: "Política" },
   { papel: "vendas", href: "aviso.html", rotulo: "Consultar e avisar" },
+  { papel: "reposicao", href: "dashboard.html", rotulo: "Dashboard" },
   { papel: "reposicao", href: "reposicao.html", rotulo: "Painel do repositor" },
   { papel: "reposicao", href: "gondola.html", rotulo: "Montar gôndola" },
   { papel: "admin", href: "usuarios.html", rotulo: "Usuários" },
@@ -156,6 +157,36 @@ export function dataCurta(isoDia) {
   return `${dia}/${mes}`;
 }
 
+export function porDia(valor) {
+  const arredondado = Math.round(valor * 10) / 10;
+  return numero(arredondado, Number.isInteger(arredondado) ? 0 : 1);
+}
+
+const DIAS_DA_SEMANA = ["no domingo", "na segunda", "na terça", "na quarta", "na quinta", "na sexta", "no sábado"];
+const UMA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
+
+function quandoFoi(isoDia) {
+  const [ano, mes, dia] = isoDia.split("-").map(Number);
+  const data = new Date(ano, mes - 1, dia);
+  return Date.now() - data < UMA_SEMANA_MS ? DIAS_DA_SEMANA[data.getDay()] : `em ${dataCurta(isoDia)}`;
+}
+
+export function emSequencia(partes) {
+  return partes.length > 1 ? `${partes.slice(0, -1).join(", ")} e ${partes.at(-1)}` : partes[0];
+}
+
+export function fraseDaReposicao(r) {
+  const gondola = r.na_gondola
+    ? `Sobram ~${numero(r.na_gondola)} de ${numero(r.pecas_no_mix)} na gôndola`
+    : `A gôndola de ${numero(r.pecas_no_mix)} provavelmente esvaziou`;
+  return `${gondola}: vendeu ${numero(r.vendido_desde)} desde a reposição de ${r.reposto_por}, ${quando(r.reposto_em)}. Vende ${porDia(r.venda_media_diaria)} por dia.`;
+}
+
+export function fraseDaQueda(queda) {
+  const dias = queda.ultimos_dias.map((d) => `${numero(d.quantidade)} ${quandoFoi(d.dia)}`);
+  return `Vendia ${porDia(queda.venda_diaria_base)} por dia. Vendeu ${emSequencia(dias)}.`;
+}
+
 export function hojeIso() {
   const agora = new Date();
   return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-${String(agora.getDate()).padStart(2, "0")}`;
@@ -241,7 +272,7 @@ export function sinais(lista) {
 export const PAPEIS = {
   comprador: { rotulo: "Comprador", descricao: "painel, tela do SKU, política, preços e chat" },
   vendas: { rotulo: "Vendas", descricao: "consulta de produto, avisos ao comprador e ao repositor e meus avisos" },
-  reposicao: { rotulo: "Reposição", descricao: "painel do repositor e mix de gôndola" },
+  reposicao: { rotulo: "Reposição", descricao: "dashboard das gôndolas, painel do repositor e mix de gôndola" },
   admin: { rotulo: "Admin", descricao: "cadastro das pessoas e dos setores da loja" },
 };
 
@@ -312,13 +343,52 @@ export function barraDeFiltros(formulario, aoMudar) {
   };
 }
 
+let infos = 0;
+
+function fecharInfos(exceto) {
+  for (const aberto of document.querySelectorAll(".info.aberto")) {
+    if (aberto === exceto) continue;
+    aberto.classList.remove("aberto");
+    aberto.querySelector("button").setAttribute("aria-expanded", "false");
+  }
+}
+
+// Explicação escondida atrás de um "i": só aparece quando o usuário pede.
+export function info(texto) {
+  if (infos === 0) {
+    document.addEventListener("click", (evento) => fecharInfos(evento.target.closest(".info")));
+    document.addEventListener("keydown", (evento) => evento.key === "Escape" && fecharInfos());
+  }
+  const id = `info-${++infos}`;
+  const caixa = el("span", { class: "info" });
+  const botao = el("button", { type: "button", "aria-label": "O que é isto?", "aria-expanded": "false", "aria-controls": id }, "i");
+  botao.addEventListener("click", () => {
+    const abrir = !caixa.classList.contains("aberto");
+    caixa.classList.toggle("aberto", abrir);
+    botao.setAttribute("aria-expanded", String(abrir));
+  });
+  caixa.append(botao, el("span", { class: "info-balao", id, role: "note" }, texto));
+  return caixa;
+}
+
 export function guardarNaUrl(parametros) {
   const consulta = new URLSearchParams(parametros).toString();
   history.replaceState(null, "", `${consulta ? `?${consulta}` : location.pathname}${location.hash}`);
   return consulta;
 }
 
-export const TIPOS_DE_AVISO = { acabou: "Acabou", vendendo_muito: "Vendendo muito", gondola_vazia: "Gôndola vazia" };
+export const TIPOS_DE_AVISO = {
+  acabou: "Acabou",
+  vendendo_muito: "Vendendo muito",
+  gondola_vazia: "Gôndola vazia",
+  faltou_na_gondola: "Faltou para a gôndola",
+};
+
+// "Faltou para a gôndola: 15 peças" no aviso do repositor; nos outros, só o tipo.
+export function tipoDoAviso(aviso) {
+  const tipo = TIPOS_DE_AVISO[aviso.tipo] ?? aviso.tipo;
+  return aviso.quantidade ? `${tipo}: ${numero(aviso.quantidade)} ${aviso.quantidade === 1 ? "peça" : "peças"}` : tipo;
+}
 
 export const TIPOS_DE_VERIFICACAO = {
   repus: "Repôs a gôndola",

@@ -73,6 +73,7 @@ def test_a_decisao_notifica_a_autora_de_cada_aviso_aberto_e_mais_ninguem(client:
         "quantidade": 120,
         "motivo": None,
         "decidido_por": "Carla",
+        "tipo_do_aviso": "acabou",
     }
     como(cenario, ANA)
     assert len(decisoes_notificadas(client)) == 1
@@ -132,6 +133,7 @@ def test_meus_avisos_mostra_a_decisao_que_fechou_cada_um_ou_que_aguarda_o_compra
             "tipo": "vendendo_muito",
             "setor": None,
             "comentario": None,
+            "pecas": None,
             "criado_em": "2026-10-01T10:00:00Z",
             "decisao": None,
             "verificacao": None,
@@ -146,6 +148,7 @@ def test_meus_avisos_mostra_a_decisao_que_fechou_cada_um_ou_que_aguarda_o_compra
             "tipo": "acabou",
             "setor": None,
             "comentario": "Cliente quer 200.",
+            "pecas": None,
             "criado_em": "2026-10-01T09:00:00Z",
             "decisao": {
                 "tipo": "vou_comprar",

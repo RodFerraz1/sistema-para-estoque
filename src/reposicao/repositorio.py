@@ -8,7 +8,14 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
-from src.reposicao.schemas import AvisoGondola, CapacidadeGondola, Setor, SetorDoSku, VerificacaoGondola
+from src.reposicao.schemas import (
+    AvisoGondola,
+    CapacidadeGondola,
+    ResultadoVerificacao,
+    Setor,
+    SetorDoSku,
+    VerificacaoGondola,
+)
 
 
 class SetorJaExiste(Exception):
@@ -29,8 +36,9 @@ class VerificacoesRepositorio(Protocol):
         mais antiga (o `id` desempata)."""
         ...
 
-    def ultimas(self) -> dict[str, VerificacaoGondola]:
-        """A verificação mais recente de cada SKU que tem alguma, pelo `sku_code`."""
+    def ultimas(self, resultado: ResultadoVerificacao | None = None) -> dict[str, VerificacaoGondola]:
+        """A verificação mais recente de cada SKU que tem alguma, pelo `sku_code`. Com
+        `resultado`, a mais recente com esse resultado."""
         ...
 
 

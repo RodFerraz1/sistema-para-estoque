@@ -21,6 +21,7 @@ class SKU(_CatalogDTO):
     gramatura: int | None
     material: str | None
     ativo: bool
+    ean: str | None = None
 
 
 class Fornecedor(_CatalogDTO):

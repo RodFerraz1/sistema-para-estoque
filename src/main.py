@@ -42,7 +42,7 @@ class UISemCache(StaticFiles):
 def create_app() -> FastAPI:
     # Lida na subida para a configuração inválida (REDATOR sem a chave do provedor) impedir o app de subir.
     get_settings()
-    app = FastAPI(title="Copilot de Compras", version="0.1.0", dependencies=[Depends(exige_x_requested_with)])
+    app = FastAPI(title="Integração - Bandfashion", version="0.1.0", dependencies=[Depends(exige_x_requested_with)])
     app.include_router(health_router)
     app.include_router(usuarios_router)
     app.include_router(skus_router)

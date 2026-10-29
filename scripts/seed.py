@@ -268,6 +268,14 @@ def _sku_code(spec: ProdutoSpec, cor: str, tamanho: str, idx: int) -> str:
     return f"{parts}-{cor_slug}-{tam_slug}-{idx:02d}"
 
 
+def _ean13(sequencia: int) -> str:
+    """EAN-13 com o prefixo 789 do Brasil e dígito verificador válido, para o leitor da
+    câmera aceitar a etiqueta impressa a partir do seed."""
+    corpo = f"789{sequencia:09d}"
+    soma = sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(corpo))
+    return corpo + str((10 - soma % 10) % 10)
+
+
 def _giro_alvo(rng: random.Random, categoria: str) -> float:
     base = {
         "felpudo": (40, 180),
@@ -400,6 +408,7 @@ def _seed_produtos_e_skus(
                         "gramatura": gramatura,
                         "material": spec.material,
                         "ativo": True,
+                        "ean": _ean13(len(skus_rows) + 1),
                         "criado_em": inicio,
                     }
                     skus_rows.append(sku_row)
@@ -424,8 +433,8 @@ def _seed_produtos_e_skus(
     for row in skus_rows:
         insercoes.add(
             """
-            INSERT INTO erp.skus (id, produto_id, sku_code, cor, tamanho, gramatura, material, ativo, criado_em)
-            VALUES (:id, :produto_id, :sku_code, :cor, :tamanho, :gramatura, :material, :ativo, :criado_em)
+            INSERT INTO erp.skus (id, produto_id, sku_code, cor, tamanho, gramatura, material, ativo, ean, criado_em)
+            VALUES (:id, :produto_id, :sku_code, :cor, :tamanho, :gramatura, :material, :ativo, :ean, :criado_em)
             """,
             row,
         )

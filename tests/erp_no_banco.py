@@ -26,11 +26,11 @@ def erp_no_banco(erp: InMemoryERPAdapter) -> Iterator[None]:
             conn.execute(
                 text(
                     """
-                    INSERT INTO erp.skus (id, produto_id, sku_code, cor, tamanho, gramatura, material, ativo)
-                    VALUES (:id, :produto_id, :sku_code, :cor, :tamanho, :gramatura, :material, :ativo)
+                    INSERT INTO erp.skus (id, produto_id, sku_code, cor, tamanho, gramatura, material, ativo, ean)
+                    VALUES (:id, :produto_id, :sku_code, :cor, :tamanho, :gramatura, :material, :ativo, :ean)
                     """
                 ),
-                sku.model_dump(include={"id", "produto_id", "sku_code", "cor", "tamanho", "gramatura", "material", "ativo"}),
+                sku.model_dump(include={"id", "produto_id", "sku_code", "cor", "tamanho", "gramatura", "material", "ativo", "ean"}),
             )
         for fornecedor in erp.fornecedores:
             conn.execute(

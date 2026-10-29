@@ -1,50 +1,40 @@
-import { api, barraDeFiltros, cabecalho, dataCurta, el, guardarNaUrl, mensagem, nomeDaCategoria, numero, quando } from "./comum.js";
+import { api, cabecalho, el, fraseDaQueda, fraseDaReposicao, mensagem, numero, porDia, quando } from "./comum.js";
 
 cabecalho("reposicao");
 
 const carregando = document.getElementById("carregando");
 const conteudo = document.getElementById("painel");
-const filtros = barraDeFiltros(document.getElementById("filtros"), carregar);
-
-const DIAS_DA_SEMANA = ["no domingo", "na segunda", "na terça", "na quarta", "na quinta", "na sexta", "no sábado"];
-const UMA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
+const dialogo = document.getElementById("confirmar-acao");
 
 let setores = [];
 
-function quandoFoi(isoDia) {
-  const [ano, mes, dia] = isoDia.split("-").map(Number);
-  const data = new Date(ano, mes - 1, dia);
-  return Date.now() - data < UMA_SEMANA_MS ? DIAS_DA_SEMANA[data.getDay()] : `em ${dataCurta(isoDia)}`;
-}
-
-function porDia(valor) {
-  const arredondado = Math.round(valor * 10) / 10;
-  return numero(arredondado, Number.isInteger(arredondado) ? 0 : 1);
-}
-
-function emSequencia(partes) {
-  return partes.length > 1 ? `${partes.slice(0, -1).join(", ")} e ${partes.at(-1)}` : partes[0];
-}
-
-function frase(queda) {
-  const dias = queda.ultimos_dias.map((d) => `${numero(d.quantidade)} ${quandoFoi(d.dia)}`);
-  return `Vendia ${porDia(queda.venda_diaria_base)} por dia. Vendeu ${emSequencia(dias)}.`;
-}
-
 const RESULTADOS = [
   { resultado: "repus", texto: "Repus", classe: "primario repus" },
-  { resultado: "estava_na_gondola", texto: "Estava na gôndola" },
   { resultado: "sem_estoque_no_deposito", texto: "Não tem no depósito" },
 ];
 
-function recadoDoResultado(item, resultado, comAviso) {
-  const nome = `${item.produto_nome} ${item.cor}`;
-  const vendedora = comAviso ? " A vendedora que avisou vai saber." : "";
-  if (resultado === "sem_estoque_no_deposito") {
-    return `${nome}: a compradora vai saber que o ERP diz ${numero(item.disponivel)} un. e o depósito não tem.${vendedora}`;
-  }
-  const feito = resultado === "repus" ? "reposto" : "estava na gôndola";
-  return `${nome}: ${feito}. Sai da lista e só volta se passar mais um dia inteiro sem vender.${vendedora}`;
+const RECADOS = {
+  repus: "reposto",
+  sem_estoque_no_deposito: "não tem no depósito",
+};
+
+function recadoDoResultado(item, resultado) {
+  return `${item.produto_nome} ${item.cor}: ${RECADOS[resultado]}.`;
+}
+
+function confirmar(item, acao) {
+  document.getElementById("t-confirmar-acao").textContent = `${item.produto_nome} ${item.cor} · ${item.tamanho}`;
+  document.getElementById("acao-a-confirmar").textContent = acao;
+  dialogo.showModal();
+  return new Promise((resolve) => {
+    const fim = new AbortController();
+    const responder = (sim) => {
+      fim.abort();
+      resolve(sim);
+    };
+    dialogo.addEventListener("submit", (e) => responder(e.submitter?.value === "confirmar"), { signal: fim.signal });
+    dialogo.addEventListener("cancel", () => responder(false), { signal: fim.signal });
+  });
 }
 
 function escolhaDoSetor(item) {
@@ -59,14 +49,95 @@ function escolhaDoSetor(item) {
   return { select, campo: el("div", { class: "campo-setor" }, el("label", { for: id }, "Setor"), select) };
 }
 
-function verificacao(item, comAviso) {
-  const id = `comentario-${item.sku_code}`;
-  const comentario = el("input", { id, type: "text", maxlength: "2000", placeholder: "Ex.: estava no lugar errado" });
-  const setor = escolhaDoSetor(item);
+function pecas(n) {
+  return `${numero(n)} ${n === 1 ? "peça" : "peças"}`;
+}
+
+// Quantas peças a gôndola precisava: as que a vendedora pediu no aviso mais recente que diz
+// quantas, se não as que a hora de repor manda levar. Vazio quando ninguém sabe.
+function precisava(item) {
+  const pedido = [...(item.avisos ?? [])].reverse().find((a) => a.pecas)?.pecas;
+  return pedido ?? item.reposicao?.a_repor ?? null;
+}
+
+// O depósito não tinha tudo: registra o que foi reposto e pede ao comprador o que faltou.
+function reposicaoParcial(item, extras = () => ({})) {
+  const id = item.sku_code;
+  const total = precisava(item);
+  const precisavaDe = el("input", { id: `precisava-${id}`, type: "number", inputmode: "numeric", min: "2", max: "10000", step: "1", value: total ?? "" });
+  const pos = el("input", { id: `pos-${id}`, type: "number", inputmode: "numeric", min: "1", max: "10000", step: "1" });
+  if (total && item.disponivel > 0 && item.disponivel < total) pos.value = item.disponivel;
+  const falta = el("p", { class: "falta", "aria-live": "polite" });
+  const enviar = el("button", { type: "submit", class: "primario" }, "Pedir ao comprador o que faltou");
   const erro = el("div", {});
-  const botoes = RESULTADOS.map(({ resultado, texto, classe }) => {
+
+  function faltaram() {
+    const de = Number(precisavaDe.value);
+    const foram = Number(pos.value);
+    return Number.isInteger(de) && Number.isInteger(foram) && foram > 0 && foram < de ? de - foram : null;
+  }
+
+  function atualizar() {
+    const n = faltaram();
+    enviar.disabled = n === null;
+    enviar.textContent = n === null ? "Pedir ao comprador o que faltou" : `Pedir ${pecas(n)} ao comprador`;
+    falta.replaceChildren(n === null ? "" : el("strong", {}, `Faltaram ${pecas(n)}.`));
+  }
+
+  const formulario = el(
+    "form",
+    { class: "repor-parte", hidden: true, novalidate: true },
+    el(
+      "div",
+      { class: "repor-parte-campos" },
+      el("div", { class: "campo" }, el("label", { for: precisavaDe.id }, "A gôndola precisava de"), el("div", { class: "unidade" }, precisavaDe, " peças")),
+      el("div", { class: "campo" }, el("label", { for: pos.id }, "Você pôs"), el("div", { class: "unidade" }, pos, " peças")),
+    ),
+    falta,
+    enviar,
+    erro,
+  );
+  formulario.addEventListener("input", atualizar);
+  formulario.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    const n = faltaram();
+    if (n === null) return;
+    if (!(await confirmar(item, `Repus ${pecas(Number(pos.value))} e pedir ${pecas(n)} ao comprador`))) return;
+    enviar.disabled = true;
+    try {
+      await api("POST", `/skus/${encodeURIComponent(item.sku_code)}/falta-na-gondola`, {
+        pecas_pedidas: Number(precisavaDe.value),
+        pecas_repostas: Number(pos.value),
+        ...extras(),
+      });
+      recadoDaVerificacao = `${item.produto_nome} ${item.cor}: repostas ${pecas(Number(pos.value))}, ${pecas(n)} pedidas ao comprador.`;
+      await carregar();
+    } catch (e) {
+      erro.replaceChildren(mensagem("erro", `Não foi registrado: ${e.message}`));
+      enviar.disabled = false;
+    }
+  });
+  atualizar();
+
+  const abrir = el("button", { type: "button", class: "repus-parte", "aria-expanded": "false" }, "Repus só uma parte");
+  abrir.addEventListener("click", () => {
+    formulario.hidden = !formulario.hidden;
+    abrir.setAttribute("aria-expanded", String(!formulario.hidden));
+    if (!formulario.hidden) (precisavaDe.value ? pos : precisavaDe).focus();
+  });
+  return { abrir, formulario };
+}
+
+function verificacao(item) {
+  const id = `comentario-${item.sku_code}`;
+  const comentario = el("input", { id, type: "text", maxlength: "2000", placeholder: "Opcional" });
+  const setor = escolhaDoSetor(item);
+  const parcial = reposicaoParcial(item, () => ({ comentario: comentario.value.trim() || null, setor_id: setor.select.value || null }));
+  const erro = el("div", {});
+  const [repus, semEstoque] = RESULTADOS.map(({ resultado, texto, classe }) => {
     const botao = el("button", { type: "button", class: classe ?? "" }, texto);
     botao.addEventListener("click", async () => {
+      if (!(await confirmar(item, texto))) return;
       botoes.forEach((b) => (b.disabled = true));
       try {
         await api("POST", `/skus/${encodeURIComponent(item.sku_code)}/verificacoes`, {
@@ -74,7 +145,7 @@ function verificacao(item, comAviso) {
           comentario: comentario.value.trim() || null,
           setor_id: setor.select.value || null,
         });
-        recadoDaVerificacao = recadoDoResultado(item, resultado, comAviso);
+        recadoDaVerificacao = recadoDoResultado(item, resultado);
         await carregar();
       } catch (e) {
         erro.replaceChildren(mensagem("erro", `Não foi registrado: ${e.message}`));
@@ -83,16 +154,18 @@ function verificacao(item, comAviso) {
     });
     return botao;
   });
+  const botoes = [repus, semEstoque];
   return el(
     "div",
     { class: "verificar" },
     el(
       "div",
       { class: "verificar-campos" },
-      el("div", {}, el("label", { for: id }, "O que você achou? ", el("span", { class: "suave" }, "Comentário opcional")), comentario),
+      el("div", {}, el("label", { for: id }, "Comentário"), comentario),
       setor.campo,
     ),
-    el("div", { class: "resultados-verificacao" }, botoes),
+    el("div", { class: "resultados-verificacao" }, repus, parcial.abrir, semEstoque),
+    parcial.formulario,
     erro,
   );
 }
@@ -104,14 +177,6 @@ function produto(item) {
     el("strong", {}, item.produto_nome),
     el("span", {}, `${item.cor} · ${item.tamanho}`),
     el("code", {}, item.sku_code),
-  );
-}
-
-function linkDaGondola(item) {
-  return el(
-    "a",
-    { class: "botao montar-gondola", href: `gondola.html?produto=${encodeURIComponent(item.produto_id)}` },
-    "Montar a gôndola deste produto",
   );
 }
 
@@ -145,10 +210,9 @@ function cartaoDeQueda(item) {
         seloDoSetor(item),
       ),
     ),
-    el("p", { class: "frase" }, frase(item)),
+    el("p", { class: "frase" }, fraseDaQueda(item)),
     numerosDaQueda(item, item.disponivel),
-    verificacao(item, false),
-    linkDaGondola(item),
+    verificacao(item),
   );
 }
 
@@ -158,6 +222,7 @@ function linhaDoAviso(aviso) {
     {},
     el("strong", {}, aviso.avisado_por),
     el("span", { class: "suave" }, ` avisou ${quando(aviso.criado_em)}`),
+    aviso.pecas ? el("span", {}, ` · pediu ${numero(aviso.pecas)} ${aviso.pecas === 1 ? "peça" : "peças"}`) : null,
     aviso.comentario ? el("span", { class: "comentario-do-aviso" }, `"${aviso.comentario}"`) : null,
   );
 }
@@ -179,7 +244,7 @@ function cartaoDeAviso(item) {
       ),
     ),
     el("ul", { class: "avisos-da-gondola", "aria-label": "Quem avisou" }, item.avisos.map(linhaDoAviso)),
-    item.queda ? el("p", { class: "frase" }, frase(item.queda)) : null,
+    item.queda ? el("p", { class: "frase" }, fraseDaQueda(item.queda)) : null,
     item.queda
       ? numerosDaQueda(item.queda, item.disponivel)
       : el(
@@ -187,31 +252,59 @@ function cartaoDeAviso(item) {
           { class: "numeros grandes so-estoque" },
           el("div", {}, el("dt", {}, "No estoque (ERP)"), el("dd", {}, `${numero(item.disponivel)} un.`)),
         ),
-    item.disponivel === 0 ? el("p", { class: "suave" }, "O ERP diz que não tem. Se não achar no depósito, a compradora já vê o produto em ruptura.") : null,
-    verificacao(item, true),
-    linkDaGondola(item),
+    verificacao(item),
   );
 }
 
-function vazio() {
-  if (Object.keys(filtros.valores()).length) {
-    return el(
-      "div",
-      { class: "card vazio" },
-      el("strong", {}, "Nenhum produto com esses filtros"),
-      el("p", { class: "suave" }, "Tente outra palavra, outro setor ou outra categoria."),
-      el("button", { type: "button", onclick: filtros.limpar }, "Limpar filtros"),
-    );
-  }
+function botaoRepus(item) {
+  const erro = el("div", {});
+  const botao = el("button", { type: "button", class: "primario repus" }, "Repus");
+  botao.addEventListener("click", async () => {
+    if (!(await confirmar(item, "Repus"))) return;
+    botao.disabled = true;
+    try {
+      await api("POST", `/skus/${encodeURIComponent(item.sku_code)}/verificacoes`, { resultado: "repus" });
+      recadoDaVerificacao = recadoDoResultado(item, "repus");
+      await carregar();
+    } catch (e) {
+      erro.replaceChildren(mensagem("erro", `Não foi registrado: ${e.message}`));
+      botao.disabled = false;
+    }
+  });
+  const parcial = reposicaoParcial(item);
   return el(
     "div",
-    { class: "card vazio" },
-    el("strong", {}, "Nada parado na gôndola"),
-    el("p", { class: "suave" }, "Nenhum produto com estoque parou de vender nos últimos dias em que a loja abriu."),
+    { class: "verificar" },
+    el("div", { class: "resultados-verificacao so-repus" }, botao, parcial.abrir),
+    parcial.formulario,
+    erro,
   );
 }
 
-function grupo(id, titulo, explicacao, itens, cartao, seVazio) {
+function cartaoDeHoraDeRepor(item) {
+  const r = item.reposicao;
+  return el(
+    "article",
+    { class: "card repor hora-de-repor" },
+    el(
+      "div",
+      { class: "repor-topo" },
+      produto(item),
+      el("div", { class: "selos" }, el("span", { class: "selo destaque" }, "Hora de repor"), seloDoSetor(item)),
+    ),
+    el("p", { class: "frase" }, fraseDaReposicao(r)),
+    el(
+      "dl",
+      { class: "numeros grandes" },
+      el("div", {}, el("dt", {}, "Na gôndola (estimado)"), el("dd", {}, numero(r.na_gondola))),
+      el("div", {}, el("dt", {}, "Levar do depósito"), el("dd", {}, numero(r.a_repor))),
+      el("div", {}, el("dt", {}, "No estoque (ERP)"), el("dd", {}, `${numero(item.disponivel)} un.`)),
+    ),
+    botaoRepus(item),
+  );
+}
+
+function grupo(id, titulo, itens, cartao, seVazio) {
   return el(
     "section",
     { class: "grupo", "aria-labelledby": id },
@@ -220,7 +313,6 @@ function grupo(id, titulo, explicacao, itens, cartao, seVazio) {
       {},
       el("h2", { id }, titulo),
       el("span", { class: "contagem" }, String(itens.length)),
-      el("p", { class: "suave" }, explicacao),
     ),
     itens.length ? el("div", { class: "itens" }, itens.map(cartao)) : seVazio,
   );
@@ -238,18 +330,23 @@ function mostrar(painel) {
       grupo(
         "t-avisos",
         "Avisos das vendedoras",
-        "Uma vendedora viu a gôndola vazia. Vá ao setor, veja e diga o que achou. O aviso mais antigo vem primeiro.",
         avisos,
         cartaoDeAviso,
-        el("p", { class: "suave nenhum-aviso" }, "Nenhuma gôndola vazia avisada agora."),
+        el("p", { class: "suave nenhum-aviso" }, "Nenhum aviso."),
       ),
       grupo(
         "t-quedas",
         "Pararam de vender e têm estoque",
-        "Vendiam todo dia e quase não venderam desde então. Veja se estão na gôndola e diga o que achou. Quem perde mais venda vem primeiro.",
         painel.quedas_de_venda,
         cartaoDeQueda,
-        vazio(),
+        el("p", { class: "suave nenhum-aviso" }, "Nenhum produto parou de vender."),
+      ),
+      grupo(
+        "t-hora-de-repor",
+        "Hora de repor",
+        painel.hora_de_repor,
+        cartaoDeHoraDeRepor,
+        el("p", { class: "suave nenhum-aviso" }, "Nenhuma gôndola perto de esvaziar."),
       ),
     ),
   );
@@ -259,11 +356,10 @@ let ultimaConsulta = 0;
 let recadoDaVerificacao = null;
 
 async function carregar() {
-  const consulta = guardarNaUrl(filtros.valores());
   const numeroDaConsulta = ++ultimaConsulta;
   conteudo.setAttribute("aria-busy", "true");
   try {
-    const painel = await api("GET", `/reposicao/painel?${consulta}`);
+    const painel = await api("GET", "/reposicao/painel");
     if (numeroDaConsulta === ultimaConsulta) mostrar(painel);
   } catch (e) {
     if (numeroDaConsulta === ultimaConsulta) conteudo.replaceChildren(mensagem("erro", `Não foi possível montar o painel: ${e.message}`));
@@ -273,11 +369,7 @@ async function carregar() {
 }
 
 try {
-  const [categorias, ativos] = await Promise.all([api("GET", "/categorias"), api("GET", "/setores")]);
-  setores = ativos;
-  filtros.opcoes("setor", setores.map((s) => [s.id, s.nome]));
-  filtros.opcoes("categoria", categorias.map((c) => [c, nomeDaCategoria(c)]));
-  filtros.mostrar();
+  setores = await api("GET", "/setores");
   await carregar();
 } catch (e) {
   conteudo.replaceChildren(mensagem("erro", `Não foi possível montar o painel: ${e.message}`));

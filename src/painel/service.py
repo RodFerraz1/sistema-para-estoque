@@ -47,6 +47,7 @@ from src.painel.schemas import (
     GRUPOS,
     Aviso,
     CobrancaEntrega,
+    CompraACaminho,
     DecisaoCompra,
     Disponibilidade,
     EntregaPendente,
@@ -106,6 +107,11 @@ class PedidoSemEntregaAtrasada(LookupError):
     def __init__(self, pedido_id: UUID) -> None:
         super().__init__(f"O pedido '{pedido_id}' não tem entrega atrasada.")
         self.pedido_id = pedido_id
+
+
+class FaltaSemFalta(ValueError):
+    def __init__(self) -> None:
+        super().__init__("Só há falta quando o repositor repõe menos peças do que a gôndola precisa.")
 
 
 class NovaPrevisaoNoPassado(ValueError):
@@ -209,6 +215,8 @@ def _passa_no_estoque(filtro: FiltroEstoque, palavras: list[str], ficha: Ficha, 
     if palavras and not sku_contem_todas(ficha.sku, palavras):
         return False
     if filtro.categoria and ficha.sku.categoria != filtro.categoria:
+        return False
+    if filtro.fornecedor_id is not None and all(f.fornecedor_id != filtro.fornecedor_id for f in ficha.fornecedores):
         return False
     if filtro.situacao == "em_ruptura":
         return _em_ruptura(ficha.cobertura, parametros)
@@ -349,7 +357,14 @@ class Painel:
             raise SKUNaoEncontrado(sku_code)
         return sku
 
-    def registrar_aviso(self, sku_code: str, tipo: TipoAviso, autor: Usuario, comentario: str | None = None) -> Aviso:
+    def registrar_aviso(
+        self,
+        sku_code: str,
+        tipo: TipoAviso,
+        autor: Usuario,
+        comentario: str | None = None,
+        quantidade: int | None = None,
+    ) -> Aviso:
         """Notifica o comprador na hora. Lança `SKUNaoEncontrado` e `SKUInativo`."""
         sku = self._sku(sku_code)
         if not sku.ativo:
@@ -362,6 +377,7 @@ class Painel:
             avisado_por=autor.nome,
             usuario_id=autor.id,
             criado_em=self._relogio(),
+            quantidade=quantidade,
         )
         self._avisos.gravar(aviso)
         self._notificacoes.registrar(
@@ -374,11 +390,36 @@ class Painel:
                     "tipo": tipo,
                     "avisado_por": aviso.avisado_por,
                     "comentario": aviso.comentario,
+                    "quantidade": quantidade,
                 },
             ),
             aviso.criado_em,
         )
         return aviso
+
+    def registrar_falta_na_gondola(
+        self,
+        sku_code: str,
+        pecas_pedidas: int,
+        pecas_repostas: int,
+        autor: Usuario,
+        comentario: str | None = None,
+        setor_id: UUID | None = None,
+    ) -> Aviso:
+        """O repositor repôs só parte das peças que a gôndola precisava porque faltou no
+        depósito: registra a verificação `repus`, que fecha os avisos de gôndola vazia e
+        conta à vendedora quantas foram, e avisa o comprador das peças que faltaram, com o
+        aviso `faltou_na_gondola`. Lança `FaltaSemFalta` com as repostas fora de 1 até
+        menos que as pedidas e propaga o que `registrar_verificacao` lança."""
+        if not 0 < pecas_repostas < pecas_pedidas:
+            raise FaltaSemFalta()
+        faltaram = pecas_pedidas - pecas_repostas
+        comentario = _opcional(comentario)
+        resumo = f"Repus {pecas_repostas} de {pecas_pedidas} peças; pedi as {faltaram} que faltaram ao comprador."
+        self._reposicao.registrar_verificacao(
+            sku_code, "repus", autor, f"{resumo} {comentario}" if comentario else resumo, setor_id
+        )
+        return self.registrar_aviso(sku_code, "faltou_na_gondola", autor, comentario, faltaram)
 
     def registrar_decisao(
         self,
@@ -390,7 +431,7 @@ class Painel:
         comentario: str | None = None,
     ) -> DecisaoCompra:
         """Guarda a sugestão de pedido do momento (quantidade e versão da política). Fecha
-        os avisos abertos do SKU, notifica na hora cada vendedora autora de um deles (uma
+        os avisos abertos do SKU, notifica na hora cada autor de um deles (uma
         vez por pessoa) e tira o SKU do painel por `PRAZO_DA_DECISAO`. Não cria pedido
         de compra. Lança `SKUNaoEncontrado`, `QuantidadeObrigatoria`,
         `QuantidadeSoParaComprar` e `MotivoObrigatorio`. Propaga `SKUSemEstoque`."""
@@ -421,11 +462,12 @@ class Painel:
         )
         self._decisoes.gravar(decisao)
         for usuario_id in dict.fromkeys(a.usuario_id for a in abertos if a.usuario_id is not None):
+            tipo_do_aviso = next(a for a in abertos if a.usuario_id == usuario_id).tipo
             self._notificacoes.registrar(
                 Condicao(
                     tipo="decisao_sobre_aviso",
                     sku_code=sku_code,
-                    papel_destino="vendas",
+                    papel_destino="reposicao" if tipo_do_aviso == "faltou_na_gondola" else "vendas",
                     usuario_destino=usuario_id,
                     detalhe={
                         **_nome_do_sku(sku),
@@ -433,6 +475,7 @@ class Painel:
                         "quantidade": quantidade,
                         "motivo": motivo,
                         "decidido_por": decisao.decidido_por,
+                        "tipo_do_aviso": tipo_do_aviso,
                     },
                 ),
                 decisao.criado_em,
@@ -486,15 +529,8 @@ class Painel:
             )
         return entregas
 
-    def disponibilidade(self, sku_code: str) -> Disponibilidade:
-        """Para a vendedora: o disponível, a situação pela política ativa e o que falta
-        chegar, pela previsão (sem previsão por último). Lança `SKUNaoEncontrado`. Lança
-        `SKUSemEstoque` para SKU sem a linha de estoque no ERP."""
-        sku = self._sku(sku_code)
-        estoque = self._inventory.estoque_atual(sku_code)
-        if estoque is None:
-            raise SKUSemEstoque(sku_code)
-        hoje = self._relogio().date()
+    def _chegadas(self, sku_code: str, hoje: date) -> list[PrevisaoDeChegada]:
+        """O que falta chegar, pela previsão (sem previsão por último)."""
         entregas: list[PrevisaoDeChegada] = []
         for item in self._inventory.em_transito(sku_code).itens:
             cobrancas = self._cobrancas.listar(item.pedido_id)
@@ -508,6 +544,17 @@ class Painel:
                 )
             )
         entregas.sort(key=lambda e: (e.previsao is None, e.previsao or hoje))
+        return entregas
+
+    def disponibilidade(self, sku_code: str) -> Disponibilidade:
+        """Para a vendedora: o disponível, a situação pela política ativa e o que falta
+        chegar, pela previsão (sem previsão por último). Lança `SKUNaoEncontrado`. Lança
+        `SKUSemEstoque` para SKU sem a linha de estoque no ERP."""
+        sku = self._sku(sku_code)
+        estoque = self._inventory.estoque_atual(sku_code)
+        if estoque is None:
+            raise SKUSemEstoque(sku_code)
+        entregas = self._chegadas(sku_code, self._relogio().date())
         disponivel = estoque.quantidade_disponivel
         parametros = self._politicas.ativa().parametros
         return Disponibilidade(
@@ -516,6 +563,23 @@ class Painel:
             situacao=_situacao(disponivel, self._inventory.cobertura_meses(sku_code), parametros),
             entregas=entregas,
         )
+
+    def compras_do_produto(self, sku_code: str) -> list[CompraACaminho]:
+        """Para a vendedora: o que falta chegar de todos os SKUs ativos do produto do
+        `sku_code`, pela previsão (sem previsão por último), depois pela cor e pelo tamanho.
+        Lança `SKUNaoEncontrado`."""
+        produto_id = self._sku(sku_code).produto_id
+        hoje = self._relogio().date()
+        compras = [
+            CompraACaminho(sku=sku, chegada=chegada)
+            for sku in self._catalog.listar_skus()
+            if sku.produto_id == produto_id
+            for chegada in self._chegadas(sku.sku_code, hoje)
+        ]
+        compras.sort(
+            key=lambda c: (c.chegada.previsao is None, c.chegada.previsao or hoje, *ordem_por_nome(c.sku)[1:])
+        )
+        return compras
 
     def avisos_abertos(self, sku_code: str) -> list[Aviso]:
         """Os sem decisão de compra posterior, do mais recente para o mais antigo."""

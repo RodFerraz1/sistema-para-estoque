@@ -12,7 +12,14 @@ from src.reposicao.repositorio import (
     SetorJaExiste,
     VerificacoesRepositorio,
 )
-from src.reposicao.schemas import AvisoGondola, CapacidadeGondola, Setor, SetorDoSku, VerificacaoGondola
+from src.reposicao.schemas import (
+    AvisoGondola,
+    CapacidadeGondola,
+    ResultadoVerificacao,
+    Setor,
+    SetorDoSku,
+    VerificacaoGondola,
+)
 
 
 class InMemoryVerificacoesRepositorio(VerificacoesRepositorio):
@@ -33,8 +40,12 @@ class InMemoryVerificacoesRepositorio(VerificacoesRepositorio):
             [v for v in self._verificacoes if v.sku_code in sku_codes and v.criado_em >= desde]
         )
 
-    def ultimas(self) -> dict[str, VerificacaoGondola]:
-        return {sku_code: self.listar(sku_code)[0] for sku_code in {v.sku_code for v in self._verificacoes}}
+    def ultimas(self, resultado: ResultadoVerificacao | None = None) -> dict[str, VerificacaoGondola]:
+        ultimas: dict[str, VerificacaoGondola] = {}
+        for verificacao in self._recentes_primeiro(self._verificacoes):
+            if resultado is None or verificacao.resultado == resultado:
+                ultimas.setdefault(verificacao.sku_code, verificacao)
+        return ultimas
 
 
 class InMemorySetoresRepositorio(SetoresRepositorio):

@@ -133,6 +133,17 @@ def test_mesma_hora_desempata_pelo_id(verificacoes: VerificacoesRepositorio) -> 
     assert verificacoes.ultimas() == {SKU: maior}
 
 
+def test_ultimas_com_resultado_traz_a_mais_recente_com_esse_resultado(verificacoes: VerificacoesRepositorio) -> None:
+    repus = verificacao(SKU, minutos=0, resultado="repus")
+    depois = verificacao(SKU, minutos=10, resultado="estava_na_gondola")
+    so_estava = verificacao(OUTRO_SKU, minutos=5, resultado="estava_na_gondola")
+    for v in (depois, repus, so_estava):
+        verificacoes.gravar(v)
+
+    assert verificacoes.ultimas("repus") == {SKU: repus}
+    assert verificacoes.ultimas() == {SKU: depois, OUTRO_SKU: so_estava}
+
+
 def test_sem_verificacao_ultimas_e_vazio(verificacoes: VerificacoesRepositorio) -> None:
     assert verificacoes.ultimas() == {}
 

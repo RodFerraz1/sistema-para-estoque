@@ -26,10 +26,10 @@ from src.ai.schemas import (
 from src.erp_adapter.schemas import StatusPedidoCompra
 from src.inventory.schemas import Cobertura, Estoque, StatusEmTransito
 from src.notificacoes.schemas import TipoEpisodio
-from src.painel.schemas import GrupoDoPainel, SituacaoDisponibilidade, TipoAviso, TipoDecisao
+from src.painel.schemas import GrupoDoPainel, SituacaoDisponibilidade, TipoAviso, TipoAvisoDeVendas, TipoDecisao
 from src.politica_compra.schemas import MotivoAlerta, ParametrosPolitica
 from src.purchasing.schemas import Alerta, MemoriaCalculo, MotivoSemCompra
-from src.reposicao.schemas import ResultadoVerificacao
+from src.reposicao.schemas import Prioridade, ResultadoVerificacao
 from src.usuarios.schemas import Papel
 
 TextoLivre = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
@@ -307,6 +307,20 @@ class PrevisaoDeChegadaResponse(BaseModel):
     atrasada: bool
 
 
+class CompraACaminhoResponse(BaseModel):
+    """Sem preço de compra nem fornecedor: a vendedora também lê."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    cor: str
+    tamanho: str
+    gramatura: int | None
+    quantidade: int
+    previsao: date | None
+    atrasada: bool
+
+
 class DisponibilidadeResponse(BaseModel):
     """Sem preço de compra nem fornecedor: a vendedora também lê."""
 
@@ -348,12 +362,15 @@ class MeuAvisoResponse(BaseModel):
     tipo: TipoAviso | Literal["gondola_vazia"]
     setor: str | None = None
     comentario: str | None
+    pecas: int | None = None
     criado_em: datetime
     decisao: DecisaoSobreAvisoResponse | None = None
     verificacao: VerificacaoSobreAvisoResponse | None = None
 
 
 class AvisoResponse(BaseModel):
+    """`quantidade`: no `faltou_na_gondola`, as peças que faltaram no depósito."""
+
     model_config = ConfigDict(frozen=True)
 
     id: UUID
@@ -362,12 +379,23 @@ class AvisoResponse(BaseModel):
     comentario: str | None
     avisado_por: str
     criado_em: datetime
+    quantidade: int | None
 
 
 class RegistrarAvisoRequest(BaseModel):
     sku_code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    tipo: TipoAviso
+    tipo: TipoAvisoDeVendas
     comentario: TextoLivre | None = None
+
+
+class RegistrarFaltaNaGondolaRequest(BaseModel):
+    """O repositor repôs `pecas_repostas` das `pecas_pedidas` que a gôndola precisava.
+    `setor_id` corrige o setor conhecido do SKU."""
+
+    pecas_pedidas: Annotated[int, Field(gt=1, le=10_000)]
+    pecas_repostas: Annotated[int, Field(gt=0, le=10_000)]
+    comentario: TextoLivre | None = None
+    setor_id: UUID | None = None
 
 
 class VerificacaoGondolaResponse(BaseModel):
@@ -438,9 +466,12 @@ class SetorDoSkuResponse(BaseModel):
 
 
 class RegistrarAvisoGondolaRequest(BaseModel):
+    """`pecas`: quantas peças a vendedora pede para levar do depósito, opcional."""
+
     sku_code: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     setor_id: UUID
     comentario: TextoLivre | None = None
+    pecas: Annotated[int, Field(gt=0, le=10_000)] | None = None
 
 
 class AvisoGondolaResponse(BaseModel):
@@ -455,6 +486,19 @@ class AvisoGondolaResponse(BaseModel):
     disponivel_no_erp: int
     avisado_por: str
     criado_em: datetime
+    pecas: int | None
+
+
+class SugestaoDeReposicaoResponse(BaseModel):
+    """Quantas peças levar do depósito para a gôndola vazia: as do mix de gôndola de hoje.
+    `pecas` nula quando o produto não tem capacidade da gôndola; zero quando o mix não põe
+    nenhuma peça dele."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pecas: int | None
+    capacidade: int | None
+    disponivel: int
 
 
 class ItemAlertaResponse(BaseModel):
@@ -784,11 +828,25 @@ class QuedaNoAvisoResponse(BaseModel):
 
 
 class AvisoNoPainelResponse(BaseModel):
+    """`pecas`: quantas a vendedora pediu para levar do depósito, nula quando não disse."""
+
     model_config = ConfigDict(frozen=True)
 
     id: UUID
     avisado_por: str
     comentario: str | None
+    criado_em: datetime
+    pecas: int | None
+
+
+class AvisoGondolaAbertoResponse(BaseModel):
+    """`meu`: avisado pelo usuário logado."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    avisado_por: str
+    meu: bool
     criado_em: datetime
 
 
@@ -810,11 +868,72 @@ class AvisoDeGondolaNoPainelResponse(BaseModel):
     queda: QuedaNoAvisoResponse | None
 
 
+class ReposicaoDaGondolaResponse(BaseModel):
+    """`pecas_no_mix`: o que o mix de gôndola de hoje põe do SKU; `na_gondola`: a estimativa
+    do que sobrou, as peças do mix menos o que vendeu desde `reposto_em`, nunca negativa;
+    `dias_na_gondola`: quantos dias da `venda_media_diaria` a estimativa segura; `a_repor`:
+    quantas peças levar do depósito para a gôndola voltar ao mix."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pecas_no_mix: int
+    na_gondola: int
+    a_repor: int
+    venda_media_diaria: float
+    dias_na_gondola: float
+    vendido_desde: int
+    reposto_em: datetime
+    reposto_por: str
+
+
+class HoraDeReporResponse(BaseModel):
+    """SKU cuja gôndola, pelo que vendeu desde a última reposição, está perto de esvaziar."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku_code: str
+    produto_id: UUID
+    produto_nome: str
+    cor: str
+    tamanho: str
+    categoria: str
+    disponivel: int
+    setor: SetorResumoResponse | None
+    reposicao: ReposicaoDaGondolaResponse
+
+
 class PainelDoRepositorResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     avisos_de_gondola: list[AvisoDeGondolaNoPainelResponse]
     quedas_de_venda: list[QuedaDeVendaResponse]
+    hora_de_repor: list[HoraDeReporResponse]
+
+
+class GondolaNoDashboardResponse(BaseModel):
+    """Uma gôndola a repor, na ordem do dashboard. `queda`, `avisos` (do mais antigo para o
+    mais recente) e `reposicao` são os motivos: a queda de venda, os avisos das vendedoras e
+    a hora de repor. `mais_de_um_motivo` tem dois ou mais deles; as outras prioridades, só o
+    de mesmo nome. `a_repor`: quantas peças levar do depósito. Com queda ou aviso a gôndola
+    está vazia e são as peças do mix de hoje, nulo sem capacidade gravada do produto."""
+
+    model_config = ConfigDict(frozen=True)
+
+    prioridade: Prioridade
+    sku_code: str
+    produto_nome: str
+    cor: str
+    tamanho: str
+    disponivel: int
+    setor: SetorResumoResponse | None
+    queda: QuedaNoAvisoResponse | None
+    avisos: list[AvisoNoPainelResponse]
+    reposicao: ReposicaoDaGondolaResponse | None
+    a_repor: int | None
+
+
+class RegistrarMontagemRequest(BaseModel):
+    capacidade: Annotated[int, Field(gt=0)]
 
 
 class ProdutoDaGondolaResponse(BaseModel):

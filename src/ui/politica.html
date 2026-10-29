@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Política de compra - Copilot de Compras</title>
+  <title>Política de compra - Integração - Bandfashion</title>
+  <link rel="icon" href="logo.png">
   <link rel="stylesheet" href="estilo.css">
   <script type="module" src="politica.js"></script>
 </head>
 <body>
   <header>
     <div class="conteudo">
-      <strong class="marca">Copilot de Compras</strong>
+      <strong class="marca">Integração - Bandfashion</strong>
       <nav aria-label="Telas do Copilot"></nav>
       <button id="abrir-chat" type="button" class="abrir-chat" aria-expanded="false" aria-controls="chat-lateral">Perguntar ao Copilot</button>
     </div>
@@ -123,6 +124,13 @@
         <label for="dias_mix_gondola">12. Para dividir a gôndola entre as cores e tamanhos de um produto pelo que mais vende, quantos dias de venda o Copilot deve olhar?</label>
         <p class="suave">Os dias em que a loja não abriu não contam. Mais dias dão uma divisão mais estável; menos dias percebem antes uma cor que passou a vender mais. A mesma conta aparece na tela do SKU, para comprar a grade na proporção do que vende.</p>
         <div class="unidade"><input id="dias_mix_gondola" name="dias_mix_gondola" type="number" min="1" step="1" required> dias com a loja aberta</div>
+      </div>
+
+      <h2>Hora de repor <span class="selo destaque">a validar com o comprador</span></h2>
+      <div class="card pergunta">
+        <label for="piso_gondola_dias">13. Com quantos dias de venda ainda na gôndola o repositor deve repor?</label>
+        <p class="suave">O Copilot desconta da gôndola montada o que vendeu desde a última reposição. Exemplo: cabem 100 tapetes e vendem 50 por dia. Com meio dia, sobram 25 quando chega a hora de repor, um dia e meio depois de encher.</p>
+        <div class="unidade"><input id="piso_gondola_dias" name="piso_gondola_dias" type="number" min="0" step="0.5" required> dias de venda</div>
       </div>
 
       <div class="barra-salvar">

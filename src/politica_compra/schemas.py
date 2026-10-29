@@ -72,6 +72,7 @@ class ParametrosPolitica(BaseModel):
     venda_diaria_minima_queda: float = Field(gt=0)
     limiar_queda: float = Field(gt=0, lt=1)
     dias_mix_gondola: int = Field(ge=1)
+    piso_gondola_dias: float = Field(ge=0)
 
     @model_validator(mode="after")
     def _regras_entre_campos(self) -> Self:
@@ -109,6 +110,7 @@ PARAMETROS_V1 = ParametrosPolitica(
     venda_diaria_minima_queda=1.0,
     limiar_queda=0.01,
     dias_mix_gondola=90,
+    piso_gondola_dias=0.5,
 )
 
 

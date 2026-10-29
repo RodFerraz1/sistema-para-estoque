@@ -15,6 +15,7 @@ from src.api.tests.cenario_painel import (
     KATRINA,
     PISO,
     REGULAR,
+    SEM_FORNECEDOR,
     URGENTE,
     ZERADO,
     atrasar,
@@ -115,3 +116,33 @@ def test_sku_que_nao_existe_responde_404(client: TestClient) -> None:
     preparar()
 
     assert client.get("/skus/NAO-EXISTE/disponibilidade").status_code == 404
+
+
+def compras_do_produto(client: TestClient, sku: SKU) -> list[dict]:
+    response = client.get(f"/skus/{sku.sku_code}/compras-do-produto")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_compras_do_produto_trazem_todas_as_cores_pela_previsao(client: TestClient) -> None:
+    cenario = preparar()
+    atrasar(cenario, KATRINA, (REGULAR, 40), prevista=date(2026, 10, 15), key="bege")
+    atrasar(cenario, BOA_VISTA, (ZERADO, 30), prevista=date(2026, 9, 30), key="lilas")
+
+    assert compras_do_produto(client, URGENTE) == [
+        {"sku_code": ZERADO.sku_code, "cor": "lilás", "tamanho": "70x140", "gramatura": 400, "quantidade": 30, "previsao": "2026-09-30", "atrasada": True},
+        {"sku_code": REGULAR.sku_code, "cor": "bege", "tamanho": "70x140", "gramatura": 400, "quantidade": 40, "previsao": "2026-10-15", "atrasada": False},
+        {"sku_code": PISO.sku_code, "cor": "rosa", "tamanho": "70x140", "gramatura": 400, "quantidade": 100, "previsao": None, "atrasada": False},
+    ]
+
+
+def test_compras_do_produto_nao_trazem_outro_produto(client: TestClient) -> None:
+    preparar()
+
+    assert compras_do_produto(client, SEM_FORNECEDOR) == []
+
+
+def test_compras_do_produto_de_sku_que_nao_existe_responde_404(client: TestClient) -> None:
+    preparar()
+
+    assert client.get("/skus/NAO-EXISTE/compras-do-produto").status_code == 404

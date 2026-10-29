@@ -2,12 +2,13 @@
 Postgres via SQLAlchemy; outra (`InMemoryERPAdapter`) serve para testes de
 módulos superiores.
 
-As leituras em lote (`estoques`, `giros`, `vendas_diarias`, `fornecedores_por_sku`,
-`itens_em_transito`) são o retrato do estoque inteiro: uma consulta cada, só dos SKUs
+As leituras em lote (`estoques`, `giros`, `vendas_diarias`, `vendido_depois_de`,
+`fornecedores_por_sku`, `itens_em_transito`) são o retrato do estoque inteiro: uma consulta cada, só dos SKUs
 ativos, indexadas por `sku_code`. Um SKU sem nada a devolver fica fora do dicionário.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Protocol
 from uuid import UUID
@@ -67,6 +68,10 @@ class ERPAdapter(Protocol):
 
     def vendas_diarias(self, desde: datetime) -> dict[str, list[VendasDoDia]]:
         """Vendas com `data >= desde` somadas por dia, do mais antigo ao mais recente."""
+        ...
+
+    def vendido_depois_de(self, momentos: Mapping[str, datetime]) -> dict[str, int]:
+        """Para cada SKU ativo de `momentos`, a soma das vendas com `data > momento`."""
         ...
 
     def fornecedores_por_sku(self) -> dict[str, list[FornecedorParaSKU]]:

@@ -3,29 +3,34 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Painel do repositor - Copilot de Compras</title>
+  <title>Painel do repositor - Integração - Bandfashion</title>
+  <link rel="icon" href="logo.png">
   <link rel="stylesheet" href="estilo.css">
   <script type="module" src="reposicao.js"></script>
 </head>
 <body>
   <header>
     <div class="conteudo estreito">
-      <strong class="marca">Copilot de Compras</strong>
+      <strong class="marca">Integração - Bandfashion</strong>
       <nav aria-label="Telas do Copilot"></nav>
     </div>
   </header>
   <main class="conteudo estreito">
     <h1>Painel do repositor</h1>
-    <p class="suave">O que provavelmente está faltando na gôndola: as gôndolas vazias que as vendedoras avisaram e os produtos que pararam de vender, mas o ERP diz que tem no depósito.</p>
 
-    <form id="filtros" class="filtros filtros-repositor" role="search" aria-label="Buscar e filtrar o painel do repositor" hidden>
-      <input id="filtro-busca" name="busca" type="search" autocomplete="off" enterkeyhint="search" maxlength="100" placeholder="Buscar nome, cor, tamanho" aria-label="Buscar por código, nome, cor ou tamanho">
-      <select id="filtro-setor" name="setor" aria-label="Setor"><option value="">Todos os setores</option></select>
-      <select id="filtro-categoria" name="categoria" aria-label="Categoria"><option value="">Todas as categorias</option></select>
-      <button id="limpar-filtros" class="limpar-filtros" type="button" hidden>Limpar filtros</button>
-    </form>
-    <p id="carregando" class="carregando">Procurando o que falta na gôndola...</p>
+    <p id="carregando" class="carregando">Carregando...</p>
     <div id="painel"></div>
   </main>
+
+  <dialog id="confirmar-acao" class="confirmacao" aria-labelledby="t-confirmar-acao">
+    <form method="dialog">
+      <h2 id="t-confirmar-acao"></h2>
+      <p id="acao-a-confirmar"></p>
+      <div class="confirmacao-botoes">
+        <button value="cancelar" autofocus>Cancelar</button>
+        <button value="confirmar" class="primario">Confirmar</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>

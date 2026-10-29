@@ -56,7 +56,7 @@ Mostrar: o admin cadastra cada pessoa, com um ou mais papéis (comprador, vendas
 
 ### 2. O tapete marrom parou de vender (1 min)
 
-Na janela do Rafa, o painel do repositor (`/ui/reposicao.html`) já abre com o sino aceso e o pop-up "1 SKU parou de vender com estoque". Ou:
+Na janela do Rafa, o dashboard (`/ui/dashboard.html`, a tela da TV do depósito) já abre com o quadrado do tapete marrom (`TAP-MARR-4060-01`) em primeiro, em laranja, "Parou de vender" no contador, o sino aceso e o pop-up "1 SKU parou de vender com estoque". Para agir, ele vai ao "Painel do repositor" (`/ui/reposicao.html`), a tela do tablet. Ou:
 
 ```bash
 como rafa "$API/reposicao/painel" | jq '.quedas_de_venda[] | {sku_code, cor, venda_diaria_base, ultimos_dias, venda_perdida, disponivel, setor: .setor.nome}'
@@ -141,9 +141,9 @@ como bia "$API/skus?busca=toalha%20banho%20bege%2070x140" | jq -c '[.[].sku_code
 como bia "$API/skus/TBC-BEGE-70140-02/disponibilidade" | jq -c '{disponivel, situacao, entregas}'
 ```
 
-![Consulta da vendedora no celular: tem pouco, 18 no estoque, vem 24 unidades por volta de 11/10](img/consulta.png)
+![Consulta da vendedora no celular: 18 unidades em estoque, vem 24 unidades com chegada prevista para 11/10](img/consulta.png)
 
-Mostrar: a vendedora responde o cliente no balcão sem ligar para ninguém: "Tem pouco", 18 no estoque, "Vem 24 unidades, chega por volta de 11/10", já com a nova previsão que a Carla registrou. Ela não vê preço nem fornecedor. O cliente quer 40, então ela toca em "Avisar o comprador", "Vendendo muito", "Cliente quer 40 toalhas e só chegam 24.". Ou:
+Mostrar: a vendedora responde o cliente no balcão sem ligar para ninguém: "Quantidade em estoque: 18 unidades", "Vem 24 unidades, chegada prevista para 11/10", já com a nova previsão que a Carla registrou. Ela não vê preço nem fornecedor. O cliente quer 40, então ela toca em "Avisar comprador", "Vendendo muito", "Cliente quer 40 toalhas e só chegam 24.". Ou:
 
 ```bash
 como bia -X POST "$API/avisos" -d '{"sku_code": "TBC-BEGE-70140-02", "tipo": "vendendo_muito", "comentario": "Cliente quer 40 toalhas e só chegam 24."}' | jq -c '{sku_code, tipo, avisado_por}'
@@ -153,7 +153,7 @@ Esperado: a toalha entra no topo do painel da Carla, em "Pedidos da equipe de ve
 
 ### 8. A vendedora vê a gôndola vazia (30 s)
 
-Passando pelos tapetes, a Bia vê que não há nenhum cinza exposto. Ela busca "tapete cinza", escolhe o `TAP-CINZ-4060-02`, toca em "Gôndola vazia": o setor já vem como Tapetes, porque o Copilot lembra o setor de cada SKU. Comenta "Cliente procurou o cinza e não tinha nenhum exposto." e avisa o repositor. Ou:
+Passando pelos tapetes, a Bia vê que não há nenhum cinza exposto. Ela busca "tapete cinza", escolhe o `TAP-CINZ-4060-02`, toca em "Avisar reposição": o setor já vem como Tapetes, porque o Copilot lembra o setor de cada SKU. Comenta "Cliente procurou o cinza e não tinha nenhum exposto." e avisa o repositor. Ou:
 
 ```bash
 como bia "$API/skus/TAP-CINZ-4060-02/setor" | jq -c '.setor'
@@ -172,26 +172,29 @@ Na janela do Rafa, o aviso da Bia está no topo do painel do repositor, em "Avis
 como rafa "$API/reposicao/painel" | jq -c '.avisos_de_gondola[] | {sku_code, setor: .setor.nome, avisado_por: [.avisos[].avisado_por], disponivel, produto_id}'
 ```
 
-No card, toque em "Montar a gôndola deste produto" (`/ui/gondola.html?produto=b9903f6e-8aed-5466-a9f0-7be5d46303cb`), digite 12 peças e toque em "Lembrar este número". Ou:
+No card, toque em "Montar a gôndola deste produto" (`/ui/gondola.html?produto=b9903f6e-8aed-5466-a9f0-7be5d46303cb`) e digite 12 peças. Ou:
 
 ```bash
 PRODUTO=b9903f6e-8aed-5466-a9f0-7be5d46303cb
 como rafa "$API/reposicao/produtos/$PRODUTO/mix?capacidade=12" \
   | jq -c '.skus[] | {cor, participacao: (.participacao * 100 | round), disponivel, quantidade}'
-como rafa -X PUT "$API/reposicao/produtos/$PRODUTO/capacidade" -d '{"capacidade": 12}' | jq -c '{capacidade}'
 ```
 
 ![Mix de gôndola do Tapete Banheiro: 12 peças divididas pela participação nas vendas](img/gondola.png)
 
-Mostrar: o problema da reunião, o repositor que expõe a mesma quantidade de cada cor. Com 12 lugares, o Copilot divide pela participação nas vendas dos últimos 90 dias abertos: 4 marrons (45%), 3 cinzas (23%), 2 azuis (14%), 2 beges (10%) e 1 branco (8%). Toda cor com estoque ganha ao menos uma peça e ninguém recebe mais do que tem no depósito. A conta é do código, sem IA. O número fica lembrado para a próxima vez. Depois de montar, o Rafa registra "Repus" no aviso:
+Mostrar: o problema da reunião, o repositor que expõe a mesma quantidade de cada cor. Com 12 lugares, o Copilot divide pela participação nas vendas dos últimos 90 dias abertos: 4 marrons (45%), 3 cinzas (23%), 2 azuis (14%), 2 beges (10%) e 1 branco (8%). Toda cor com estoque ganha ao menos uma peça e ninguém recebe mais do que tem no depósito. A conta é do código, sem IA. Depois de pôr as peças, o Rafa toca em "Montei a gôndola":
 
 ```bash
-como rafa -X POST "$API/skus/TAP-CINZ-4060-02/verificacoes" \
-  -d '{"resultado": "repus", "comentario": "Montei a gôndola de tapetes: 4 marrons, 3 cinzas, 2 azuis, 2 beges e 1 branco."}' \
-  | jq -c '{resultado, verificado_por}'
+como rafa -X POST "$API/reposicao/produtos/$PRODUTO/montagem" -d '{"capacidade": 12}' | jq -c '[.[] | .sku_code]'
 ```
 
-Esperado: o aviso fecha e o painel do repositor fica vazio.
+Esperado: o número fica lembrado, as 5 cores recebem "Repus", o aviso da Bia fecha e o painel do repositor fica vazio. Daqui em diante, o Copilot desconta da gôndola o que o ERP vender de cada cor e, quando sobrar meio dia de venda (pergunta 13), a cor volta ao dashboard como "Hora de repor", com as peças a levar do depósito. O seed não traz vendas depois de hoje; para ver a hora de repor sem esperar, finja que a montagem foi no último dia aberto, antes das vendas:
+
+```bash
+docker compose exec db psql -U copilot -d copilot -c \
+  "UPDATE copilot.verificacoes_gondola SET criado_em = criado_em - interval '3 days' WHERE sku_code LIKE 'TAP-%' AND resultado = 'repus'"
+como rafa "$API/reposicao/dashboard" | jq -c '.[] | {prioridade, sku_code, a_repor}'
+```
 
 ### 10. A vendedora acompanha os avisos dela (30 s)
 

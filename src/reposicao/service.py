@@ -25,12 +25,24 @@ que a verificação corrigiu, é o setor conhecido do SKU.
 O mix de gôndola divide a capacidade da gôndola de um produto entre as cores e tamanhos
 pela participação de cada SKU nas vendas do produto nos últimos `dias_mix_gondola` dias
 abertos. Também é conta, sem Jev.
+
+A hora de repor estima o que sobrou na gôndola de um SKU de produto com capacidade: as peças
+que o mix põe dele menos o que o ERP vendeu desde a última verificação `repus`. Quando a
+estimativa segura no máximo `piso_gondola_dias` dias da venda média do mix e o estoque tem
+mais do que isso, o SKU entra no painel do repositor. Sem verificação `repus`, não há de onde
+descontar e o SKU fica de fora.
+
+O dashboard do repositor junta os três grupos numa lista só, com cada SKU uma vez só, por
+prioridade: primeiro quem tem mais de um motivo (parou de vender, uma vendedora avisou, chegou
+a hora de repor), depois quem só parou de vender, depois as gôndolas vazias que as vendedoras
+avisaram e por fim a hora de repor.
 """
 from __future__ import annotations
 
 import math
 from collections.abc import Callable
 from datetime import UTC, date, datetime, time, timedelta
+from typing import get_args
 from uuid import UUID, uuid4
 
 from src.catalog.schemas import SKU
@@ -61,16 +73,20 @@ from src.reposicao.schemas import (
     DiaObservado,
     FiltroReposicao,
     ItemAvisoGondola,
+    ItemDoDashboard,
+    ItemHoraDeRepor,
     ItemQuedaDeVenda,
     MeuAvisoGondola,
     MixDeGondola,
     PainelDoRepositor,
+    Prioridade,
     ProdutoDaGondola,
     QuedaDeVenda,
     ResultadoVerificacao,
     Setor,
     SetorDoSku,
     SkuNoMix,
+    SugestaoDeReposicao,
     VerificacaoGondola,
 )
 from src.sales.schemas import VendasDoDia
@@ -125,6 +141,15 @@ def _desde(hoje: date, parametros: ParametrosPolitica) -> datetime:
     return datetime.combine(hoje - timedelta(days=dias), time(), tzinfo=UTC)
 
 
+def _desde_do_mix(hoje: date, parametros: ParametrosPolitica) -> datetime:
+    """Dias corridos que cobrem, com folga para domingos e feriados, os dias abertos do mix."""
+    return datetime.combine(hoje - timedelta(days=parametros.dias_mix_gondola * 3 // 2), time(), tzinfo=UTC)
+
+
+def _por_dia(vendas_diarias: dict[str, list[VendasDoDia]]) -> dict[str, dict[date, int]]:
+    return {codigo: {v.dia: v.quantidade for v in dias} for codigo, dias in vendas_diarias.items()}
+
+
 def _dias_abertos(vendas: dict[str, dict[date, int]], hoje: date) -> list[date]:
     """Do mais recente ao mais antigo, antes de hoje."""
     vendeu = {dia for por_dia in vendas.values() for dia, quantidade in por_dia.items() if quantidade > 0}
@@ -136,7 +161,7 @@ def quedas_de_venda(
 ) -> dict[str, QuedaDeVenda]:
     """Os SKUs com queda de venda. Sem dias abertos que bastem para a janela e para um dia
     de base, nenhum."""
-    vendas = {codigo: {v.dia: v.quantidade for v in dias} for codigo, dias in vendas_diarias.items()}
+    vendas = _por_dia(vendas_diarias)
     abertos = _dias_abertos(vendas, hoje)
     n = parametros.dias_observados_queda
     janela = list(reversed(abertos[:n]))
@@ -191,6 +216,34 @@ def dividir_a_gondola(capacidade: int, vendido: dict[str, int], disponivel: dict
     return quantidade
 
 
+def pecas_no_mix(
+    skus: list[SKU], capacidades: dict[UUID, CapacidadeGondola], vendido: dict[str, int], disponivel: dict[str, int]
+) -> dict[str, int]:
+    """Quantas peças o mix de hoje põe de cada SKU de produto com capacidade."""
+    por_produto: dict[UUID, list[str]] = {}
+    for sku in skus:
+        if sku.produto_id in capacidades:
+            por_produto.setdefault(sku.produto_id, []).append(sku.sku_code)
+    pecas: dict[str, int] = {}
+    for produto_id, codigos in por_produto.items():
+        pecas |= dividir_a_gondola(
+            capacidades[produto_id].capacidade,
+            {c: vendido.get(c, 0) for c in codigos},
+            {c: disponivel.get(c, 0) for c in codigos},
+        )
+    return pecas
+
+
+def _pedidas(avisos: list[AvisoGondola]) -> int | None:
+    """As peças do aviso mais recente que diz quantas. `avisos` do mais antigo para o
+    mais recente."""
+    return next((a.pecas for a in reversed(avisos) if a.pecas), None)
+
+
+def _motivos(item: ItemDoDashboard) -> int:
+    return (item.queda is not None) + bool(item.avisos) + (item.hora_de_repor is not None)
+
+
 def _ainda_verificado(queda: QuedaDeVenda, verificacao: VerificacaoGondola | None) -> bool:
     """Nenhum dia aberto inteiro fechou depois da verificação."""
     return verificacao is not None and verificacao.criado_em.astimezone(UTC).date() >= queda.ultimos_dias[-1].dia
@@ -240,13 +293,16 @@ class Reposicao:
     def quedas_de_venda(self, parametros: ParametrosPolitica) -> dict[str, QuedaDeVenda]:
         """As quedas de venda de todos os SKUs ativos, com ou sem estoque, numa leitura só
         das vendas diárias."""
-        hoje = self._relogio().astimezone(UTC).date()
+        hoje = self._hoje()
         return quedas_de_venda(self._sales.vendas_diarias_de_todos(_desde(hoje, parametros)), hoje, parametros)
 
     def _na_lista(
-        self, skus: list[SKU], estoques: dict[str, Estoque], verificacoes: dict[str, VerificacaoGondola]
+        self,
+        skus: list[SKU],
+        estoques: dict[str, Estoque],
+        verificacoes: dict[str, VerificacaoGondola],
+        quedas: dict[str, QuedaDeVenda],
     ) -> list[ItemQuedaDeVenda]:
-        quedas = self.quedas_de_venda(self._politicas.ativa().parametros)
         return [
             ItemQuedaDeVenda(sku=sku, disponivel=estoque.quantidade_disponivel, queda=queda)
             for sku in skus
@@ -264,19 +320,72 @@ class Reposicao:
                 abertos.setdefault(aviso.sku_code, []).append(aviso)
         return abertos
 
+    def _hora_de_repor(
+        self,
+        skus: list[SKU],
+        disponivel: dict[str, int],
+        pecas: dict[str, int],
+        vendido: dict[str, int],
+        dias: int,
+        parametros: ParametrosPolitica,
+    ) -> list[ItemHoraDeRepor]:
+        """Sem ordem e sem setor. `pecas` e `vendido` só têm os SKUs de produto com
+        capacidade; `vendido`, na janela de `dias` dias abertos do mix."""
+        reposicoes = self._verificacoes.ultimas("repus")
+        candidatos = [
+            ItemHoraDeRepor(
+                sku=s,
+                disponivel=disponivel[s.sku_code],
+                pecas_no_mix=pecas[s.sku_code],
+                venda_media_diaria=vendido[s.sku_code] / dias,
+                reposicao=reposicoes[s.sku_code],
+                vendido_desde=0,
+            )
+            for s in skus
+            if s.sku_code in pecas
+            and s.sku_code in reposicoes
+            and pecas[s.sku_code]
+            and vendido[s.sku_code]
+        ]
+        if not candidatos:
+            return []
+        vendido_desde = self._sales.vendido_depois_de({i.sku.sku_code: i.reposicao.criado_em for i in candidatos})
+        itens = [i.model_copy(update={"vendido_desde": vendido_desde.get(i.sku.sku_code, 0)}) for i in candidatos]
+        return [i for i in itens if i.dias_na_gondola <= parametros.piso_gondola_dias and i.disponivel > i.na_gondola]
+
+    def _hoje(self) -> date:
+        return self._relogio().astimezone(UTC).date()
+
     def painel(self, filtro: FiltroReposicao | None = None) -> PainelDoRepositor:
         """Primeiro os SKUs ativos com aviso de gôndola vazia aberto, do aviso mais antigo
         para o mais recente. Depois os SKUs ativos com queda de venda e disponível maior que
         zero, menos os verificados sem um dia aberto inteiro depois, da maior venda perdida
         para a menor (o código desempata). Um SKU com aviso e queda fica só no primeiro
-        grupo, com a queda. O setor de cada SKU é o conhecido. Um número fixo de leituras."""
-        filtro = filtro or FiltroReposicao()
+        grupo, com a queda. Por fim a hora de repor dos outros SKUs, de quem segura menos
+        dias na gôndola para quem segura mais (a venda maior e o código desempatam). O setor
+        de cada SKU é o conhecido. Um número fixo de leituras."""
+        return self._painel(filtro or FiltroReposicao())[0]
+
+    def _painel(self, filtro: FiltroReposicao) -> tuple[PainelDoRepositor, dict[str, int], dict[str, ItemHoraDeRepor]]:
+        """O painel, as peças que o mix de hoje põe de cada SKU de produto com capacidade e a
+        hora de repor dos SKUs que ficaram nos avisos ou nas quedas."""
         palavras = palavras_da_busca(filtro.busca or "")
         skus = self._catalog.listar_skus()
         estoques = self._inventory.estoques()
         verificacoes = self._verificacoes.ultimas()
-        quedas = {item.sku.sku_code: item for item in self._na_lista(skus, estoques, verificacoes)}
+        parametros = self._politicas.ativa().parametros
+        capacidades = self._capacidades.todas()
+        hoje = self._hoje()
+        desde = min(_desde(hoje, parametros), _desde_do_mix(hoje, parametros)) if capacidades else _desde(hoje, parametros)
+        vendas_diarias = self._sales.vendas_diarias_de_todos(desde)
+        todas_as_quedas = quedas_de_venda(vendas_diarias, hoje, parametros)
+        quedas = {item.sku.sku_code: item for item in self._na_lista(skus, estoques, verificacoes, todas_as_quedas)}
         abertos = self._avisos_abertos(verificacoes)
+        disponivel = {codigo: e.quantidade_disponivel for codigo, e in estoques.items()}
+        vendas = _por_dia(vendas_diarias)
+        janela = _dias_abertos(vendas, hoje)[: parametros.dias_mix_gondola] if capacidades else []
+        vendido = {codigo: sum(do_sku.get(dia, 0) for dia in janela) for codigo, do_sku in vendas.items()}
+        pecas = pecas_no_mix(skus, capacidades, vendido, disponivel) if janela else {}
         setores = {s.id: s for s in self._setores.listar()}
         setor_do_sku = {codigo: setores[s.setor_id] for codigo, s in self._setores.dos_skus().items()}
 
@@ -306,7 +415,85 @@ class Reposicao:
             if codigo not in abertos and passa(item.sku)
         ]
         itens.sort(key=lambda i: (-i.queda.venda_perdida, i.sku.sku_code))
-        return PainelDoRepositor(avisos_de_gondola=avisos, quedas_de_venda=itens)
+        todas_as_horas = [
+            item.model_copy(update={"setor": setor_do_sku.get(item.sku.sku_code)})
+            for item in self._hora_de_repor(skus, disponivel, pecas, vendido, len(janela), parametros)
+            if passa(item.sku)
+        ]
+        em_outro_grupo = {
+            item.sku.sku_code: item for item in todas_as_horas if item.sku.sku_code in abertos or item.sku.sku_code in quedas
+        }
+        hora_de_repor = [item for item in todas_as_horas if item.sku.sku_code not in em_outro_grupo]
+        hora_de_repor.sort(key=lambda i: (i.dias_na_gondola, -i.venda_media_diaria, i.sku.sku_code))
+        painel = PainelDoRepositor(avisos_de_gondola=avisos, quedas_de_venda=itens, hora_de_repor=hora_de_repor)
+        return painel, pecas, em_outro_grupo
+
+    def dashboard(self) -> list[ItemDoDashboard]:
+        """As gôndolas do painel do repositor numa lista só, um SKU uma vez só, por
+        prioridade. Primeiro quem tem mais de um motivo (queda de venda, aviso de gôndola
+        vazia, hora de repor), dos mais motivos para os menos; depois quem só parou de vender,
+        da maior venda perdida para a menor; depois quem só foi avisado, do aviso mais antigo
+        para o mais recente; por fim quem só chegou à hora de repor, na ordem do painel. Com
+        queda ou aviso a gôndola está vazia: repõe as peças que a vendedora pediu no aviso
+        mais recente que diz quantas, se não as do mix de hoje, sem `a_repor` quando o
+        produto não tem capacidade ou o mix não põe nenhuma peça dele."""
+        painel, pecas, horas = self._painel(FiltroReposicao())
+        itens = [
+            *(
+                ItemDoDashboard(
+                    prioridade="parou_de_vender",
+                    sku=i.sku,
+                    disponivel=i.disponivel,
+                    setor=i.setor,
+                    queda=i.queda,
+                    hora_de_repor=horas.get(i.sku.sku_code),
+                )
+                for i in painel.quedas_de_venda
+            ),
+            *(
+                ItemDoDashboard(
+                    prioridade="gondola_vazia",
+                    sku=i.sku,
+                    disponivel=i.disponivel,
+                    setor=i.setor,
+                    queda=i.queda,
+                    avisos=i.avisos,
+                    hora_de_repor=horas.get(i.sku.sku_code),
+                )
+                for i in painel.avisos_de_gondola
+            ),
+        ]
+        itens = [
+            i.model_copy(
+                update={
+                    "prioridade": "mais_de_um_motivo" if _motivos(i) > 1 else i.prioridade,
+                    "a_repor": _pedidas(i.avisos) or pecas.get(i.sku.sku_code) or None,
+                }
+            )
+            for i in itens
+        ]
+        itens += [
+            ItemDoDashboard(
+                prioridade="hora_de_repor",
+                sku=i.sku,
+                disponivel=i.disponivel,
+                setor=i.setor,
+                hora_de_repor=i,
+                a_repor=i.a_repor,
+            )
+            for i in painel.hora_de_repor
+        ]
+        ordem = {p: n for n, p in enumerate(get_args(Prioridade))}
+        posicao_no_painel = {i.sku.sku_code: n for n, i in enumerate(itens)}
+        return sorted(
+            itens,
+            key=lambda i: (
+                ordem[i.prioridade],
+                -_motivos(i),
+                -(i.queda.venda_perdida if i.queda else 0),
+                posicao_no_painel[i.sku.sku_code],
+            ),
+        )
 
     def varrer_episodios(self) -> None:
         """Abre e fecha os episódios de queda de venda pelos SKUs do painel do repositor de
@@ -327,7 +514,10 @@ class Reposicao:
                 },
             )
             for item in self._na_lista(
-                self._catalog.listar_skus(), self._inventory.estoques(), self._verificacoes.ultimas()
+                self._catalog.listar_skus(),
+                self._inventory.estoques(),
+                self._verificacoes.ultimas(),
+                self.quedas_de_venda(self._politicas.ativa().parametros),
             )
         ]
         self._notificacoes.varrer(TIPOS_DE_EPISODIO, condicoes)
@@ -402,7 +592,12 @@ class Reposicao:
         return verificacao
 
     def registrar_aviso_gondola(
-        self, sku_code: str, setor_id: UUID, autor: Usuario, comentario: str | None = None
+        self,
+        sku_code: str,
+        setor_id: UUID,
+        autor: Usuario,
+        comentario: str | None = None,
+        pecas: int | None = None,
     ) -> AvisoGondola:
         """Guarda o disponível do ERP no momento, lembra o setor como o setor conhecido do SKU
         e notifica na hora o papel `reposicao`. Lança `SKUNaoEncontrado`, `SKUInativo`,
@@ -418,6 +613,7 @@ class Reposicao:
             avisado_por=autor.nome,
             usuario_id=autor.id,
             criado_em=self._relogio(),
+            pecas=pecas,
         )
         self._avisos.gravar(aviso)
         self._setores.lembrar(
@@ -436,11 +632,32 @@ class Reposicao:
                     "avisado_por": autor.nome,
                     "comentario": aviso.comentario,
                     "disponivel_no_erp": disponivel,
+                    "pecas": pecas,
                 },
             ),
             aviso.criado_em,
         )
         return aviso
+
+    def sugestao_de_reposicao(self, sku_code: str) -> SugestaoDeReposicao:
+        """Para o aviso de gôndola vazia: com a gôndola vazia, repõe as peças do mix de hoje
+        do SKU, com a capacidade gravada do produto. Lança `SKUNaoEncontrado`."""
+        sku = self._catalog.carregar_sku(sku_code)
+        if sku is None:
+            raise SKUNaoEncontrado(sku_code)
+        mix = self.mix(sku.produto_id)
+        linha = next((s for s in mix.skus if s.sku.sku_code == sku_code), None)
+        if linha is None:
+            return SugestaoDeReposicao(pecas=None, capacidade=mix.capacidade, disponivel=0)
+        return SugestaoDeReposicao(pecas=linha.quantidade, capacidade=mix.capacidade, disponivel=linha.disponivel)
+
+    def avisos_de_gondola_abertos(self, sku_code: str) -> list[AvisoGondola]:
+        """Do SKU, do mais recente para o mais antigo. Lança `SKUNaoEncontrado`."""
+        if self._catalog.carregar_sku(sku_code) is None:
+            raise SKUNaoEncontrado(sku_code)
+        verificacoes = self._verificacoes.listar(sku_code)
+        ultima = verificacoes[0] if verificacoes else None
+        return [a for a in self._avisos.listar(sku_code) if _aberto(a, ultima)]
 
     def meus_avisos_de_gondola(self, autor: Usuario) -> list[MeuAvisoGondola]:
         """Os avisos de gôndola vazia do usuário nos últimos `PRAZO_DE_MEUS_AVISOS`, do mais
@@ -495,14 +712,10 @@ class Reposicao:
         skus = self._skus_do_produto(produto_id)
         gravada = self._capacidades.do_produto(produto_id)
         capacidade = capacidade or (gravada.capacidade if gravada else None)
-        hoje = self._relogio().astimezone(UTC).date()
-        dias = self._politicas.ativa().parametros.dias_mix_gondola
-        desde = datetime.combine(hoje - timedelta(days=dias * 3 // 2), time(), tzinfo=UTC)
-        vendas = {
-            codigo: {v.dia: v.quantidade for v in lista}
-            for codigo, lista in self._sales.vendas_diarias_de_todos(desde).items()
-        }
-        janela = _dias_abertos(vendas, hoje)[:dias]
+        hoje = self._hoje()
+        parametros = self._politicas.ativa().parametros
+        vendas = _por_dia(self._sales.vendas_diarias_de_todos(_desde_do_mix(hoje, parametros)))
+        janela = _dias_abertos(vendas, hoje)[: parametros.dias_mix_gondola]
         vendido = {s.sku_code: sum(vendas.get(s.sku_code, {}).get(dia, 0) for dia in janela) for s in skus}
         estoques = self._inventory.estoques()
         disponivel = {s.sku_code: e.quantidade_disponivel if (e := estoques.get(s.sku_code)) else 0 for s in skus}
@@ -530,6 +743,17 @@ class Reposicao:
         )
         self._capacidades.gravar(gravada)
         return gravada
+
+    def registrar_montagem(self, produto_id: UUID, capacidade: int, autor: Usuario) -> list[VerificacaoGondola]:
+        """O repositor montou a gôndola do produto pelo mix: grava a capacidade e registra
+        `repus`, como em `registrar_verificacao`, em cada SKU em que o mix põe alguma peça.
+        Lança `ProdutoNaoEncontrado`."""
+        self.gravar_capacidade(produto_id, capacidade, autor)
+        return [
+            self.registrar_verificacao(s.sku.sku_code, "repus", autor)
+            for s in self.mix(produto_id).skus
+            if s.quantidade
+        ]
 
     def setores(self) -> list[Setor]:
         """Todos, ativos ou não, pelo nome."""

@@ -40,6 +40,7 @@ def make_sku(
     gramatura: int | None = 400,
     material: str | None = "algodão 100%",
     ativo: bool = True,
+    ean: str | None = None,
 ) -> SKU:
     return SKU(
         id=uid("sku", sku_code),
@@ -52,6 +53,7 @@ def make_sku(
         gramatura=gramatura,
         material=material,
         ativo=ativo,
+        ean=ean,
     )
 
 

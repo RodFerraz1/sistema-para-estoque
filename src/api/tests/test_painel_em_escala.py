@@ -1,7 +1,7 @@
 """O painel, a tela de Estoque, o painel do repositor, o mix de gôndola e a varredura das
 notificações leem o estoque inteiro num retrato em lote: o número de consultas ao banco não
 depende do número de SKUs. Conta as consultas de `GET /painel`, `GET /estoque`,
-`GET /reposicao/painel`, `GET /reposicao/produtos/{id}/mix` e `GET /notificacoes` contra o
+`GET /reposicao/painel`, `GET /reposicao/dashboard`, `GET /reposicao/produtos/{id}/mix` e `GET /notificacoes` contra o
 Postgres, com o que já estiver no banco e com 30 SKUs a mais.
 O tempo com 5.000 SKUs fica no benchmark (`scripts/benchmark_painel.py`), fora da suíte.
 Pulado sem banco."""
@@ -78,7 +78,7 @@ def _consultas(client: TestClient, rota: str) -> int:
     return len(consultas)
 
 
-@pytest.mark.parametrize("rota", ["/painel", "/estoque", "/reposicao/painel"])
+@pytest.mark.parametrize("rota", ["/painel", "/estoque", "/reposicao/painel", "/reposicao/dashboard"])
 def test_faz_o_mesmo_numero_de_consultas_com_mais_skus(client: TestClient, rota: str) -> None:
     antes = _consultas(client, rota)
 

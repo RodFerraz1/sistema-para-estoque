@@ -72,8 +72,9 @@ def buscar_skus(
     busca: str = Query(..., min_length=2, max_length=100),
     catalog: Catalog = Depends(get_catalog),
 ) -> list[SKUResumoResponse]:
-    """Busca da página de aviso: até 20 SKUs ativos com todas as palavras no código, no
-    nome do produto, na cor ou no tamanho, sem diferenciar acento nem maiúscula."""
+    """Busca da página de aviso: o SKU ativo com esse código de barras (EAN) ou até 20 SKUs
+    ativos com todas as palavras no código, no nome do produto, na cor ou no tamanho, sem
+    diferenciar acento nem maiúscula."""
     return [
         SKUResumoResponse(sku_code=s.sku_code, produto_nome=s.produto_nome, cor=s.cor, tamanho=s.tamanho)
         for s in catalog.buscar_skus(busca)

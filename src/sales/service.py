@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Mapping
 from datetime import UTC, datetime
 
 from src.erp_adapter.port import ERPAdapter
@@ -85,6 +86,11 @@ class Sales:
         """As vendas dos SKUs ativos desde `desde`, somadas por dia em UTC, numa leitura só.
         SKU sem venda fica de fora."""
         return self._erp.vendas_diarias(desde)
+
+    def vendido_depois_de(self, momentos: Mapping[str, datetime]) -> dict[str, int]:
+        """Para cada SKU ativo de `momentos`, quanto vendeu depois do momento, numa leitura
+        só. SKU sem venda depois dele fica de fora."""
+        return self._erp.vendido_depois_de(momentos)
 
     def giro(self, vendas_por_mes: list[VendasDoMes], meses: int = 6) -> GiroMedioMensal:
         """Média dos `meses` fechados antes do mês corrente. Com menos histórico que isso,

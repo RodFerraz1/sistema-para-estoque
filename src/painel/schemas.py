@@ -12,7 +12,8 @@ from src.inventory.schemas import StatusEmTransito
 from src.politica_compra.schemas import MotivoAlerta
 from src.reposicao.schemas import VerificacaoGondola
 
-TipoAviso = Literal["acabou", "vendendo_muito"]
+TipoAvisoDeVendas = Literal["acabou", "vendendo_muito"]
+TipoAviso = Literal["acabou", "vendendo_muito", "faltou_na_gondola"]
 TipoDecisao = Literal["vou_comprar", "negociando", "nao_comprar_agora"]
 GrupoDoPainel = Literal[
     "pedidos_de_vendas", "estoque_divergente", "entregas_atrasadas", "em_ruptura", "vao_faltar", "outros_alertas"
@@ -33,9 +34,11 @@ POR_PAGINA_MAXIMO = 100
 
 
 class Aviso(BaseModel):
-    """Recado da equipe de vendas sobre um SKU. Fica aberto até uma decisão de compra
-    do mesmo SKU registrada depois dele: não há coluna de status. `avisado_por` é o nome
-    de quem avisou no momento; `usuario_id` é nulo nos avisos de antes do login."""
+    """Recado ao comprador sobre um SKU: da equipe de vendas (`acabou`, `vendendo_muito`)
+    ou do repositor (`faltou_na_gondola`, com a `quantidade` de peças que faltaram no
+    depósito para repor a gôndola). Fica aberto até uma decisão de compra do mesmo SKU
+    registrada depois dele: não há coluna de status. `avisado_por` é o nome de quem avisou
+    no momento; `usuario_id` é nulo nos avisos de antes do login."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -46,6 +49,7 @@ class Aviso(BaseModel):
     avisado_por: str
     usuario_id: UUID | None
     criado_em: datetime
+    quantidade: int | None = None
 
 
 class DecisaoCompra(BaseModel):
@@ -220,6 +224,16 @@ class PrevisaoDeChegada(BaseModel):
     atrasada: bool
 
 
+class CompraACaminho(BaseModel):
+    """O que falta chegar de um pedido de compra para um SKU do produto, para a vendedora
+    ver todas as cores e tamanhos que vêm. Ver `PrevisaoDeChegada`."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sku: SKU
+    chegada: PrevisaoDeChegada
+
+
 class Disponibilidade(BaseModel):
     """Se o SKU tem estoque e o que vem de compra, sem preço de compra nem fornecedor.
     `pouco` é em ruptura (cobertura abaixo do piso de alerta) e `acabou` é disponível zero."""
@@ -279,13 +293,14 @@ class PainelDeAlertas(BaseModel):
 class FiltroEstoque(BaseModel):
     """Vazio, não filtra. `busca` segue a regra do `catalog.buscar_skus`; `situacao` é
     `em_ruptura` (cobertura abaixo do piso de alerta), `sem_venda` (sem giro) ou
-    `com_transito` (compra a caminho)."""
+    `com_transito` (compra a caminho); `fornecedor_id` é de um fornecedor que vende o SKU."""
 
     model_config = ConfigDict(frozen=True)
 
     busca: str | None = None
     categoria: str | None = None
     situacao: SituacaoEstoque | None = None
+    fornecedor_id: UUID | None = None
 
 
 class ItemEstoque(BaseModel):

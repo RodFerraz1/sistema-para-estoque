@@ -18,7 +18,14 @@ from src.reposicao.repositorio import (
     SetorJaExiste,
     VerificacoesRepositorio,
 )
-from src.reposicao.schemas import AvisoGondola, CapacidadeGondola, Setor, SetorDoSku, VerificacaoGondola
+from src.reposicao.schemas import (
+    AvisoGondola,
+    CapacidadeGondola,
+    ResultadoVerificacao,
+    Setor,
+    SetorDoSku,
+    VerificacaoGondola,
+)
 
 # O id em texto desempata como o `str(id)` das versões em memória.
 _ORDEM = "ORDER BY criado_em DESC, id::text DESC"
@@ -54,13 +61,14 @@ class PostgresVerificacoesRepositorio(VerificacoesRepositorio):
             ).all()
         return [VerificacaoGondola.model_validate(row._asdict()) for row in rows]
 
-    def ultimas(self) -> dict[str, VerificacaoGondola]:
+    def ultimas(self, resultado: ResultadoVerificacao | None = None) -> dict[str, VerificacaoGondola]:
         sql = (
             f"SELECT DISTINCT ON (sku_code) {', '.join(_CAMPOS)} FROM copilot.verificacoes_gondola "
+            f"{'WHERE resultado = :resultado ' if resultado else ''}"
             "ORDER BY sku_code, criado_em DESC, id::text DESC"
         )
         with self._engine.connect() as conn:
-            rows = conn.execute(text(sql)).all()
+            rows = conn.execute(text(sql), {"resultado": resultado}).all()
         return {row.sku_code: VerificacaoGondola.model_validate(row._asdict()) for row in rows}
 
 

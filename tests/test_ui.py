@@ -21,6 +21,7 @@ PAGINAS = [
     "reposicao.html",
     "setores.html",
     "gondola.html",
+    "dashboard.html",
 ]
 PAPEL_DAS_PAGINAS = {
     "index.html": "comprador",
@@ -30,6 +31,7 @@ PAPEL_DAS_PAGINAS = {
     "aviso.html": "vendas",
     "reposicao.html": "reposicao",
     "gondola.html": "reposicao",
+    "dashboard.html": "reposicao",
     "usuarios.html": "admin",
     "setores.html": "admin",
 }
@@ -39,7 +41,7 @@ PAGINAS_DO_COMPRADOR = {
     "politica.html": "politica.js",
     "estoque.html": "estoque.js",
 }
-TIPOS = {".html": "text/html", ".css": "text/css", ".js": "text/javascript"}
+TIPOS = {".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".png": "image/png"}
 REFERENCIA_NO_HTML = re.compile(r'(?:src|href)="([^"]+)"')
 IMPORT_NO_JS = re.compile(r'from\s+"\./([^"]+)"')
 CHAMADA_DA_API = re.compile(r'api\(\s*"([A-Z]+)",\s*["`]([^"`]+)["`]')
@@ -164,23 +166,27 @@ def test_cada_pagina_chama_a_api() -> None:
     }
     assert chamadas["conta.js"] == [("PUT", "/eu/senha")]
     assert set(chamadas["notificacoes.js"]) == {("GET", "/notificacoes"), ("POST", "/notificacoes/vistas")}
-    assert set(chamadas["estoque.js"]) == {("GET", "/estoque?${consulta}"), ("GET", "/categorias")}
+    assert set(chamadas["estoque.js"]) == {("GET", "/estoque?${consulta}"), ("GET", "/categorias"), ("GET", "/fornecedores")}
     assert set(chamadas["reposicao.js"]) == {
         ("GET", "/reposicao/painel?${consulta}"),
         ("GET", "/categorias"),
         ("GET", "/setores"),
         ("POST", "/skus/${encodeURIComponent(item.sku_code)}/verificacoes"),
+        ("POST", "/skus/${encodeURIComponent(item.sku_code)}/falta-na-gondola"),
     }
     assert {
         ("GET", "/setores"),
         ("GET", "/skus/${encodeURIComponent(s.sku_code)}/setor"),
+        ("GET", "/skus/${encodeURIComponent(s.sku_code)}/avisos-gondola"),
         ("POST", "/avisos-gondola"),
     } <= set(chamadas["aviso.js"])
     assert set(chamadas["gondola.js"]) == {
         ("GET", "/reposicao/produtos?${consulta}"),
         ("GET", "/reposicao/produtos/${produtoId}/mix?${consulta}"),
         ("PUT", "/reposicao/produtos/${produtoId}/capacidade"),
+        ("POST", "/reposicao/produtos/${produtoId}/montagem"),
     }
+    assert chamadas["dashboard.js"] == [("GET", "/reposicao/dashboard")]
     assert set(chamadas["setores.js"]) == {("GET", "/setores"), ("POST", "/setores"), ("PUT", "/setores/${setor.id}")}
 
 
@@ -225,7 +231,7 @@ def test_painel_tem_link_para_a_pagina_de_aviso_e_nao_tem_mais_o_link_publico() 
 
 
 def test_aviso_e_decisao_nao_pedem_mais_o_nome() -> None:
-    for pagina, script, campo in [("aviso.html", "aviso.js", "avisado_por"), ("sku.html", "sku.js", "decidido_por:")]:
+    for pagina, script, campo in [("aviso.html", "aviso.js", "avisado_por:"), ("sku.html", "sku.js", "decidido_por:")]:
         assert "Seu nome" not in (UI_DIR / pagina).read_text()
         js = (UI_DIR / script).read_text()
         assert campo not in js and "lerNome" not in js and "guardarNome" not in js
@@ -266,7 +272,7 @@ def test_estoque_tem_a_barra_de_filtros_do_painel_com_os_nomes_da_api() -> None:
     parametros = {p["name"] for p in app.openapi()["paths"]["/estoque"]["get"]["parameters"] if p["in"] == "query"}
     campos = set(re.findall(r'<(?:input|select) id="[\w-]+" name="(\w+)"', html))
 
-    assert campos == {"busca", "categoria", "situacao", "ordem"}
+    assert campos == {"busca", "categoria", "situacao", "fornecedor", "ordem"}
     assert campos | {"pagina", "por_pagina"} == parametros
     assert 'id="limpar-filtros"' in html
     assert "barraDeFiltros(" in estoque and "guardarNaUrl(" in estoque
@@ -281,11 +287,13 @@ def test_menu_do_comprador_tem_o_estoque_logo_depois_do_painel() -> None:
     assert telas[:2] == [("comprador", "index.html"), ("comprador", "estoque.html")]
 
 
-def test_decididos_ficam_recolhidos_por_padrao() -> None:
+def test_painel_abre_nas_prioridades_e_os_grupos_viram_filtros() -> None:
     painel = (UI_DIR / "painel.js").read_text()
 
-    assert "Decididos nos últimos 7 dias" in painel
-    assert re.search(r'"details",\s*\{ class: "card decididos"[^}]*\}', painel)
+    assert 'get("ver") ?? PRIORIDADES.id' in painel
+    assert "const visoes = [PRIORIDADES, ...grupos, DECIDIDOS]" in painel
+    assert 'class: "resumo"' not in painel
+    assert 'id="visoes"' in (UI_DIR / "index.html").read_text()
 
 
 def test_chat_html_saiu(client: TestClient) -> None:
@@ -350,7 +358,7 @@ def test_painel_do_repositor_e_de_celular_com_os_filtros_da_api() -> None:
 def test_politica_pergunta_a_sensibilidade_da_queda_de_venda() -> None:
     html = (UI_DIR / "politica.html").read_text()
 
-    for campo in ("dias_observados_queda", "venda_diaria_minima_queda", "limiar_queda", "dias_mix_gondola"):
+    for campo in ("dias_observados_queda", "venda_diaria_minima_queda", "limiar_queda", "dias_mix_gondola", "piso_gondola_dias"):
         assert f'name="{campo}"' in html
     assert "a validar com o comprador" in html
 
@@ -363,3 +371,28 @@ def test_montar_gondola_e_de_celular_e_os_cards_do_repositor_levam_ate_ela() -> 
     assert 'href: "gondola.html", rotulo: "Montar gôndola"' in (UI_DIR / "comum.js").read_text()
     assert "Montar a gôndola deste produto" in (UI_DIR / "reposicao.js").read_text()
     assert "gondola.html?produto=" in (UI_DIR / "reposicao.js").read_text()
+
+
+def test_dashboard_e_a_tela_inicial_do_repositor_e_se_atualiza_sozinho() -> None:
+    html = (UI_DIR / "dashboard.html").read_text()
+    js = (UI_DIR / "dashboard.js").read_text()
+    comum = (UI_DIR / "comum.js").read_text()
+
+    assert 'name="viewport"' in html and "chat" not in html.lower()
+    assert comum.index('href: "dashboard.html", rotulo: "Dashboard"') < comum.index('href: "reposicao.html"')
+    assert '"/reposicao/dashboard"' in js and "setInterval(atualizar" in js
+    assert "<form" not in html and "<input" not in html
+
+
+def test_painel_do_repositor_tem_a_hora_de_repor_e_a_gondola_registra_a_montagem() -> None:
+    assert "Hora de repor" in (UI_DIR / "reposicao.js").read_text()
+    assert "/montagem" in (UI_DIR / "gondola.js").read_text()
+
+
+def test_consulta_da_vendedora_le_o_codigo_de_barras_pela_camera() -> None:
+    html = (UI_DIR / "aviso.html").read_text()
+    leitor = (UI_DIR / "leitor.js").read_text()
+    ids = set(re.findall(r'getElementById\("([^"]+)"\)', leitor))
+    assert ids and all(f'id="{i}"' in html for i in ids)
+    assert 'from "./leitor.js"' in (UI_DIR / "aviso.js").read_text()
+    assert "barcode-detector@3.2.2/" in leitor

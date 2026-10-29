@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Estoque - Copilot de Compras</title>
+  <title>Estoque - Integração - Bandfashion</title>
+  <link rel="icon" href="logo.png">
   <link rel="stylesheet" href="estilo.css">
   <script type="module" src="estoque.js"></script>
 </head>
 <body>
   <header>
     <div class="conteudo">
-      <strong class="marca">Copilot de Compras</strong>
+      <strong class="marca">Integração - Bandfashion</strong>
       <nav aria-label="Telas do Copilot"></nav>
       <button id="abrir-chat" type="button" class="abrir-chat" aria-expanded="false" aria-controls="chat-lateral">Perguntar ao Copilot</button>
     </div>
@@ -26,6 +27,7 @@
       <input id="filtro-busca" name="busca" type="search" autocomplete="off" enterkeyhint="search" maxlength="100" placeholder="Buscar código, nome, cor, tamanho" aria-label="Buscar por código, nome, cor ou tamanho">
       <select id="filtro-categoria" name="categoria" aria-label="Categoria"><option value="">Todas as categorias</option></select>
       <select id="filtro-situacao" name="situacao" aria-label="Situação"><option value="">Todas as situações</option></select>
+      <select id="filtro-fornecedor" name="fornecedor" aria-label="Fornecedor"><option value="">Todos os fornecedores</option></select>
       <button id="limpar-filtros" class="limpar-filtros" type="button" hidden>Limpar filtros</button>
     </form>
     <div class="barra-estoque" hidden>

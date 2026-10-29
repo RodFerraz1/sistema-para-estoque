@@ -77,12 +77,18 @@ class Catalog:
         return sorted(nomes.items(), key=lambda par: _normalizar(par[1]))
 
     def buscar_skus(self, texto: str, limite: int = 20) -> list[SKU]:
-        """SKUs ativos cujo código, nome do produto, cor ou tamanho contêm todas as
-        palavras de `texto`, sem diferenciar acento nem maiúscula. Ordem: nome do
-        produto, cor e tamanho."""
+        """O SKU ativo cujo código de barras (EAN) é `texto`, quando há. Senão, os SKUs
+        ativos cujo código, nome do produto, cor ou tamanho contêm todas as palavras de
+        `texto`, sem diferenciar acento nem maiúscula. Ordem: nome do produto, cor e tamanho.
+        O EAN não entra na busca por palavras: os dígitos de um tamanho como 70x140
+        casariam com metade dos códigos de barras."""
         palavras = palavras_da_busca(texto)
         if not palavras:
             return []
-        achados = [sku for sku in self._erp.listar_skus() if sku_contem_todas(sku, palavras)]
+        skus = self._erp.listar_skus()
+        pelo_ean = [sku for sku in skus if sku.ean is not None and sku.ean == texto.strip()]
+        if pelo_ean:
+            return pelo_ean
+        achados = [sku for sku in skus if sku_contem_todas(sku, palavras)]
         achados.sort(key=ordem_por_nome)
         return achados[:limite]

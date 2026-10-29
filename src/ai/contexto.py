@@ -62,7 +62,11 @@ _MOTIVOS_DE_ALERTA: dict[MotivoAlerta, str] = {
     MotivoAlerta.ABAIXO_PEDIDO_MINIMO: "a compra sugerida fica abaixo do pedido mínimo do fornecedor",
     MotivoAlerta.PERIODO_SAZONAL: "a compra chega em época forte de vendas",
 }
-_TIPOS_DE_AVISO: dict[TipoAviso, str] = {"acabou": "Acabou", "vendendo_muito": "Vendendo muito"}
+_TIPOS_DE_AVISO: dict[TipoAviso, str] = {
+    "acabou": "Acabou",
+    "vendendo_muito": "Vendendo muito",
+    "faltou_na_gondola": "Faltou no depósito para repor a gôndola",
+}
 # O Brasil não tem horário de verão desde 2019.
 _BRASILIA = timezone(timedelta(hours=-3))
 _TAG_DE_TRECHO = re.compile(r"<(/?)(trecho)", re.IGNORECASE)
@@ -235,8 +239,9 @@ def _item_alerta(item: ItemAlerta) -> str:
 
 
 def _aviso(aviso: Aviso) -> str:
+    falta = f" ({_unidades(aviso.quantidade)} a menos)" if aviso.quantidade else ""
     texto = (
-        f"{_TIPOS_DE_AVISO[aviso.tipo]}, avisado por {aviso.avisado_por} "
+        f"{_TIPOS_DE_AVISO[aviso.tipo]}{falta}, avisado por {aviso.avisado_por} "
         f"em {_data(aviso.criado_em)}"
     )
     return f'{texto}: "{aviso.comentario}"' if aviso.comentario else texto

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import UTC, date, datetime
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from typing import cast
 from uuid import UUID
 
@@ -228,6 +228,15 @@ class InMemoryERPAdapter(ERPAdapter):
         for venda in self.vendas:
             if venda.sku_id in ativos and venda.data >= desde:
                 yield ativos[venda.sku_id], venda
+
+    def vendido_depois_de(self, momentos: Mapping[str, datetime]) -> dict[str, int]:
+        if not momentos:
+            return {}
+        somas: dict[str, int] = defaultdict(int)
+        for codigo, venda in self._vendas_ativas(min(momentos.values())):
+            if codigo in momentos and venda.data > momentos[codigo]:
+                somas[codigo] += venda.quantidade
+        return dict(somas)
 
     def fornecedores_por_sku(self) -> dict[str, list[FornecedorParaSKU]]:
         por_sku = {codigo: self.fornecedores_de(codigo) for codigo in self._ativos().values()}

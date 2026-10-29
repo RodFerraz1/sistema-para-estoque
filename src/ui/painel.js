@@ -1,7 +1,6 @@
 import { montarChat } from "./chat.js";
 import {
   MOTIVOS,
-  TIPOS_DE_AVISO,
   api,
   barraDeFiltros,
   cabecalho,
@@ -12,12 +11,14 @@ import {
   el,
   guardarNaUrl,
   hojeIso,
+  info,
   mensagem,
   nomeDaCategoria,
   numero,
   quando,
   resumoDaDecisao,
   selosDeMotivo,
+  tipoDoAviso,
 } from "./comum.js";
 
 cabecalho("comprador");
@@ -30,8 +31,8 @@ const filtros = barraDeFiltros(document.getElementById("filtros"), carregar);
 const GRUPOS = [
   {
     id: "pedidos_de_vendas",
-    titulo: "Pedidos da equipe de vendas",
-    descricao: () => "Avisos que as vendedoras mandaram e ainda não têm decisão.",
+    titulo: "Pedidos da loja",
+    descricao: () => "Avisos que as vendedoras e o repositor mandaram e ainda não têm decisão.",
     cor: "var(--vendas)",
   },
   {
@@ -104,7 +105,7 @@ function recado(item) {
   return el(
     "div",
     { class: "recado" },
-    el("strong", {}, `${TIPOS_DE_AVISO[ultimo.tipo]}`),
+    el("strong", {}, tipoDoAviso(ultimo)),
     ` · ${ultimo.avisado_por}, ${quando(ultimo.criado_em)}${outros}`,
     ultimo.comentario ? [el("br"), el("q", {}, ultimo.comentario)] : null,
   );
@@ -145,7 +146,7 @@ function motivosAlemDoGrupo(item, grupo) {
   return item.motivos.filter((m) => m !== MOTIVO_DO_GRUPO[grupo]);
 }
 
-function cartao(item, { id, cor }, piso) {
+function cartao(item, { id, cor, titulo }, piso, comOrigem = false) {
   const motivos = motivosAlemDoGrupo(item, id);
   const zerado = item.disponivel === 0;
   return el(
@@ -154,6 +155,7 @@ function cartao(item, { id, cor }, piso) {
     el(
       "div",
       { class: "item-produto" },
+      comOrigem ? el("small", { class: "origem" }, titulo) : null,
       el("strong", {}, item.produto_nome),
       el("span", {}, `${item.cor} · ${item.tamanho}`),
       el("code", {}, item.sku_code),
@@ -312,67 +314,93 @@ function fornecedorAtrasado(f) {
   );
 }
 
-function cabecalhoDoGrupo({ id, titulo, descricao }, contagem, piso) {
-  return el(
-    "header",
-    {},
-    el("h2", { id: `t-${id}` }, titulo),
-    el("span", { class: "contagem" }, String(contagem)),
-    el("p", { class: "suave" }, descricao(piso)),
+const PRIORIDADES = {
+  id: "prioridades",
+  titulo: "Prioridades",
+  descricao: (piso) =>
+    `O que não pode esperar: estoque divergente, produto zerado, pedido da loja, o que vai acabar antes de uma compra feita hoje chegar, o que parou de vender e entrega atrasada com produto em ruptura. Os outros alertas, como estoque abaixo de ${dias(piso)} de venda, ficam nos filtros.`,
+  cor: "var(--primaria)",
+};
+
+const DECIDIDOS = {
+  id: "decididos",
+  titulo: "Decididos",
+  descricao: () => "Decisões de compra dos últimos 7 dias. O produto volta para o painel quando a decisão faz 7 dias ou quando chega um aviso novo.",
+  cor: "var(--sucesso)",
+};
+
+const zerado = (item) => item.disponivel === 0 && item.cobertura_atual_dias !== null;
+
+// Menor número, mais urgente; null fica fora das prioridades.
+function urgencia(item) {
+  if (item.grupo === "estoque_divergente") return 0;
+  if (zerado(item)) return 1;
+  if (item.grupo === "pedidos_de_vendas") return 2;
+  if (item.grupo === "vao_faltar" || item.motivos.includes("ruptura_antes_da_chegada")) return 3;
+  if (item.parou_de_vender) return 4;
+  return null;
+}
+
+function prioridades(alertas) {
+  const cobertura = (item) => item.cobertura_atual_dias ?? Infinity;
+  return alertas
+    .filter((item) => urgencia(item) !== null)
+    .sort((a, b) => urgencia(a) - urgencia(b) || cobertura(a) - cobertura(b));
+}
+
+function cabecalhoDaVisao({ id, titulo, descricao }, piso) {
+  return el("header", {}, el("h2", { id: `t-${id}` }, titulo), info(descricao(piso)));
+}
+
+function secao(visao, piso, ...filhos) {
+  return el("section", { class: "grupo", id: visao.id, "aria-labelledby": `t-${visao.id}` }, cabecalhoDaVisao(visao, piso), filhos);
+}
+
+function nadaNaVisao(titulo) {
+  return el("div", { class: "card vazio" }, el("strong", {}, `Nada em ${titulo.toLowerCase()}`), el("p", { class: "suave" }, "Quando aparecer, fica aqui."));
+}
+
+function visaoDePrioridades(itens, fornecedores, restantes, piso) {
+  const doItem = (item) => GRUPOS.find((g) => g.id === item.grupo);
+  const mais = restantes
+    ? el(
+        "p",
+        { class: "suave mais-alertas" },
+        `Mais ${plural(restantes, "alerta menos urgente", "alertas menos urgentes")} nos filtros acima.`,
+      )
+    : null;
+  if (itens.length === 0 && fornecedores.length === 0) {
+    return secao(
+      PRIORIDADES,
+      piso,
+      el("div", { class: "card vazio" }, el("strong", {}, "Nada urgente agora"), el("p", { class: "suave" }, "Nenhum produto faltando e nenhum pedido da loja esperando decisão.")),
+      mais,
+    );
+  }
+  return secao(
+    PRIORIDADES,
+    piso,
+    el("div", { class: "itens" }, itens.map((item) => cartao(item, doItem(item), piso, true)), fornecedores.map(fornecedorAtrasado)),
+    mais,
   );
 }
 
-function grupoDeEntregas(g, itens, fornecedores) {
-  if (fornecedores.length === 0) return null;
-  return el(
-    "section",
-    { class: "grupo", id: g.id, "aria-labelledby": `t-${g.id}` },
-    cabecalhoDoGrupo(g, itens.length),
-    el("div", { class: "itens" }, fornecedores.map(fornecedorAtrasado)),
-  );
+function visaoDoGrupo(g, itens, piso) {
+  return secao(g, piso, itens.length ? el("div", { class: "itens" }, itens.map((item) => cartao(item, g, piso))) : nadaNaVisao(g.titulo));
 }
 
-function grupo(g, itens, piso) {
-  const doGrupo = { id: g.id, cor: g.cor };
-  if (itens.length === 0) return null;
-  return el(
-    "section",
-    { class: "grupo", id: g.id, "aria-labelledby": `t-${g.id}` },
-    cabecalhoDoGrupo(g, itens.length, piso),
-    el("div", { class: "itens" }, itens.map((item) => cartao(item, doGrupo, piso))),
-  );
+function visaoDeEntregas(g, fornecedores) {
+  return secao(g, null, fornecedores.length ? el("div", { class: "itens" }, fornecedores.map(fornecedorAtrasado)) : nadaNaVisao(g.titulo));
 }
 
-function resumo(grupos, contagens, decididos) {
-  return el(
-    "div",
-    { class: "resumo" },
-    grupos.map((g) =>
-      el(
-        "a",
-        { href: `#${g.id}`, style: `--cor: ${contagens[g.id] ? g.cor : "var(--borda-forte)"}` },
-        el("strong", {}, String(contagens[g.id])),
-        el("span", {}, g.titulo),
-      ),
-    ),
-    el(
-      "a",
-      { href: "#decididos", style: "--cor: var(--sucesso)" },
-      el("strong", {}, String(decididos.length)),
-      el("span", {}, "Decididos nos últimos 7 dias"),
-    ),
-  );
-}
-
-function decididos(itens) {
-  return el(
-    "details",
-    { class: "card decididos", id: "decididos" },
-    el("summary", {}, el("strong", {}, `Decididos nos últimos 7 dias (${itens.length})`)),
+function visaoDeDecididos(itens) {
+  return secao(
+    DECIDIDOS,
+    null,
     itens.length
       ? el(
           "ul",
-          { class: "historico" },
+          { class: "card historico" },
           itens.map(({ decisao, ...sku }) =>
             el(
               "li",
@@ -383,9 +411,37 @@ function decididos(itens) {
             ),
           ),
         )
-      : el("p", { class: "suave" }, "Nenhuma decisão de compra nos últimos 7 dias."),
-    el("p", { class: "suave" }, "O produto volta para o painel quando a decisão faz 7 dias ou quando chega um aviso novo."),
+      : el("div", { class: "card vazio" }, el("strong", {}, "Nenhuma decisão nos últimos 7 dias")),
   );
+}
+
+function barraDeVisoes(visoes, contagens) {
+  return el(
+    "div",
+    { class: "visoes", role: "group", "aria-label": "O que mostrar no painel" },
+    visoes.map((v) =>
+      el(
+        "button",
+        {
+          type: "button",
+          class: contagens[v.id] ? null : "sem-itens",
+          "aria-pressed": String(v.id === visao),
+          style: `--cor: ${v.cor}`,
+          onclick: () => trocarVisao(v.id),
+        },
+        v.titulo,
+        el("span", { class: "contagem" }, String(contagens[v.id])),
+      ),
+    ),
+  );
+}
+
+function trocarVisao(id) {
+  visao = id;
+  history.replaceState(null, "", location.pathname + location.search);
+  guardarEstadoNaUrl();
+  mostrar(ultimoPainel, politica);
+  barraVisoes.querySelector('[aria-pressed="true"]').focus();
 }
 
 function skusComErro(codigos) {
@@ -419,50 +475,71 @@ function mostrar(painel, politica) {
   for (const item of painel.alertas) porGrupo[item.grupo].push(item);
   pararamDeVender = new Set(painel.alertas.filter((i) => i.parou_de_vender).map((i) => i.sku_code));
   porGrupo.pedidos_de_vendas.sort((a, b) => b.ultimo_aviso.criado_em.localeCompare(a.ultimo_aviso.criado_em));
-  const comFiltro = Object.keys(filtros.valores()).length > 0;
-  const vazio = comFiltro ? nenhumComFiltros() : tudoEmDia();
+
+  const comEntregas = grupos.some((g) => g.id === "entregas_atrasadas");
+  const urgentes = prioridades(painel.alertas);
+  const cobrarJa = comEntregas ? painel.entregas_atrasadas.filter((f) => f.tem_sku_em_ruptura) : [];
+  const visoes = [PRIORIDADES, ...grupos, DECIDIDOS];
+  const contagens = {
+    ...painel.contagens,
+    prioridades: urgentes.length + cobrarJa.length,
+    decididos: painel.decididos.length,
+  };
+  if (!visoes.some((v) => v.id === visao)) visao = PRIORIDADES.id;
+  barraVisoes.replaceChildren(barraDeVisoes(visoes, contagens));
+
+  const g = grupos.find((x) => x.id === visao);
+  let corpo;
+  if (visao === DECIDIDOS.id) corpo = visaoDeDecididos(painel.decididos);
+  else if (painel.alertas.length === 0) corpo = Object.keys(filtros.valores()).length ? nenhumComFiltros() : tudoEmDia();
+  else if (visao === PRIORIDADES.id) corpo = visaoDePrioridades(urgentes, cobrarJa, painel.alertas.length - urgentes.length, piso);
+  else if (g.id === "entregas_atrasadas") corpo = visaoDeEntregas(g, painel.entregas_atrasadas);
+  else corpo = visaoDoGrupo(g, porGrupo[g.id], piso);
+
   const recado = recadoDaCobranca;
   recadoDaCobranca = null;
-  conteudo.replaceChildren(
-    el(
-      "div",
-      {},
-      recado ? mensagem("sucesso", recado) : null,
-      skusComErro(painel.skus_com_erro),
-      resumo(grupos, painel.contagens, painel.decididos),
-      painel.alertas.length
-        ? grupos.map((g) =>
-            g.id === "entregas_atrasadas"
-              ? grupoDeEntregas(g, porGrupo[g.id], painel.entregas_atrasadas)
-              : grupo(g, porGrupo[g.id], piso),
-          )
-        : vazio,
-      decididos(painel.decididos),
-    ),
-  );
+  conteudo.replaceChildren(el("div", {}, recado ? mensagem("sucesso", recado) : null, skusComErro(painel.skus_com_erro), corpo));
 }
 
 function montarFiltros(politica, categorias, fornecedores) {
   const ruptura = "abaixo_do_piso_alerta";
   const motivos = [...politica.parametros.motivos_de_alerta].sort((a, b) => (b === ruptura) - (a === ruptura));
   filtros.opcoes("categoria", categorias.map((c) => [c, nomeDaCategoria(c)]));
-  filtros.opcoes("motivo", [["aviso", "Aviso da equipe de vendas"], ...motivos.map((m) => [m, MOTIVOS[m] ?? m])]);
+  filtros.opcoes("motivo", [["aviso", "Aviso da loja"], ...motivos.map((m) => [m, MOTIVOS[m] ?? m])]);
   filtros.opcoes("fornecedor", fornecedores.map((f) => [f.id, f.nome]));
   filtros.mostrar();
 }
 
+const barraVisoes = document.getElementById("visoes");
+
+function visaoDoEndereco() {
+  const ancora = location.hash.slice(1);
+  if (ancora.startsWith("pedido-")) return "entregas_atrasadas";
+  if (ancora) return ancora;
+  return new URLSearchParams(location.search).get("ver") ?? PRIORIDADES.id;
+}
+
+function guardarEstadoNaUrl() {
+  guardarNaUrl({ ...filtros.valores(), ...(visao === PRIORIDADES.id ? {} : { ver: visao }) });
+}
+
+let visao = visaoDoEndereco();
+let ultimoPainel;
 let politica;
 let pararamDeVender = new Set();
 let ultimaConsulta = 0;
 let recadoDaCobranca = null;
 
 async function carregar() {
-  const consulta = guardarNaUrl(filtros.valores());
+  guardarEstadoNaUrl();
+  const consulta = new URLSearchParams(filtros.valores()).toString();
   const numero = ++ultimaConsulta;
   conteudo.setAttribute("aria-busy", "true");
   try {
     const painel = await api("GET", `/painel?${consulta}`);
-    if (numero === ultimaConsulta) mostrar(painel, politica);
+    if (numero !== ultimaConsulta) return;
+    ultimoPainel = painel;
+    mostrar(painel, politica);
   } catch (e) {
     if (numero !== ultimaConsulta) return;
     conteudo.replaceChildren(mensagem("erro", e.status === 503 ? e.message : `Não foi possível calcular o painel: ${e.message}`));
@@ -480,7 +557,7 @@ try {
   politica = politicaAtiva;
   montarFiltros(politica, categorias, fornecedores);
   await carregar();
-  const ancora = location.hash && document.getElementById(location.hash.slice(1));
+  const ancora = location.hash.startsWith("#pedido-") && document.getElementById(location.hash.slice(1));
   if (ancora) {
     ancora.classList.add("em-foco");
     ancora.scrollIntoView();

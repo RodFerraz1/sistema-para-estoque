@@ -26,6 +26,10 @@ _Avoid_: vendedor (sozinho), time comercial.
 Unidade individual comercializável, definida por combinação de modelo, cor, tamanho e material. Ex: "Toalha Banho Conforto Bege 70x140". Um mesmo produto de catálogo pode ter dezenas de SKUs.
 _Avoid_: produto (impreciso), item.
 
+**Código de barras (EAN)**:
+O EAN-13 impresso na etiqueta do SKU. A vendedora lê com a câmera do celular ou com o leitor de mão, ou digita os números, e a consulta abre direto no SKU. Na busca, só o código inteiro casa: um pedaço dos números não acha nada.
+_Avoid_: código (sozinho, confunde com o código do SKU), barcode.
+
 **Pedido de compra**:
 Compromisso formal do atacadista com um fornecedor pra receber quantidades específicas de SKUs em uma data futura, sob condições comerciais definidas (preço, prazo de pagamento, frete).
 _Avoid_: purchase order (usar em inglês só em código quando for API/DTO), ordem de compra, encomenda.
@@ -110,6 +114,10 @@ _Avoid_: recomendação, pedido sugerido, proposta.
 Recado da equipe de vendas ao comprador chefe sobre um SKU: `acabou` ou `vendendo muito`, com comentário opcional, em nome do usuário que avisou. Fica aberto até o comprador chefe registrar uma decisão de compra para o SKU. É um sinal humano e põe o SKU no painel mesmo quando o cálculo não vê problema. A vendedora acompanha o desfecho em "Meus avisos".
 _Avoid_: alerta (é o que o `purchasing` calcula), pedido, solicitação, chamado.
 
+**Falta na gôndola**:
+Aviso do repositor ao comprador chefe (`faltou_na_gondola`): a gôndola precisava de mais peças do que o depósito tinha. O repositor repõe o que tem, diz quantas a gôndola precisava e quantas pôs, e o aviso leva a diferença. Funciona como o aviso da equipe de vendas: entra em "Pedidos da loja" no painel, fecha com a decisão de compra e a decisão notifica o repositor. A reposição parcial também fecha o aviso de gôndola vazia, e a vendedora vê quantas foram.
+_Avoid_: ruptura (é o cálculo da cobertura), pedido de compra, estoque divergente (é quando o ERP diz que tem e o depósito não tem nada).
+
 **Motivo de alerta**:
 Alerta do `purchasing` que o comprador chefe escolheu, na política de compra, para pôr um SKU no painel de alertas. Padrão: ruptura (abaixo do piso de alerta). Ruptura antes da chegada só faz sentido com o lead time ligado (ADR-0006).
 _Avoid_: prioridade, risco (genérico demais), motivo de destaque (nome antigo, da fila de aprovação).
@@ -161,7 +169,7 @@ SKU que vende com regularidade e cuja venda nos últimos dias abertos ficou muit
 _Avoid_: venda parada, anomalia, encalhe (é o sinal do corpus sobre compra anterior).
 
 **Aviso de gôndola vazia**:
-Recado da vendedora ao repositor de que a gôndola de um SKU está vazia, com o setor. Fica aberto até a verificação de gôndola do SKU, cujo resultado a vendedora vê em "Meus avisos". Não é o aviso ao comprador: tem outro destino e fecha de outro jeito.
+Recado da vendedora ao repositor de que a gôndola de um SKU está vazia, com o setor e, opcionalmente, quantas peças levar do depósito. A sugestão de peças é a parte do SKU no mix de gôndola, e a vendedora pode mudar; o que ela pede vale no dashboard do repositor no lugar do mix. Fica aberto até a verificação de gôndola do SKU, cujo resultado a vendedora vê em "Meus avisos". Não é o aviso ao comprador: tem outro destino e fecha de outro jeito.
 _Avoid_: aviso (sozinho é o recado ao comprador), pedido de reposição, chamado.
 
 **Setor**:
@@ -181,8 +189,20 @@ Dia em que a loja vendeu alguma coisa. É a régua da queda de venda e da partic
 _Avoid_: dia útil, dia de loja (sozinho).
 
 **Painel do repositor**:
-Tela inicial do repositor. Lista os SKUs que provavelmente faltam na gôndola: primeiro os avisos de gôndola vazia abertos, depois a queda de venda com estoque disponível. Um SKU com os dois aparece uma vez.
+Tela de trabalho do repositor, no tablet. Lista os SKUs que provavelmente faltam na gôndola: primeiro os avisos de gôndola vazia abertos, depois a queda de venda com estoque disponível e por fim a hora de repor, cada um com a verificação de gôndola. Um SKU aparece uma vez.
 _Avoid_: fila do repositor, lista de reposição.
+
+**Dashboard do repositor**:
+Tela inicial do repositor, feita para uma TV no depósito: só mostra, sem nada para preencher, as gôndolas a repor, um quadrado por SKU com o setor, o código, o produto e quantas peças levar. Cada SKU aparece uma vez só, mesmo com mais de um motivo. Primeiro quem tem mais de um motivo (parou de vender, uma vendedora avisou, chegou a hora de repor), depois quem só parou de vender, depois os avisos de gôndola vazia e por fim a hora de repor. Atualiza sozinha.
+_Avoid_: painel (sozinho é o do comprador ou o do repositor), monitor, TV.
+
+**Hora de repor**:
+SKU de um produto com capacidade da gôndola cuja gôndola, descontado o que vendeu desde a última verificação `repus`, segura no máximo `piso_gondola_dias` dias de venda (padrão meio dia: cabem 100, vende 50 por dia, repor um dia e meio depois de encher), e que tem no depósito mais do que se estima na gôndola. Sem `repus` registrado, o Copilot não sabe de onde descontar.
+_Avoid_: reposição programada, ruptura de gôndola, piso (sozinho é o de compra).
+
+**Montagem da gôndola**:
+O repositor monta a gôndola de um produto pelo mix e avisa o Copilot: a capacidade fica gravada e cada SKU com peça no mix recebe uma verificação `repus`. É o ponto de partida da hora de repor.
+_Avoid_: planograma, abastecimento.
 
 **Participação nas vendas**:
 Fração da venda de um produto que vem de um SKU dele (uma cor e um tamanho), numa janela de dias abertos. Base do mix de gôndola. Aparece também para o comprador chefe.
